@@ -43,8 +43,20 @@ pub fn router(state: AppState) -> Router {
             post(routes::reports::append).get(routes::reports::sync),
         )
         .route("/api/hunts/{code}/stream", get(routes::stream::stream))
-        .route("/health", get(|| async { "ok" }))
+        .route("/health", get(health))
         .with_state(state)
+}
+
+/// Liveness, and the clock reference the client measures its own skew against.
+///
+/// `no-store` is load-bearing rather than hygiene: a cached response carries a stale `Date`, and a
+/// client measuring against it would compute the cache's age instead of its clock's error — either
+/// warning about a good clock or, worse, staying quiet about a bad one.
+async fn health() -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CACHE_CONTROL, "no-store, max-age=0")],
+        "ok",
+    )
 }
 
 /// Bridges Postgres NOTIFY into the in-process broadcast the SSE handlers subscribe to.

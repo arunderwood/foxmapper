@@ -134,15 +134,15 @@ each sees the other three on their own device within seconds.
 > are deliberately coarse. SC-001a/b and SC-008 are unverifiable until they exist, which is why T070
 > is the real gate.
 
-- [ ] T049 [US1] Join flow in `web/src/ui/join.ts` — open link, pick callsign, report. No account, no round-trip, **works offline once loaded**
-- [ ] T050 [US1] Map view in `web/src/ui/map-view.ts` — primary view; shows whether you are seeing everyone's reports or only what your device holds (FR-018) and the unsynced queue depth
-- [ ] T051 [US1] Report entry surface in `web/src/ui/report-entry.ts` — all four kinds reachable from one place, none presented as lesser (FR-005d); targets large enough for a gloved thumb; **under 10 seconds is the requirement, not an aspiration**
-- [ ] T052 [P] [US1] Target display in `web/src/ui/target.ts` — frequency, label, found-state in the primary view (FR-004b)
-- [ ] T053 [P] [US1] Limits notice in `web/src/ui/limits.ts` — not certified for life-safety search; the picture is only as good as the reports entered (FR-022); anyone with the code can join and report (FR-027)
-- [ ] T054 [P] [US1] Clock warning in `web/src/ui/clock-warning.ts` — warn above 2 minutes, **never silently correct** (FR-009c)
-- [ ] T055 [US1] Last-hunt memory in `web/src/ui/last-hunt.ts` — reopen the last hunt on return; **no hunt list, no switcher, no multi-hunt view** (FR-004c/d)
-- [ ] T056 [US1] Service worker app-shell precache in `web/public/sw.ts` — **app shell only; tiles are not pre-fetched**
-- [ ] T057 [P] [US1] Storage durability in `web/src/ui/storage.ts` — call `navigator.storage.persist()`, offer Add to Home Screen as an **offer never a gate**, surface unsynced count
+- [X] T049 [US1] Join flow in `web/src/ui/join.ts` — open link, pick callsign, report. No account, no round-trip, **works offline once loaded**
+- [X] T050 [US1] Map view in `web/src/ui/map-view.ts` — primary view; shows whether you are seeing everyone's reports or only what your device holds (FR-018) and the unsynced queue depth
+- [X] T051 [US1] Report entry surface in `web/src/ui/report-entry.ts` — all four kinds reachable from one place, none presented as lesser (FR-005d); targets large enough for a gloved thumb; **under 10 seconds is the requirement, not an aspiration**
+- [X] T052 [P] [US1] Target display in `web/src/ui/target.ts` — frequency, label, found-state in the primary view (FR-004b)
+- [X] T053 [P] [US1] Limits notice in `web/src/ui/limits.ts` — not certified for life-safety search; the picture is only as good as the reports entered (FR-022); anyone with the code can join and report (FR-027)
+- [X] T054 [P] [US1] Clock warning in `web/src/ui/clock-warning.ts` — warn above 2 minutes, **never silently correct** (FR-009c)
+- [X] T055 [US1] Last-hunt memory in `web/src/ui/last-hunt.ts` — reopen the last hunt on return; **no hunt list, no switcher, no multi-hunt view** (FR-004c/d)
+- [X] T056 [US1] Service worker app-shell precache in `web/public/sw.ts` — **app shell only; tiles are not pre-fetched**
+- [X] T057 [P] [US1] Storage durability in `web/src/ui/storage.ts` — call `navigator.storage.persist()`, offer Add to Home Screen as an **offer never a gate**, surface unsynced count
 
 ### Tests for User Story 1 (per [quickstart.md](quickstart.md))
 
@@ -150,7 +150,7 @@ each sees the other three on their own device within seconds.
 - [ ] T059 [P] [US1] E2E two-device propagation in `web/tests/e2e/shared-picture.spec.ts` — report visible on the other device in **under 5 s** (SC-002); omni and null render without implying direction; retraction propagates
 - [ ] T060 [P] [US1] E2E relayed attribution in `web/tests/e2e/relay.spec.ts` — **0 relayed reports attributed to the operator who typed them** (SC-011); relay marking visible
 - [ ] T061 [P] [US1] E2E offline in `web/tests/e2e/offline.spec.ts` — **real airplane mode, HTTP cache cleared**; three reports accepted and rendered locally; survives force-quit; 100% present after reconnect (SC-005); blank basemap is expected, a lost report is not
-- [ ] T062 [US1] Manual SSE check per [quickstart.md](quickstart.md) Level 2 — `curl -N` shows events arriving one at a time; **a burst means a proxy is buffering and SC-002 is failing invisibly**
+- [X] T062 [US1] Manual SSE check per [quickstart.md](quickstart.md) Level 2 — `curl -N` shows events arriving one at a time; **a burst means a proxy is buffering and SC-002 is failing invisibly**
 - [ ] T063 [US1] Manual sensor checks per [quickstart.md](quickstart.md) Level 4 on real iOS and Android — declination applied (Bellingham ~15.2°); **stand next to a car and confirm the 10–30° swing**; clock set to 2030 does not crash
 - [ ] T064 [US1] Manual iOS storage checks per [quickstart.md](quickstart.md) Level 4 — the two things research could **not** verify from primary sources: does `persist()` beat the ITP 7-day rule, and does Add to Home Screen discard the tab's cache
 - [ ] T065 [US1] Jargon review of every reachable screen against [contracts/aprs-mapping.md § Vocabulary firewall](contracts/aprs-mapping.md) — **0 occurrences** of NRQ, DFS, PHG, Q, R, N, S or any raw digit (SC-008)

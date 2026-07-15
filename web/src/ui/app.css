@@ -1,0 +1,301 @@
+/*
+ * Field styling. Every rule here is answering a condition outdoors, not a taste.
+ *
+ * The screen is dimmed, the sun is on it, the hunter has one hand free and gloves on. That sets
+ * the contrast, the target size, and the refusal to put anything important behind a tap.
+ */
+
+:root {
+  --bg: #101418;
+  --surface: #1a2027;
+  --surface-raised: #232b34;
+  --line: #39424d;
+  --text: #f2f5f8;
+  --text-dim: #a8b3bf;
+  --accent: #4b9fff;
+  --warn: #ffb02e;
+  --danger: #ff6b5a;
+
+  /* SC-001a: a gloved thumb. 44px is the documented floor; this is the field, so it is bigger. */
+  --touch: 56px;
+  --radius: 10px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* No pull-to-refresh: a hunter dragging the map must not reload the app mid-report. */
+  overscroll-behavior: none;
+  /* The page itself never scrolls — only the panels inside it do. A map that can be dragged off
+     the top of the screen is a map a hunter has to fight. */
+  overflow: hidden;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Typography ---- */
+
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.2;
+}
+h1 {
+  font-size: 1.5rem;
+}
+h2 {
+  font-size: 1.1rem;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+/* ---- Controls ---- */
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: var(--touch);
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  /* Nothing here is a double-tap target; kill the 300ms delay and the zoom. */
+  touch-action: manipulation;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04121f;
+  font-weight: 600;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04121f;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input {
+  font: inherit;
+  /* 16px minimum, or iOS zooms the viewport on focus and the hunter loses the map. */
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: var(--touch);
+  padding: 0 0.75rem;
+  width: 100%;
+}
+
+/* ---- Layout ---- */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  flex: 1;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.choices {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* ---- Map ---- */
+
+.map-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * The status bar. FR-018 and the queue depth live in the PRIMARY view — never a tooltip, never a
+ * dismissible modal. A hunter must be able to see, without tapping anything, whether they are
+ * looking at everyone's reports or only what their own phone holds.
+ */
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+  background: linear-gradient(to bottom, rgba(16, 20, 24, 0.94), rgba(16, 20, 24, 0));
+  pointer-events: none;
+}
+
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  /* A warning that runs off the edge of the screen has not been given to anyone. Long ones wrap
+     rather than truncate — the constitution puts these in the primary view to be read. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.chip.warn,
+.chip.danger {
+  white-space: normal;
+  border-radius: var(--radius);
+}
+
+.chip.warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.chip.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.report-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  padding: 0.5rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  background: rgba(16, 20, 24, 0.94);
+  border-top: 1px solid var(--line);
+}
+
+/*
+ * All four kinds sit side by side at the same size. FR-005d: none is presented as lesser — a
+ * hunter with a stock antenna is not filing a second-class report, and the layout must not say
+ * otherwise.
+ */
+.report-bar button {
+  flex-direction: column;
+  font-size: 0.8rem;
+  padding: 0.5rem 0.25rem;
+  min-height: var(--touch);
+}
+
+/* The licence requires the attribution be present, so it is lifted clear of the report bar
+   rather than sitting under it. */
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  bottom: calc(var(--touch) + 1rem);
+}
+
+/* ---- Sheet ---- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 92%;
+  overflow-y: auto;
+  background: var(--surface);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 1.25rem;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.5rem;
+}
+
+/* ---- Notices ---- */
+
+.notice {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  border-radius: 50%;
+  margin-right: 0.35em;
+  vertical-align: baseline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

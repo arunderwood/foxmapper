@@ -44,9 +44,9 @@ export function createBasemap(options: BasemapOptions): MapLibreMap {
     maxTileCacheSize: 200,
   });
 
-  map.addControl(
-    new maplibregl.AttributionControl({ compact: false, customAttribution: ATTRIBUTION }),
-  );
+  // The style's own sources already carry exactly the required attribution, so adding it as
+  // customAttribution here renders it twice. The licence needs it present, not doubled.
+  map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
   map.on('error', (event) => {
     // An unreachable tile host is what a hunt looks like. Surfacing it as an error would train

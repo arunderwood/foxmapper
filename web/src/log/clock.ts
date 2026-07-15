@@ -32,7 +32,11 @@ export type ClockOffset = number | null;
 export async function measureOffset(db: FoxmapperDb, apiOrigin: string): Promise<ClockOffset> {
   try {
     const before = Date.now();
-    const response = await fetch(`${apiOrigin}/health`, { cache: 'no-store' });
+    // Cache-busted by URL, not only by `cache: 'no-store'`: a proxy or the browser's memory cache
+    // will happily serve a response — and its minutes-old `Date` header — with a 0 ms round-trip.
+    // A stale Date makes this measure the cache's age instead of the clock's error, which would
+    // either warn about a good clock or, worse, stay quiet about a bad one.
+    const response = await fetch(`${apiOrigin}/health?t=${before}`, { cache: 'no-store' });
     const after = Date.now();
 
     const serverDate = response.headers.get('date');
