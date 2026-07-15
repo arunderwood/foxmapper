@@ -88,11 +88,11 @@ III and IV live entirely in this phase, and it is testable with no browser, no m
 
 ### The client spine
 
-- [ ] T032 IndexedDB persistence keyed by report id in `web/src/log/store.ts` — load-all-on-open; survives force-quit (depends on T009)
-- [ ] T033 Local participant identity in `web/src/log/identity.ts` per [contracts/http-api.md § Joining is local](contracts/http-api.md#joining-is-a-purely-local-act) — mint `participant_id` on first use, **works with the network already gone**
-- [ ] T034 Outbound queue and sync in `web/src/log/sync.ts` — queue drains only on `2xx`; `429` is retryable and never drops a report; SSE with `Last-Event-ID`; re-create `EventSource` on `readyState === CLOSED` with backoff; polling fallback on the same cursor (depends on T032)
-- [ ] T035 Clock offset measurement in `web/src/log/clock.ts` per FR-009a/b — measure against the server on load, retain for offline use, write `clock_offset_ms` on every authored report, **`null` when never measured (not 0)**
-- [ ] T036 Divergence audit in `web/src/log/audit.ts` — compare `id_digest`; **only when the outbound queue is empty**; full `ids` diff only on mismatch (depends on T034)
+- [X] T032 IndexedDB persistence keyed by report id in `web/src/log/store.ts` — load-all-on-open; survives force-quit (depends on T009)
+- [X] T033 Local participant identity in `web/src/log/identity.ts` per [contracts/http-api.md § Joining is local](contracts/http-api.md#joining-is-a-purely-local-act) — mint `participant_id` on first use, **works with the network already gone**
+- [X] T034 Outbound queue and sync in `web/src/log/sync.ts` — queue drains only on `2xx`; `429` is retryable and never drops a report; SSE with `Last-Event-ID`; re-create `EventSource` on `readyState === CLOSED` with backoff; polling fallback on the same cursor (depends on T032)
+- [X] T035 Clock offset measurement in `web/src/log/clock.ts` per FR-009a/b — measure against the server on load, retain for offline use, write `clock_offset_ms` on every authored report, **`null` when never measured (not 0)**
+- [X] T036 Divergence audit in `web/src/log/audit.ts` — compare `id_digest`; **only when the outbound queue is empty**; full `ids` diff only on mismatch (depends on T034)
 
 **Checkpoint**: The domain and the spine are done and provable without a browser. Principles III and
 IV are satisfied or they are not, and you can tell from `npm run test:unit` and `cargo test`.
