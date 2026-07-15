@@ -39,14 +39,14 @@ Two deployables per [plan.md § Project Structure](plan.md): `server/` (Rust rel
 
 **Purpose**: Toolchains and skeletons. Nothing here knows what a bearing is.
 
-- [ ] T001 Create `server/` and `web/` directory skeletons per [plan.md § Source Code](plan.md)
-- [ ] T002 [P] Initialize Rust project in `server/Cargo.toml` with `axum`, `tokio`, `sqlx` (postgres, runtime-tokio), `serde`, `uuid`
-- [ ] T003 [P] Initialize TypeScript project in `web/package.json` with `vite`, `maplibre-gl` 5.x, `@turf/sector`, `geomagnetism`, `idb`
-- [ ] T004 [P] Configure `rustfmt.toml` and clippy lints in `server/`
-- [ ] T005 [P] Configure `web/tsconfig.json` (strict), eslint, prettier
-- [ ] T006 [P] Add `proptest` to `server/Cargo.toml` dev-dependencies
-- [ ] T007 [P] Add `vitest` and `@playwright/test` to `web/package.json`
-- [ ] T008 CI workflow in `.github/workflows/ci.yml`: `cargo test`, `cargo clippy`, `vitest run`, `tsc --noEmit`
+- [X] T001 Create `server/` and `web/` directory skeletons per [plan.md § Source Code](plan.md)
+- [X] T002 [P] Initialize Rust project in `server/Cargo.toml` with `axum`, `tokio`, `sqlx` (postgres, runtime-tokio), `serde`, `uuid`
+- [X] T003 [P] Initialize TypeScript project in `web/package.json` with `vite`, `maplibre-gl` 5.x, `@turf/sector`, `geomagnetism`, `idb`
+- [X] T004 [P] Configure `rustfmt.toml` and clippy lints in `server/`
+- [X] T005 [P] Configure `web/tsconfig.json` (strict), eslint, prettier
+- [X] T006 [P] Add `proptest` to `server/Cargo.toml` dev-dependencies
+- [X] T007 [P] Add `vitest` and `@playwright/test` to `web/package.json`
+- [X] T008 CI workflow in `.github/workflows/ci.yml`: `cargo test`, `cargo clippy`, `vitest run`, `tsc --noEmit`
 
 ---
 
@@ -59,15 +59,15 @@ III and IV live entirely in this phase, and it is testable with no browser, no m
 
 ### The log domain (pure functions, no I/O)
 
-- [ ] T009 [P] Report types for all five kinds plus the `wire` object in `web/src/log/types.ts` per [contracts/log-format.md](contracts/log-format.md) — `confidence_q` restricted to 3|4|5, `max_range_r` to 1|3|5, `strength_s` to 2|5|8, `clock_offset_ms` nullable
-- [ ] T010 [P] Property tests for G-Set union laws (associative, commutative, idempotent) in `web/tests/unit/gset.test.ts` per [contracts/log-format.md § Merge](contracts/log-format.md#merge)
-- [ ] T011 Implement union merge keyed by `id` in `web/src/log/gset.ts` (depends on T009, T010)
-- [ ] T012 [P] Property tests for the fold in `web/tests/unit/fold.test.ts` per [contracts/log-format.md § The fold](contracts/log-format.md#the-fold): order-independence under shuffle, idempotence, commutativity, **retraction arriving before its target**, retraction of an absent ID is inert, two identical relayed reports both survive, age-neutrality
-- [ ] T013 Implement the fold in `web/src/log/fold.ts` — compute `retracted` first then filter; never walk-and-mark (depends on T009, T012)
-- [ ] T014 [P] Tests for colour derivation in `web/tests/unit/colour.test.ts`: same callsign → same swatch across devices; suffix appears only on a real collision; a merely-relayed callsign does **not** trigger the suffix
-- [ ] T015 Implement callsign→swatch and duplicate detection in `web/src/log/colour.ts` per [contracts/log-format.md § Observer colour](contracts/log-format.md#observer-colour-is-derived-not-stored) (depends on T014)
-- [ ] T016 [P] Round-trip property tests in `web/tests/unit/aprs.test.ts` per [contracts/aprs-mapping.md § Testing](contracts/aprs-mapping.md): `decode(encode(r)) == r` for authored reports; `encode(decode(w)) == w` for all wire strings including Q=0–9, s=0–9, non-default h/g/d; **`Q ∈ {3,4,5}` for every authored report**; ingested raw digits survive unchanged; `null` always encodes s=0
-- [ ] T017 Implement the APRS mapping and its inverse in `web/src/aprs/mapping.ts` per [contracts/aprs-mapping.md](contracts/aprs-mapping.md) — N always 9, raw digits stored never decoded degrees (depends on T009, T016)
+- [X] T009 [P] Report types for all five kinds plus the `wire` object in `web/src/log/types.ts` per [contracts/log-format.md](contracts/log-format.md) — `confidence_q` restricted to 3|4|5, `max_range_r` to 1|3|5, `strength_s` to 2|5|8, `clock_offset_ms` nullable
+- [X] T010 [P] Property tests for G-Set union laws (associative, commutative, idempotent) in `web/tests/unit/gset.test.ts` per [contracts/log-format.md § Merge](contracts/log-format.md#merge)
+- [X] T011 Implement union merge keyed by `id` in `web/src/log/gset.ts` (depends on T009, T010)
+- [X] T012 [P] Property tests for the fold in `web/tests/unit/fold.test.ts` per [contracts/log-format.md § The fold](contracts/log-format.md#the-fold): order-independence under shuffle, idempotence, commutativity, **retraction arriving before its target**, retraction of an absent ID is inert, two identical relayed reports both survive, age-neutrality
+- [X] T013 Implement the fold in `web/src/log/fold.ts` — compute `retracted` first then filter; never walk-and-mark (depends on T009, T012)
+- [X] T014 [P] Tests for colour derivation in `web/tests/unit/colour.test.ts`: same callsign → same swatch across devices; suffix appears only on a real collision; a merely-relayed callsign does **not** trigger the suffix
+- [X] T015 Implement callsign→swatch and duplicate detection in `web/src/log/colour.ts` per [contracts/log-format.md § Observer colour](contracts/log-format.md#observer-colour-is-derived-not-stored) (depends on T014)
+- [X] T016 [P] Round-trip property tests in `web/tests/unit/aprs.test.ts` per [contracts/aprs-mapping.md § Testing](contracts/aprs-mapping.md): `decode(encode(r)) == r` for authored reports; `encode(decode(w)) == w` for all wire strings including Q=0–9, s=0–9, non-default h/g/d; **`Q ∈ {3,4,5}` for every authored report**; ingested raw digits survive unchanged; `null` always encodes s=0
+- [X] T017 Implement the APRS mapping and its inverse in `web/src/aprs/mapping.ts` per [contracts/aprs-mapping.md](contracts/aprs-mapping.md) — N always 9, raw digits stored never decoded degrees (depends on T009, T016)
 
 ### The relay
 
