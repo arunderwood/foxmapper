@@ -40,7 +40,30 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Answer each gate concretely for this feature. An unanswered gate is a failed gate. Violations that
+cannot be removed go in Complexity Tracking below with the simpler alternative named.
+
+- [ ] **I. Honest Uncertainty**: Does this feature present any derived estimate? If so, where is its
+      credible region rendered, and what makes confidence visibly degrade on poor geometry (<3
+      reports, narrow angular spread, multi-modal posterior)? Confirm no uncertainty signal is
+      relegated to a footer, tooltip, or dismissible modal.
+- [ ] **II. Every Radio Contributes**: Can a participant with a stock handheld and no training
+      contribute through this feature? Confirm signal-strength and negative reports remain
+      first-class inputs and bearings are not the only path.
+- [ ] **III. Offline Is the Normal Case**: State how this feature behaves with no network for the
+      whole hunt. Confirm no report is lost or blocked, the estimate still displays, and nothing
+      here needs a live server round-trip to be useful in the field.
+- [ ] **IV. Append-Only Log, Derived State**: Confirm this feature adds only immutable appended
+      facts (corrections are invalidation/supersession records), computes estimates client-side, and
+      leaves log merge a conflict-free union.
+- [ ] **V. Interop Over Invention, Plain Language**: For each new report kind, name the APRS DF/DFS
+      encoding it maps to losslessly, or justify why no on-air format exists. Separately, confirm no
+      protocol vocabulary (NRQ, DFS, PHG) reaches a participant-facing surface.
+- [ ] **Operating Constraints**: Check RF-leg content is unencrypted and non-business; position
+      tracking beyond per-report is opt-in and revocable; no search-and-rescue or certification
+      claim; joining still needs no account, install, or payment.
+- [ ] **Fusion discipline**: If this plan touches location-estimate mathematics, name the user story
+      and the field observation that motivate it.
 
 ## Project Structure
 

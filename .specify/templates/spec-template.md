@@ -21,6 +21,10 @@
   - Tested independently
   - Deployed independently
   - Demonstrated to users independently
+
+  FIELD-GATE (constitution, Development Workflow): each story also carries a Field Validation
+  entry. A story is not done when its tests pass; it is done when someone used it outdoors on a
+  real hunt and the interaction survived contact. The next story does not start until then.
 -->
 
 ### User Story 1 - [Brief Title] (Priority: P1)
@@ -30,6 +34,8 @@
 **Why this priority**: [Explain the value and why it has this priority level]
 
 **Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
+
+**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
 
 **Acceptance Scenarios**:
 
@@ -46,6 +52,8 @@
 
 **Independent Test**: [Describe how this can be tested independently]
 
+**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
+
 **Acceptance Scenarios**:
 
 1. **Given** [initial state], **When** [action], **Then** [expected outcome]
@@ -59,6 +67,8 @@
 **Why this priority**: [Explain the value and why it has this priority level]
 
 **Independent Test**: [Describe how this can be tested independently]
+
+**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
 
 **Acceptance Scenarios**:
 
@@ -77,6 +87,11 @@
 
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
+- What does this do with no network for the whole hunt, and on reconnect with a divergent log?
+- What does this show when report geometry is poor (<3 reports, narrow angular spread, multi-modal
+  posterior), and how does a participant see that the estimate is weak?
+- What does a participant who only has a stock handheld — signal-strength and "I hear nothing here"
+  reports, no bearings — get out of this?
 
 ## Requirements *(mandatory)*
 
@@ -125,7 +140,8 @@
   chosen when the feature description did not specify certain details.
 -->
 
-- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about target users, e.g., "Participants carry a stock handheld and have not been
+  trained on this tool"] — note the constitution forbids assuming network connectivity
 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
 - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]

@@ -19,6 +19,12 @@ description: "Task list template for feature implementation"
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 
+**Field-gate (constitution, Development Workflow)**: every user story phase ends with a field
+validation task — take it to a real hunt with real participants and record what happened. Passing
+tests do not close a story, and the next story does not start until the field task is done. Stories
+therefore run sequentially in priority order; the parallel-team strategy below applies only within
+a story.
+
 ## Path Conventions
 
 - **Single project**: `src/`, `tests/` at repository root
@@ -96,7 +102,12 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+### Field Validation for User Story 1 (REQUIRED — gates User Story 2)
+
+- [ ] T018 [US1] Take user story 1 to a real hunt with real participants; record what broke, what
+      confused someone, and what the estimate looked like in poor geometry
+
+**Checkpoint**: User Story 1 is done only once T018 is complete — tests passing is not done
 
 ---
 
@@ -108,17 +119,21 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
 
-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T019 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T020 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T021 [P] [US2] Create [Entity] model in src/models/[entity].py
+- [ ] T022 [US2] Implement [Service] in src/services/[service].py
+- [ ] T023 [US2] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T024 [US2] Integrate with User Story 1 components (if needed)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+### Field Validation for User Story 2 (REQUIRED — gates User Story 3)
+
+- [ ] T025 [US2] Take user story 2 to a real hunt with real participants and record the outcome
+
+**Checkpoint**: User Story 2 is done only once T025 is complete
 
 ---
 
@@ -130,16 +145,20 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
 
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T026 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T027 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T028 [P] [US3] Create [Entity] model in src/models/[entity].py
+- [ ] T029 [US3] Implement [Service] in src/services/[service].py
+- [ ] T030 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
-**Checkpoint**: All user stories should now be independently functional
+### Field Validation for User Story 3 (REQUIRED)
+
+- [ ] T031 [US3] Take user story 3 to a real hunt with real participants and record the outcome
+
+**Checkpoint**: All user stories are independently functional and each has survived a real hunt
 
 ---
 
@@ -166,16 +185,16 @@ Examples of foundational tasks (adjust based on your project):
 
 - **Setup (Phase 1)**: No dependencies - can start immediately
 - **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3+)**: All depend on Foundational phase completion
-  - User stories can then proceed in parallel (if staffed)
-  - Or sequentially in priority order (P1 → P2 → P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
+- **User Stories (Phase 3+)**: Depend on Foundational phase completion, then run sequentially in
+  priority order (P1 → P2 → P3). The field-gate forbids starting a story before the previous one
+  has been to a real hunt.
+- **Polish (Final Phase)**: Depends on all desired user stories being complete and field-validated
 
 ### User Story Dependencies
 
 - **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
+- **User Story 2 (P2)**: Starts after US1's field validation task completes - May integrate with US1 but must be independently testable
+- **User Story 3 (P3)**: Starts after US2's field validation task completes - May integrate with US1/US2 but must be independently testable
 
 ### Within Each User Story
 
@@ -189,10 +208,10 @@ Examples of foundational tasks (adjust based on your project):
 
 - All Setup tasks marked [P] can run in parallel
 - All Foundational tasks marked [P] can run in parallel (within Phase 2)
-- Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
 - All tests for a user story marked [P] can run in parallel
 - Models within a story marked [P] can run in parallel
-- Different user stories can be worked on in parallel by different team members
+- Parallelism is within a story only. The field-gate makes stories sequential, so different user
+  stories are NOT worked on concurrently by different team members
 
 ---
 
@@ -217,27 +236,26 @@ Task: "Create [Entity2] model in src/models/[entity2].py"
 1. Complete Phase 1: Setup
 2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
 3. Complete Phase 3: User Story 1
-4. **STOP and VALIDATE**: Test User Story 1 independently
+4. **STOP and VALIDATE**: Test User Story 1 independently, then take it to a real hunt
 5. Deploy/demo if ready
 
 ### Incremental Delivery
 
 1. Complete Setup + Foundational → Foundation ready
-2. Add User Story 1 → Test independently → Deploy/Demo (MVP!)
-3. Add User Story 2 → Test independently → Deploy/Demo
-4. Add User Story 3 → Test independently → Deploy/Demo
+2. Add User Story 1 → Test independently → Field-validate on a real hunt → Deploy/Demo (MVP!)
+3. Add User Story 2 → Test independently → Field-validate → Deploy/Demo
+4. Add User Story 3 → Test independently → Field-validate → Deploy/Demo
 5. Each story adds value without breaking previous stories
 
-### Parallel Team Strategy
+### Team Strategy
 
 With multiple developers:
 
 1. Team completes Setup + Foundational together
-2. Once Foundational is done:
-   - Developer A: User Story 1
-   - Developer B: User Story 2
-   - Developer C: User Story 3
-3. Stories complete and integrate independently
+2. Once Foundational is done, the team works the current story together — the field-gate means
+   there is exactly one story in flight, so parallelism goes into [P] tasks within it, not into
+   splitting stories across people
+3. The hunt that validates a story is the input to planning the next one
 
 ---
 
@@ -246,6 +264,7 @@ With multiple developers:
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
+- A story closes on its field validation task, not on green tests
 - Verify tests fail before implementing
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
