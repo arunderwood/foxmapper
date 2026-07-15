@@ -13,6 +13,13 @@ export default tseslint.config(
       // Inside a bounds-checked loop the assertion is the honest expression of what the code
       // already knows, and the alternative is a runtime branch that can never be taken.
       '@typescript-eslint/no-non-null-assertion': 'off',
+
+      // A leading underscore marks a binding that exists to be discarded — destructuring a field
+      // out of an object is the clearest way to drop it, and the name documents the intent.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
     },
   },
 );

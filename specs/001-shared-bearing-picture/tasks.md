@@ -109,24 +109,24 @@ each sees the other three on their own device within seconds.
 
 ### Sensors (US1) — hardware only; a green CI run here proves nothing
 
-- [ ] T037 [P] [US1] Heading capture in `web/src/sensors/heading.ts` per [research.md § 5](research.md) — iOS `webkitCompassHeading` behind a gesture-triggered `requestPermission()`; Android `deviceorientationabsolute` with `360 - alpha` plus screen-orientation correction; **feature-detect, because Safari does not implement `deviceorientationabsolute` at all**; record `compass_accuracy_deg` where available (iOS only)
-- [ ] T038 [P] [US1] Declination in `web/src/sensors/declination.ts` — `geomagnetism` WMM2025; both platforms give **magnetic**, so this always runs; **wrap the 2029 hard-throw in try/catch** and degrade to a stale model rather than crashing
-- [ ] T039 [P] [US1] Position in `web/src/sensors/position.ts` — `watchPosition` with `enableHighAccuracy`, discard early km-scale fixes, honest "acquiring" state, never use `coords.accuracy` in math
+- [X] T037 [P] [US1] Heading capture in `web/src/sensors/heading.ts` per [research.md § 5](research.md) — iOS `webkitCompassHeading` behind a gesture-triggered `requestPermission()`; Android `deviceorientationabsolute` with `360 - alpha` plus screen-orientation correction; **feature-detect, because Safari does not implement `deviceorientationabsolute` at all**; record `compass_accuracy_deg` where available (iOS only)
+- [X] T038 [P] [US1] Declination in `web/src/sensors/declination.ts` — `geomagnetism` WMM2025; both platforms give **magnetic**, so this always runs; **wrap the 2029 hard-throw in try/catch** and degrade to a stale model rather than crashing
+- [X] T039 [P] [US1] Position in `web/src/sensors/position.ts` — `watchPosition` with `enableHighAccuracy`, discard early km-scale fixes, honest "acquiring" state, never use `coords.accuracy` in math
 
 ### Map (US1)
 
-- [ ] T040 [P] [US1] Bearing wedge geometry in `web/src/map/wedge.ts` — `@turf/sector` → GeoJSON polygon; verify the 350°→10° north wraparound
-- [ ] T041 [US1] Basemap in `web/src/map/basemap.ts` — MapLibre against the hosted OpenFreeMap style; **an unreachable tile host is the normal field case and must not read as an error**; attribution `OpenFreeMap © OpenMapTiles Data from OpenStreetMap`; **never pre-fetch tiles — every provider prohibits it**
-- [ ] T042 [US1] Report layers in `web/src/map/layers.ts` per [data-model.md § Rendering](data-model.md#rendering-rules) — bearings as bounded sectors; `omni`/`null`/`fix` as markers that **imply no direction**; observer callsign + derived colour + duplicate suffix; relayed reports visibly marked with the entering operator; `placed` vs `measured` position distinguished; stale position marked; time shown with its `clock_offset_ms` caveat (depends on T013, T015, T040)
+- [X] T040 [P] [US1] Bearing wedge geometry in `web/src/map/wedge.ts` — `@turf/sector` → GeoJSON polygon; verify the 350°→10° north wraparound
+- [X] T041 [US1] Basemap in `web/src/map/basemap.ts` — MapLibre against the hosted OpenFreeMap style; **an unreachable tile host is the normal field case and must not read as an error**; attribution `OpenFreeMap © OpenMapTiles Data from OpenStreetMap`; **never pre-fetch tiles — every provider prohibits it**
+- [X] T042 [US1] Report layers in `web/src/map/layers.ts` per [data-model.md § Rendering](data-model.md#rendering-rules) — bearings as bounded sectors; `omni`/`null`/`fix` as markers that **imply no direction**; observer callsign + derived colour + duplicate suffix; relayed reports visibly marked with the entering operator; `placed` vs `measured` position distinguished; stale position marked; time shown with its `clock_offset_ms` caveat (depends on T013, T015, T040)
 
 ### Report entry (US1)
 
-- [ ] T043 [US1] Bearing entry in `web/src/report/bearing.ts` — compass drafts the heading, **reporter sees and can adjust it before submitting**, manual entry when no compass; three confidence buttons → Q ∈ {3,4,5}; three range buttons → R ∈ {1,3,5}; both required (depends on T037, T038, T039)
-- [ ] T044 [P] [US1] Signal-strength entry in `web/src/report/omni.ts` — three buttons → s ∈ {2,5,8}
-- [ ] T045 [P] [US1] Heard-nothing entry in `web/src/report/heard_nothing.ts` — kind is `"null"` on the wire; **do not "fix" the wire value, it is a string**
-- [ ] T046 [P] [US1] Find entry in `web/src/report/fix.ts` — marks the target found by fold; does not close the hunt
-- [ ] T047 [US1] Relayed entry in `web/src/report/relay.ts` per FR-007a–d — observer callsign distinct from `entered_by`; observer need not be a participant; observer position set by hand (depends on T043)
-- [ ] T048 [US1] Retraction in `web/src/report/retract.ts` — appends a retraction fact; retractable by whoever **entered** it, including relayed reports
+- [X] T043 [US1] Bearing entry in `web/src/report/bearing.ts` — compass drafts the heading, **reporter sees and can adjust it before submitting**, manual entry when no compass; three confidence buttons → Q ∈ {3,4,5}; three range buttons → R ∈ {1,3,5}; both required (depends on T037, T038, T039)
+- [X] T044 [P] [US1] Signal-strength entry in `web/src/report/omni.ts` — three buttons → s ∈ {2,5,8}
+- [X] T045 [P] [US1] Heard-nothing entry in `web/src/report/heard_nothing.ts` — kind is `"null"` on the wire; **do not "fix" the wire value, it is a string**
+- [X] T046 [P] [US1] Find entry in `web/src/report/fix.ts` — marks the target found by fold; does not close the hunt
+- [X] T047 [US1] Relayed entry in `web/src/report/relay.ts` per FR-007a–d — observer callsign distinct from `entered_by`; observer need not be a participant; observer position set by hand (depends on T043)
+- [X] T048 [US1] Retraction in `web/src/report/retract.ts` — appends a retraction fact; retractable by whoever **entered** it, including relayed reports
 
 ### Interface (US1)
 
