@@ -71,20 +71,20 @@ III and IV live entirely in this phase, and it is testable with no browser, no m
 
 ### The relay
 
-- [ ] T018 sqlx migrations for `hunts` and `reports` in `server/migrations/` per [data-model.md § Server-side model](data-model.md#server-side-model) — `body` is jsonb, `seq` bigserial, `received_at` on the envelope
-- [ ] T019 [P] Opaque report envelope in `server/src/model.rs` — the server MUST NOT parse `body`
-- [ ] T020 [P] Test append idempotency in `server/tests/append_idempotent.rs`: same `id` twice → one row, `202` both times
-- [ ] T021 Single-writer append in `server/src/store/mod.rs` per [contracts/http-api.md § The sequence gap](contracts/http-api.md#the-sequence-gap) — serialize appends so no `seq` is visible before commit (depends on T018)
-- [ ] T022 [P] Test cursor integrity in `server/tests/sync_cursor.rs`: concurrent appends produce no gap a reader can skip past
-- [ ] T023 Hunt code generation in `server/src/routes/hunts.rs` per [contracts/http-api.md § Hunt codes](contracts/http-api.md#hunt-codes) — **≥40 bits from a CSPRNG**, speakable format, case-insensitive lookup, generate-insert-retry on collision
-- [ ] T024 [P] Test code entropy and collision retry in `server/tests/hunt_codes.rs` — assert the entropy floor mechanically; the naive `word-word-NNNN` is ~29 bits and must fail this test
-- [ ] T025 `POST /api/hunts` and `GET /api/hunts/{code}` in `server/src/routes/hunts.rs` — target immutable after creation, `frequency` an opaque string (depends on T023)
-- [ ] T026 `POST /api/hunts/{code}/reports` (idempotent by id) and `GET …/reports?since=` in `server/src/routes/reports.rs` (depends on T021)
-- [ ] T027 SSE stream in `server/src/routes/stream.rs` — `id:` = seq, honour `Last-Event-ID`, `retry:`, `: ping` heartbeats, **`204` on purged/unknown hunt** (depends on T021)
-- [ ] T028 `id_digest` on `GET /api/hunts/{code}` and `GET …/ids` in `server/src/routes/hunts.rs` per [contracts/http-api.md § id_digest](contracts/http-api.md) — sort ascending bytewise over lowercase UUIDs, join `\n`, no trailing newline, lowercase hex
-- [ ] T029 Per-IP rate limit on append in `server/src/routes/reports.rs` per [contracts/http-api.md § Rate limiting](contracts/http-api.md#rate-limiting) — loose enough never to fire during a real hunt; anti-script, not anti-abuse
-- [ ] T030 30-day idle purge job in `server/src/store/purge.rs` — clock restarts on every append (depends on T018)
-- [ ] T031 [P] Test purge in `server/tests/purge.rs`: idle clock restarts on append; purged hunt `404`s and its stream `204`s
+- [X] T018 sqlx migrations for `hunts` and `reports` in `server/migrations/` per [data-model.md § Server-side model](data-model.md#server-side-model) — `body` is jsonb, `seq` bigserial, `received_at` on the envelope
+- [X] T019 [P] Opaque report envelope in `server/src/model.rs` — the server MUST NOT parse `body`
+- [X] T020 [P] Test append idempotency in `server/tests/append_idempotent.rs`: same `id` twice → one row, `202` both times
+- [X] T021 Single-writer append in `server/src/store/mod.rs` per [contracts/http-api.md § The sequence gap](contracts/http-api.md#the-sequence-gap) — serialize appends so no `seq` is visible before commit (depends on T018)
+- [X] T022 [P] Test cursor integrity in `server/tests/sync_cursor.rs`: concurrent appends produce no gap a reader can skip past
+- [X] T023 Hunt code generation in `server/src/routes/hunts.rs` per [contracts/http-api.md § Hunt codes](contracts/http-api.md#hunt-codes) — **≥40 bits from a CSPRNG**, speakable format, case-insensitive lookup, generate-insert-retry on collision
+- [X] T024 [P] Test code entropy and collision retry in `server/tests/hunt_codes.rs` — assert the entropy floor mechanically; the naive `word-word-NNNN` is ~29 bits and must fail this test
+- [X] T025 `POST /api/hunts` and `GET /api/hunts/{code}` in `server/src/routes/hunts.rs` — target immutable after creation, `frequency` an opaque string (depends on T023)
+- [X] T026 `POST /api/hunts/{code}/reports` (idempotent by id) and `GET …/reports?since=` in `server/src/routes/reports.rs` (depends on T021)
+- [X] T027 SSE stream in `server/src/routes/stream.rs` — `id:` = seq, honour `Last-Event-ID`, `retry:`, `: ping` heartbeats, **`204` on purged/unknown hunt** (depends on T021)
+- [X] T028 `id_digest` on `GET /api/hunts/{code}` and `GET …/ids` in `server/src/routes/hunts.rs` per [contracts/http-api.md § id_digest](contracts/http-api.md) — sort ascending bytewise over lowercase UUIDs, join `\n`, no trailing newline, lowercase hex
+- [X] T029 Per-IP rate limit on append in `server/src/routes/reports.rs` per [contracts/http-api.md § Rate limiting](contracts/http-api.md#rate-limiting) — loose enough never to fire during a real hunt; anti-script, not anti-abuse
+- [X] T030 30-day idle purge job in `server/src/store/purge.rs` — clock restarts on every append (depends on T018)
+- [X] T031 [P] Test purge in `server/tests/purge.rs`: idle clock restarts on append; purged hunt `404`s and its stream `204`s
 
 ### The client spine
 
