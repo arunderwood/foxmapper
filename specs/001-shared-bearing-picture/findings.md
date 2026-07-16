@@ -105,8 +105,16 @@ the lever is a lighter map, not code-splitting around it.
 
 ## Still unknown — and only a field test can answer
 
-**T063, T064, T066, T070 cannot be done from here.** They need real phones, four people, and a
-hunt. Nothing below is a defect; each is a question the plan deliberately left to the field.
+**T063, T064, T069a, T066 and T070 cannot be done from here.** They need real phones, real terrain,
+and — for the last two — real people. Nothing below is a defect; each is a question the plan
+deliberately left to the field.
+
+**The order matters more than the list.** Added after review: the ladder runs deploy → T069 →
+T063/T064 → **T069a (the solo hunt)** → T066 → T070, in ascending order of what a mistake costs.
+The first four rungs need nobody. T069a was a gap — Level 4 proved the hardware and Level 6 asked
+whether the product survived people, and nothing in between asked whether it worked *as a product*
+outdoors. It is not the gate and does not close the story; it is what makes the invitation in T070
+worth spending.
 
 ### T063 — sensors, on real iOS and Android
 - Does the compass swing 10–30° next to a car? The entire honesty cap (Q ≤ 5) rests on that number.
@@ -133,8 +141,17 @@ What a scan cannot do is judge *reachable*. An error path, a popup, or a phrase 
 jargon-free but still means nothing to a hunter will all pass it. SC-008 wants a human reading every
 screen they can get to; that half is still open.
 
-### T066 / T070 — four phones, four locations, one hunt
-The whole story closes here, and only here. The plan is explicit that the questions worth asking
+### T069a — the solo hunt (added after review)
+Hide a transmitter, hunt it yourself, two phones, nobody else. The only rung where **ground truth
+exists**, because you hid it: does the wedge point at the transmitter? Also the first honest read on
+the blank basemap *while walking*, ten seconds one-handed holding a radio, the cold join on real
+cell, and whether the palette survives sunlight.
+
+It cannot answer SC-006, SC-007, SC-009 or SC-012 — all need someone who is not you — and **the
+author cannot fairly test the join flow he built**. Not the gate.
+
+### T066 / T070 — four devices, then the hunt
+The whole story closes at T070, and only there. The plan is explicit that the questions worth asking
 are behavioural:
 - Did three untrained participants join and report **without being talked through it**?
 - Did the stock-antenna hunter contribute, or spectate? (SC-009 — Principle II's real test.)

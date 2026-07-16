@@ -162,6 +162,15 @@ each sees the other three on their own device within seconds.
 - [ ] T068 [US1] **Disable proxy buffering** (`X-Accel-Buffering: no`, `proxy_buffering off`) and **serve over HTTP/2**; long read timeouts. Not tuning — buffered SSE fails SC-002 silently and only in production
 - [ ] T069 [US1] Verify T062's `curl -N` check **against the deployed URL**, not localhost
 
+### Shakedown (US1) — before anyone else is invited
+
+> Level 4 proves the hardware works; Level 6 asks whether the product survives people. This is the
+> rung in between: the first use **as a product**, outdoors, by someone who does not need
+> convincing. It costs a Saturday morning and no goodwill, and it is what makes the invitation in
+> T070 worth spending.
+
+- [ ] T069a [US1] Solo hunt per [quickstart.md](quickstart.md) Level 4a — hide a transmitter, hunt it yourself with two phones, invite nobody. Against the **deployed URL on real cell**, not localhost on wifi. Record: whether the blank basemap is usable **while walking**; whether a bearing takes under 10 s one-handed **holding a radio** (SC-001a/b); whether the wedge points at a transmitter **whose location you actually know** — the only rung where ground truth exists, because you hid it; the cold join on real cell (SC-001); whether the palette survives direct sunlight (T071). **This is not the gate**: SC-006, SC-007, SC-009 and SC-012 all need someone who is not you, and **you cannot fairly test the join flow you built**
+
 ### Field Validation for User Story 1 (REQUIRED — this closes the story)
 
 - [ ] T070 [US1] Take it to a real hunt per [spec.md § Field Validation](spec.md) and [quickstart.md](quickstart.md) Level 6. Record: whether three untrained participants joined and reported **without being talked through it**; whether the stock-antenna hunter contributed rather than spectated (SC-009); whether **net control kept up with voice traffic** (SC-012 — the plan's explicit bet); whether anyone acted on someone else's report and could say whose they trusted and why (SC-006); whether anyone **fell back to voice because the interface was slower than talking** (SC-007 — the status quo winning); and whether the blank offline basemap was usable or useless
@@ -202,6 +211,32 @@ each sees the other three on their own device within seconds.
 - T043 blocks T047 (relay reuses bearing entry)
 - Deploy (T067, T068) blocks T069, which blocks T070
 - **Everything blocks T070**
+
+### The order the field work actually runs in
+
+Task numbers do not give it, so it is written out. **Ascending order of what a mistake costs**:
+each rung is cheap, and each makes the next one worth doing.
+
+```
+T067, T068  deploy              ─┐
+T069        curl -N in prod      │  nobody else involved
+T063, T064  phone realities      │  (T064 starts a 7-day clock — see below)
+T069a       the solo hunt       ─┘
+T066        four devices           four people, fifteen minutes, one tap each
+T070        the field gate         three people who did not build it. One first impression.
+```
+
+- **Deploy blocks the lot of it**, including T066 — four phones in four places need a URL, and the
+  numbering hides that. Nothing outdoors runs against localhost.
+- **T069 blocks everything after it**: buffered SSE fails SC-002 *silently and only in production*,
+  so an unverified stream makes every later observation untrustworthy rather than wrong.
+- **T063 before T069a**: a compass reading stale zeros makes the solo hunt measure nothing.
+- **T069a before T066, and both before T070.** Not comfort — Level 6 gets one first impression, and
+  the questions it asks are unanswerable if the basics are broken.
+- **T064 has a seven-day clock** and no dependants. It is the longest-lead item in the feature:
+  start it the day the deploy lands (install to Home Screen, then leave it alone for a week) rather
+  than discovering it is a week from an answer when everything else is ready.
+- **T065 is a desk task** and blocks nothing. Do it while waiting on anything above.
 
 ### Parallel Opportunities
 

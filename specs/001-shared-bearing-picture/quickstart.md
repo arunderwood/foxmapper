@@ -157,6 +157,47 @@ they are here:
    install" silently re-downloads everything, and the install offer must come while online, before the
    field.
 
+## Level 4a — the solo hunt
+
+**Hide a transmitter in a park. Hunt it yourself, with two phones. Invite nobody.**
+
+Level 4 proves the hardware works. Level 6 asks whether the product survives people. Nothing in
+between asks whether it works *as a product* — outdoors, moving, in one hand, for someone who does
+not need convincing. This is that rung, and it costs a Saturday morning and no goodwill.
+
+It exists because Level 6 gets exactly one first impression with a club. Asking "did the
+stock-antenna hunter contribute?" while the compass reads stale zeros wastes the hunt *and* the
+people. Everything below is cheaper to find alone.
+
+Run it against the **deployed** URL, on real cell, from a trailhead — not localhost on wifi.
+
+**What only this can tell you:**
+
+- **Is the blank basemap usable while you are actually walking?** The plan's strongest-worded
+  Complexity Tracking violation says reports render over blank space out of coverage, and that the
+  field gate decides whether that is survivable. You do not need three strangers to find out.
+- **Ten seconds, one hand** (SC-001a/b), while holding a radio and a yagi and wearing gloves. Time
+  it. The number in the spec is a requirement, not an aspiration.
+- **Does the wedge point where you think it points**, from a real position with a real compass, at
+  a transmitter whose location you actually know? This is the only test in the whole ladder where
+  ground truth is available — you hid it.
+- **Cold join on real cell** at the trailhead (SC-001's 15 s), not a 302 KB transfer estimate.
+- **Sunlight.** Whether the twelve swatches survive a dimmed screen outdoors (T071's input).
+- Whether the picture **helps at all**, or is just something to look at.
+
+**What this cannot tell you, and must not be mistaken for:**
+
+- **SC-006** — whether someone acts on *another person's* report and can say whose they trusted.
+  Needs another person.
+- **SC-007** — whether anyone falls back to voice. Needs voice traffic.
+- **SC-009** — whether the stock-antenna hunter contributes. Needs someone who is not you.
+- **SC-012** — whether net control keeps up. Needs net control.
+- **Whether an untrained participant can join unaided.** *You built it.* You cannot un-know where
+  the buttons are, and no amount of care makes your join a fair test of the join.
+
+**This is not the field gate and does not close the story.** Level 6 does. This is what makes
+Level 6 worth the invitation.
+
 ## Level 5 — the four-device test
 
 The spec's own Independent Test: *"Four people in different locations join one session, each submits
