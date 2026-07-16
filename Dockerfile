@@ -5,7 +5,7 @@
 # `EventSource` cannot send custom headers, and CORS on an SSE stream is a needless way to lose
 # the entire sync path. Same-origin removes the question.
 
-FROM node:22-slim AS web
+FROM node:26-slim AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
