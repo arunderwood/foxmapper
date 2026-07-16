@@ -7,7 +7,7 @@ services:
     # Debian-based, not -alpine: Render's managed Postgres is glibc, and so is CI. Alpine's musl
     # locale support collates text differently, which would only ever surface as an ORDER BY that
     # disagrees with production. Major version tracks render.yaml's postgresMajorVersion.
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: foxmapper
       POSTGRES_PASSWORD: foxmapper
@@ -15,7 +15,10 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # 18+ images put PGDATA in a version-specific subdirectory (/var/lib/postgresql/18/docker),
+      # so the mount is the parent. Mounting the old path makes the image refuse to start, even on
+      # an empty volume.
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U foxmapper']
       interval: 5s
