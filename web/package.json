@@ -25,7 +25,7 @@
     "@playwright/test": "^1.49.0",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/destination": "^7.3.5",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^3.23.0",
