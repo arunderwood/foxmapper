@@ -34,4 +34,4 @@ services:
 databases:
   - name: foxmapper-db
     plan: basic-256mb
-    postgresMajorVersion: '16'
+    postgresMajorVersion: '18'

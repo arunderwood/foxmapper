@@ -5,14 +5,14 @@
 # `EventSource` cannot send custom headers, and CORS on an SSE stream is a needless way to lose
 # the entire sync path. Same-origin removes the question.
 
-FROM node:22-slim AS web
+FROM node:26-slim AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM rust:1.90-slim AS server
+FROM rust:1.97-slim AS server
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
