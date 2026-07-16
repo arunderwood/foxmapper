@@ -1,0 +1,37 @@
+[package]
+name = "foxmapper-server"
+version = "0.1.0"
+edition = "2021"
+# 1.88, not the plan's 1.83. The plan says "1.83+" — a floor — and this is where the floor
+# actually sits once the locked dependency tree is resolved (edition2024, and `home` needs
+# 1.88). Recorded rather than discovered by a red build.
+rust-version = "1.88"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json", "migrate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "fs"] }
+async-stream = "0.3"
+thiserror = "2"
+
+[dev-dependencies]
+proptest = "1"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio-util = { version = "0.7.18", features = ["io"] }

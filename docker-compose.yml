@@ -1,0 +1,60 @@
+# Development stack: Postgres, the relay, and the PWA.
+#
+# The relay has no opinion about direction finding, so there is nothing to configure here beyond
+# a database URL — every service below would be identical if the payload were recipes.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: foxmapper
+      POSTGRES_PASSWORD: foxmapper
+      POSTGRES_DB: foxmapper
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U foxmapper']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      DATABASE_URL: postgres://foxmapper:foxmapper@db:5432/foxmapper
+      RUST_LOG: foxmapper_server=debug,tower_http=debug
+      BIND_ADDR: 0.0.0.0:8080
+    ports:
+      - '8080:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./server:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - target-cache:/app/target
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      # Vite proxies /api to the relay, so the browser sees one origin and SSE needs no CORS.
+      VITE_API_ORIGIN: http://localhost:8080
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - '5173:5173'
+    depends_on:
+      - server
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+
+volumes:
+  db-data:
+  cargo-registry:
+  target-cache:
+  web-node-modules:

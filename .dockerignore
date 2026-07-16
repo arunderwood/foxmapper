@@ -1,0 +1,15 @@
+**/node_modules/
+**/dist/
+**/target/
+.git/
+.github/
+specs/
+.claude/
+**/test-results/
+**/playwright-report/
+**/*.log
+**/.env
+**/.env.*
+Dockerfile
+.dockerignore
+docker-compose.yml
