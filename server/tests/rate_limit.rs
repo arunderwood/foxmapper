@@ -87,8 +87,30 @@ fn one_flooding_ip_does_not_starve_another() {
 #[test]
 fn idle_buckets_are_evicted() {
     let limiter = RateLimiter::default();
-    limiter.allow(ip(7), 1);
+    for last in 0..10 {
+        limiter.allow(ip(last), 1);
+    }
+    assert_eq!(limiter.tracked_ips(), 10);
+
     limiter.evict_idle(Duration::from_secs(0));
-    // Nothing to assert but the absence of unbounded growth; the bucket is rebuilt on next use.
+    assert_eq!(
+        limiter.tracked_ips(),
+        0,
+        "idle buckets must be dropped, or the map grows for the life of the process"
+    );
+
+    // The bucket is rebuilt on next use, so eviction enforces nothing less.
     assert!(limiter.allow(ip(7), 1));
+}
+
+#[test]
+fn eviction_spares_a_bucket_still_in_use() {
+    let limiter = RateLimiter::default();
+    limiter.allow(ip(8), 1);
+    limiter.evict_idle(Duration::from_secs(60 * 60));
+    assert_eq!(
+        limiter.tracked_ips(),
+        1,
+        "a bucket touched just now is not idle and must survive the sweep"
+    );
 }

@@ -14,7 +14,7 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -82,7 +82,10 @@ impl RateLimiter {
         }
     }
 
-    /// Drops buckets untouched for an hour, so the map cannot grow without bound.
+    /// Drops buckets untouched for `older_than`, so the map cannot grow without bound.
+    ///
+    /// A bucket at full capacity is indistinguishable from one that never existed, so forgetting an
+    /// idle IP costs nothing and enforces nothing less.
     ///
     /// # Panics
     /// If the bucket mutex was poisoned by a panic in another thread.
@@ -91,4 +94,30 @@ impl RateLimiter {
         let mut buckets = self.buckets.lock().expect("rate limiter mutex poisoned");
         buckets.retain(|_, b| now.saturating_duration_since(b.last) < older_than);
     }
+
+    /// How many IPs are currently tracked. The eviction sweep is otherwise unobservable.
+    ///
+    /// # Panics
+    /// If the bucket mutex was poisoned by a panic in another thread.
+    #[must_use]
+    pub fn tracked_ips(&self) -> usize {
+        self.buckets
+            .lock()
+            .expect("rate limiter mutex poisoned")
+            .len()
+    }
+}
+
+/// Sweeps idle buckets for the life of the process.
+///
+/// Without this the per-IP map grows for as long as the relay runs — every IP that ever appended,
+/// remembered forever. `evict_idle` existed for exactly this and was never called.
+pub fn spawn_eviction(limiter: Arc<RateLimiter>, interval: Duration, older_than: Duration) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        loop {
+            ticker.tick().await;
+            limiter.evict_idle(older_than);
+        }
+    });
 }

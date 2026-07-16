@@ -1,11 +1,17 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-use foxmapper_server::{rate_limit::RateLimiter, router, spawn_listener, store, AppState};
+use foxmapper_server::{
+    rate_limit, rate_limit::RateLimiter, router, spawn_listener, store, AppState,
+};
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
 use tower_http::trace::TraceLayer;
 
 const PURGE_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const EVICT_INTERVAL: Duration = Duration::from_secs(60 * 60);
+/// An IP that has not appended for an hour has a full bucket anyway, so forgetting it enforces
+/// nothing less and stops the map growing for the life of the process.
+const EVICT_IDLE_AFTER: Duration = Duration::from_secs(60 * 60);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,10 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn_listener(database_url.clone(), notify_tx.clone(), None);
     store::purge::spawn(pool.clone(), PURGE_INTERVAL);
 
+    let rate_limiter = Arc::new(RateLimiter::default());
+    rate_limit::spawn_eviction(rate_limiter.clone(), EVICT_INTERVAL, EVICT_IDLE_AFTER);
+
     let state = AppState {
         pool,
         notify_tx,
-        rate_limiter: Arc::new(RateLimiter::default()),
+        rate_limiter,
     };
 
     // Serve the PWA alongside the API when a build is present. In development the two run apart
