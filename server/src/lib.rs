@@ -47,6 +47,20 @@ pub fn router(state: AppState) -> Router {
         .with_state(state)
 }
 
+/// Serves the PWA from the same origin as the API.
+///
+/// Same-origin is not a convenience: `EventSource` cannot send custom headers and CORS on an SSE
+/// stream is a needless way to lose the entire sync path. Serving both from one origin removes
+/// the question.
+///
+/// Unknown paths fall back to `index.html` so a hunt link (`/h/quiet-fox-8821-h7k2`) opens the
+/// app — the link is the whole of joining, and a 404 there is the product not working.
+pub fn with_static(router: Router, dir: &str) -> Router {
+    use tower_http::services::{ServeDir, ServeFile};
+    let index = ServeFile::new(format!("{dir}/index.html"));
+    router.fallback_service(ServeDir::new(dir).fallback(index))
+}
+
 /// Liveness, and the clock reference the client measures its own skew against.
 ///
 /// `no-store` is load-bearing rather than hygiene: a cached response carries a stale `Date`, and a

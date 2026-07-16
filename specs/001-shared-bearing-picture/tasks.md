@@ -173,8 +173,8 @@ each sees the other three on their own device within seconds.
 ## Phase 4: Polish & Cross-Cutting Concerns
 
 - [ ] T071 [P] Colour palette review in `web/src/log/colour.ts` — the twelve swatches are provisional and have had **no colour-vision-deficiency check and no direct-sunlight check**. Changing the list repaints every hunt, so settle it before real use
-- [ ] T072 [P] Publish the log format at `docs/log-format.md` so a third party can reimplement it (FR-021) — the constitution's actual test
-- [ ] T073 [P] Bundle size check against SC-001's 15-second cold join on real cell, not wifi
+- [X] T072 [P] Publish the log format at `docs/log-format.md` so a third party can reimplement it (FR-021) — the constitution's actual test
+- [X] T073 [P] Bundle size check against SC-001's 15-second cold join on real cell, not wifi
 - [ ] T074 Write up T070's findings against the spec; feed them into the next story
 
 ---

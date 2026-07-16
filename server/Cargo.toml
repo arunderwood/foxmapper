@@ -2,7 +2,10 @@
 name = "foxmapper-server"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+# 1.88, not the plan's 1.83. The plan says "1.83+" — a floor — and this is where the floor
+# actually sits once the locked dependency tree is resolved (edition2024, and `home` needs
+# 1.88). Recorded rather than discovered by a red build.
+rust-version = "1.88"
 
 [lints.clippy]
 all = { level = "deny", priority = -1 }
@@ -24,7 +27,7 @@ sha2 = "0.10"
 hex = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tower-http = { version = "0.6", features = ["trace", "cors"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "fs"] }
 async-stream = "0.3"
 thiserror = "2"
 

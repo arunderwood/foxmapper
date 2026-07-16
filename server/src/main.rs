@@ -37,7 +37,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rate_limiter: Arc::new(RateLimiter::default()),
     };
 
-    let app = router(state).layer(TraceLayer::new_for_http());
+    // Serve the PWA alongside the API when a build is present. In development the two run apart
+    // (Vite proxies /api), so its absence is normal rather than an error.
+    let mut app = router(state);
+    if let Ok(dir) = std::env::var("WEB_DIR") {
+        if std::path::Path::new(&dir).is_dir() {
+            tracing::info!(%dir, "serving the app");
+            app = foxmapper_server::with_static(app, &dir);
+        } else {
+            tracing::warn!(%dir, "WEB_DIR is set but missing; serving the API only");
+        }
+    }
+
+    let app = app.layer(TraceLayer::new_for_http());
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     tracing::info!(%bind_addr, "relay listening");
 
