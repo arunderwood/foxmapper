@@ -51,3 +51,44 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run test:unit
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: foxmapper
+          POSTGRES_PASSWORD: foxmapper
+          POSTGRES_DB: foxmapper
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ['5432:5432']
+    env:
+      DATABASE_URL: postgres://foxmapper:foxmapper@localhost:5432/foxmapper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # The E2E suite drives the real relay, not a mock: the sync cursor, the SSE stream and the
+      # idempotent append are the things most likely to break, and a mock would assert our
+      # assumptions back at us.
+      - name: Start the relay
+        run: |
+          cargo build --manifest-path server/Cargo.toml
+          BIND_ADDR=127.0.0.1:8080 ./server/target/debug/foxmapper-server &
+          for i in $(seq 1 60); do curl -sf http://localhost:8080/health && break; sleep 2; done
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run test:e2e -- --project=chromium
+        working-directory: web

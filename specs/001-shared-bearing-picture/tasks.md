@@ -146,10 +146,10 @@ each sees the other three on their own device within seconds.
 
 ### Tests for User Story 1 (per [quickstart.md](quickstart.md))
 
-- [ ] T058 [P] [US1] E2E join in `web/tests/e2e/join.spec.ts` — link to map in **under 15 s** (SC-001)
-- [ ] T059 [P] [US1] E2E two-device propagation in `web/tests/e2e/shared-picture.spec.ts` — report visible on the other device in **under 5 s** (SC-002); omni and null render without implying direction; retraction propagates
-- [ ] T060 [P] [US1] E2E relayed attribution in `web/tests/e2e/relay.spec.ts` — **0 relayed reports attributed to the operator who typed them** (SC-011); relay marking visible
-- [ ] T061 [P] [US1] E2E offline in `web/tests/e2e/offline.spec.ts` — **real airplane mode, HTTP cache cleared**; three reports accepted and rendered locally; survives force-quit; 100% present after reconnect (SC-005); blank basemap is expected, a lost report is not
+- [X] T058 [P] [US1] E2E join in `web/tests/e2e/join.spec.ts` — link to map in **under 15 s** (SC-001)
+- [X] T059 [P] [US1] E2E two-device propagation in `web/tests/e2e/shared-picture.spec.ts` — report visible on the other device in **under 5 s** (SC-002); omni and null render without implying direction; retraction propagates
+- [X] T060 [P] [US1] E2E relayed attribution in `web/tests/e2e/relay.spec.ts` — **0 relayed reports attributed to the operator who typed them** (SC-011); relay marking visible
+- [X] T061 [P] [US1] E2E offline in `web/tests/e2e/offline.spec.ts` — **real airplane mode, HTTP cache cleared**; three reports accepted and rendered locally; survives force-quit; 100% present after reconnect (SC-005); blank basemap is expected, a lost report is not
 - [X] T062 [US1] Manual SSE check per [quickstart.md](quickstart.md) Level 2 — `curl -N` shows events arriving one at a time; **a burst means a proxy is buffering and SC-002 is failing invisibly**
 - [ ] T063 [US1] Manual sensor checks per [quickstart.md](quickstart.md) Level 4 on real iOS and Android — declination applied (Bellingham ~15.2°); **stand next to a car and confirm the 10–30° swing**; clock set to 2030 does not crash
 - [ ] T064 [US1] Manual iOS storage checks per [quickstart.md](quickstart.md) Level 4 — the two things research could **not** verify from primary sources: does `persist()` beat the ITP 7-day rule, and does Add to Home Screen discard the tab's cache

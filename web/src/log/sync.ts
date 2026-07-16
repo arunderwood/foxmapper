@@ -22,6 +22,15 @@ export interface SyncOptions {
   apiOrigin: string;
   /** Called whenever reports arrive, so the map can re-fold. */
   onReports: (reports: readonly Report[]) => void;
+  /**
+   * Called when the stream opens or drops.
+   *
+   * This is what FR-018 renders, so it must track the *connection*, not whether reports happen to
+   * have arrived: a quiet hunt is not a disconnected one, and a map that cries "no signal" over a
+   * healthy stream teaches hunters to ignore the one indicator that tells them the picture is
+   * partial.
+   */
+  onLive?: (live: boolean) => void;
   /** Called when the queue depth changes, so the UI can show what is stuck on this phone. */
   onQueueDepth?: (depth: number) => void;
   /** Called when the hunt is gone (204/404), so the client can land the participant elsewhere. */
@@ -123,6 +132,7 @@ export class Sync {
 
     source.onopen = () => {
       this.#backoff = MIN_BACKOFF_MS;
+      this.#options.onLive?.(true);
       void this.flush();
     };
 
@@ -134,6 +144,7 @@ export class Sync {
       // SSE's automatic reconnection is oversold: only network errors retry. A non-200 or a wrong
       // MIME type makes the browser fail the connection and never reconnect — so a transient 502
       // from a load balancer would kill the stream for good. Watch readyState and re-create it.
+      this.#options.onLive?.(false);
       if (source.readyState !== EventSource.CLOSED) return;
       source.close();
       if (this.#stopped) return;

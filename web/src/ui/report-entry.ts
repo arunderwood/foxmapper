@@ -14,6 +14,7 @@ import { composeOmni, STRENGTH_CHOICES } from '../report/omni.js';
 import { composeHeardNothing } from '../report/heard_nothing.js';
 import { composeFix } from '../report/fix.js';
 import type { AuthorContext } from '../report/author.js';
+import { relayContext, type RelayDetails } from '../report/relay.js';
 import type { ConfidenceQ, MaxRangeR, Report, StrengthS } from '../log/types.js';
 import { watchHeading, needsPermission, requestPermission } from '../sensors/heading.js';
 import { el } from './dom.js';
@@ -24,6 +25,87 @@ export interface EntryOptions {
   /** Rebuilt at submit time so the position and time are the observation's, not the sheet's. */
   context: () => AuthorContext;
   onSubmit: (report: Report) => void;
+}
+
+/**
+ * Net control's flow: entering an observation heard over the radio, on behalf of someone else.
+ *
+ * Folded into the ordinary sheets rather than given its own button, because a relayed report is
+ * not a fifth kind — it is any kind whose observer is not the person typing. The observer need not
+ * be a participant: a voice-only operator with a radio and no phone appears on the map here.
+ */
+function relayFields(): {
+  node: HTMLElement;
+  details: () => RelayDetails | undefined;
+} {
+  const callsign = el('input', {
+    type: 'text',
+    autocapitalize: 'characters',
+    placeholder: 'KI7XYZ',
+    'data-testid': 'relay-callsign',
+    'aria-label': 'Their callsign',
+  });
+  const lat = el('input', {
+    type: 'number',
+    step: 'any',
+    placeholder: 'Latitude',
+    'data-testid': 'relay-lat',
+    'aria-label': 'Their latitude',
+  });
+  const lon = el('input', {
+    type: 'number',
+    step: 'any',
+    placeholder: 'Longitude',
+    'data-testid': 'relay-lon',
+    'aria-label': 'Their longitude',
+  });
+
+  const fields = el(
+    'div',
+    { class: 'stack', hidden: true, 'data-testid': 'relay-fields' },
+    el('label', {}, 'Their callsign'),
+    callsign,
+    // Set by hand: net control is not standing where the observer is, and their GPS says nothing
+    // about where the observation was taken from.
+    el('label', {}, 'Where they were'),
+    lat,
+    lon,
+  );
+
+  const toggle = el(
+    'button',
+    { type: 'button', 'aria-pressed': 'false', 'data-testid': 'relay-toggle' },
+    'This is someone else’s report',
+  );
+  toggle.addEventListener('click', () => {
+    const on = toggle.getAttribute('aria-pressed') === 'true';
+    toggle.setAttribute('aria-pressed', String(!on));
+    fields.toggleAttribute('hidden', on);
+  });
+
+  return {
+    node: el('div', { class: 'stack' }, toggle, fields),
+    details: () => {
+      if (toggle.getAttribute('aria-pressed') !== 'true') return undefined;
+      const cs = callsign.value.trim();
+      const latitude = Number(lat.value);
+      const longitude = Number(lon.value);
+      if (!cs || Number.isNaN(latitude) || Number.isNaN(longitude)) return undefined;
+      return {
+        observerCallsign: cs,
+        observerPosition: { lat: latitude, lon: longitude },
+        // The observation happened before it was read out on the air, but nobody knows exactly
+        // when. Now is the honest floor, and the log records the entering operator separately so
+        // a reader can see the hop.
+        observedAt: Date.now(),
+      };
+    },
+  };
+}
+
+/** Applies the relay details if net control filled them in; otherwise the context is unchanged. */
+function withRelay(context: AuthorContext, details: RelayDetails | undefined): AuthorContext {
+  return details ? relayContext(context, details) : context;
 }
 
 /**
@@ -174,6 +256,8 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
   }
   refresh();
 
+  const relay = relayFields();
+
   send.addEventListener('click', () => {
     const q = confidence.value();
     const r = range.value();
@@ -181,7 +265,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
     stopWatching?.();
     options.onSubmit(
       composeBearing({
-        ...options.context(),
+        ...withRelay(options.context(), relay.details()),
         draft: {
           heading_magnetic: magnetic,
           heading_source: source,
@@ -211,6 +295,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
       confidence.node,
       el('h2', {}, 'How far could it be?'),
       range.node,
+      relay.node,
       el('div', { class: 'sheet-actions' }, cancel, send),
     ],
     () => {

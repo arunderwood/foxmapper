@@ -52,11 +52,19 @@ export class MapView {
         center,
         onTilesUnavailable,
       });
-      this.#map.on('load', () => {
+      // A handle for the E2E suite, which needs to assert what the map is *drawing* rather than
+      // what the log holds — the gap between those two is where the render bugs live.
+      (window as unknown as { __map?: MapLibreMap }).__map = this.#map;
+
+      // `styledata`, not `load`: the basemap starts blank and swaps in the streets if the network
+      // offers, and a swapped style drops every custom source with it. Re-adding here covers the
+      // first style and the upgrade with one path.
+      //
+      // The flush matters as much as the layers: the log comes from IndexedDB and is almost always
+      // ready before any style is. Without it a hunter opening the app cold sees empty ground while
+      // holding every report, and nothing ever redraws it.
+      this.#map.on('styledata', () => {
         this.#addLayers();
-        // The log is almost always ready before the style is — it comes from IndexedDB, and the
-        // style comes from the network. Without this, a hunter opening the app cold sees an empty
-        // map while holding every report, and nothing ever redraws it.
         this.#flush();
       });
     });
@@ -64,7 +72,8 @@ export class MapView {
 
   #addLayers(): void {
     const map = this.#map;
-    if (!map) return;
+    // Idempotent: `styledata` fires more than once per style, and re-adding a live source throws.
+    if (!map || map.getSource(WEDGE_SOURCE)) return;
 
     const empty = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
     map.addSource(WEDGE_SOURCE, { type: 'geojson', data: empty() });

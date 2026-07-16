@@ -14,20 +14,45 @@
 
 const SHELL_CACHE = 'foxmapper-shell-v1';
 
+const ENTRY_URLS = ['/', '/index.html', '/manifest.webmanifest'];
+
 /**
- * The app shell. Vite fingerprints the built assets, so the worker caches what it is asked for at
- * runtime rather than a hardcoded list that would go stale on every deploy.
+ * The shell is index.html **and the app it loads**.
+ *
+ * Caching only the entry points is the trap: a worker installs and claims the page *after* that
+ * page's scripts have already been fetched, so the fingerprinted JS and CSS never pass through
+ * the fetch handler and never land in the cache. The next offline load then serves index.html
+ * from cache and dies fetching the app — an app-shell precache with no app in it.
+ *
+ * Vite fingerprints the asset filenames on every build, so the list is read out of the freshly
+ * fetched index.html rather than hardcoded here, where it would go stale on the next deploy.
  */
-const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest'];
+async function shellUrls() {
+  const urls = new Set(ENTRY_URLS);
+  try {
+    const response = await fetch('/index.html', { cache: 'reload' });
+    if (!response.ok) return [...urls];
+    const html = await response.text();
+    for (const match of html.matchAll(/(?:src|href)="(\/[^"]+)"/g)) {
+      urls.add(match[1]);
+    }
+  } catch {
+    // Installed with no network. The entry points still get cached if they are already there, and
+    // the next install with coverage picks up the rest.
+  }
+  return [...urls];
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
+    (async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      const urls = await shellUrls();
       // Individually, so one missing file does not fail the whole install and leave the app with
       // no offline shell at all.
-      .then((cache) => Promise.allSettled(SHELL_URLS.map((url) => cache.add(url))))
-      .then(() => self.skipWaiting()),
+      await Promise.allSettled(urls.map((url) => cache.add(url)));
+      await self.skipWaiting();
+    })(),
   );
 });
 

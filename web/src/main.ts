@@ -212,7 +212,12 @@ class App {
       apiOrigin: API_ORIGIN,
       onReports: (reports) => {
         for (const report of reports) this.#log = add(this.#log, report);
-        this.#live = true;
+        this.#refresh();
+      },
+      // Tracks the stream, not the traffic: a hunt where nobody has reported yet is not a hunt
+      // this device has lost touch with.
+      onLive: (live) => {
+        this.#live = live;
         this.#refresh();
       },
       onQueueDepth: (depth) => {

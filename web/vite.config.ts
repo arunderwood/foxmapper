@@ -14,4 +14,11 @@ export default defineConfig({
       '/health': { target: RELAY, changeOrigin: true },
     },
   },
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': { target: RELAY, changeOrigin: true },
+      '/health': { target: RELAY, changeOrigin: true },
+    },
+  },
 });
