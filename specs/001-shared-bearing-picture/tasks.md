@@ -158,9 +158,9 @@ each sees the other three on their own device within seconds.
 
 ### Deploy (US1) — required before the field test
 
-- [ ] T067 [US1] Render web service + Postgres; migrations on deploy
-- [ ] T068 [US1] **Disable proxy buffering** (`X-Accel-Buffering: no`, `proxy_buffering off`) and **serve over HTTP/2**; long read timeouts. Not tuning — buffered SSE fails SC-002 silently and only in production
-- [ ] T069 [US1] Verify T062's `curl -N` check **against the deployed URL**, not localhost
+- [X] T067 [US1] Render web service + Postgres; migrations on deploy — **live at `https://foxmapper.onrender.com` 2026-07-16**. Blueprint deploy, no code change; Postgres 18, migrations ran on first boot, `/health` green in ~8 min (cold Rust release build). One image serving the PWA and the API from the same origin
+- [X] T068 [US1] **Disable proxy buffering** (`X-Accel-Buffering: no`, `proxy_buffering off`) and **serve over HTTP/2**; long read timeouts. Not tuning — buffered SSE fails SC-002 silently and only in production — **verified in production**: HTTP/2 on `/health` and the stream, `cache-control: no-cache, no-transform`, and nothing buffering (see T069). `x-accel-buffering` is absent from the response because an nginx-family proxy reads and strips it — consistent with it being honoured, and the timing settles it either way
+- [X] T069 [US1] Verify T062's `curl -N` check **against the deployed URL**, not localhost — **passed**. Three reports posted 3 s apart arrived **164 / 111 / 136 ms** after their POSTs, 3.2 s apart — tracking the posts, one at a time, not a burst. SC-002 budgets 5 s; production delivers in ~130 ms. Also verified in prod: `id:` = server seq, `Last-Event-ID: 1` replays exactly 2 and 3 (catch-up and live push are one code path), `since=0` returns the whole hunt, unknown hunt streams `204`. See [findings.md](findings.md)
 
 ### Shakedown (US1) — before anyone else is invited
 

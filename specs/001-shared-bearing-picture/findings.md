@@ -23,6 +23,7 @@ after, because the point of the field gate is that it can still change the answe
 | A report survives a force-quit and reaches the server (SC-005) | E2E, offline then reconnect | `web/tests/e2e/offline.spec.ts` |
 | 0 relayed reports attributed to the operator (SC-011) | E2E driving the real relay UI | `web/tests/e2e/relay.spec.ts` |
 | SSE is not buffered (SC-002 locally) | `curl -N` shows events 2s apart, not a burst | T062, and against the deploy image |
+| **SSE is not buffered in production (SC-002)** | `curl -N` against the deployed URL: ~130 ms delivery, events tracking the posts | **T069, `foxmapper.onrender.com`** |
 | No protocol vocabulary reaches a screen (SC-008, in part) | Literal scan of every UI module + the shipped bundle | `web/tests/unit/vocabulary.test.ts` |
 
 **Totals**: 153 web unit tests, 47 server tests, 23 E2E. All green.
@@ -116,6 +117,11 @@ whether the product survived people, and nothing in between asked whether it wor
 outdoors. It is not the gate and does not close the story; it is what makes the invitation in T070
 worth spending.
 
+**Deploy and T069 are done (2026-07-16); the ladder now starts at T063/T064.** Everything below
+needs hardware or people. **T064 is the long pole and should start today**: it has a seven-day clock
+and no dependants, so it is the one item that can put itself on the critical path by being started
+late.
+
 ### T063 — sensors, on real iOS and Android
 - Does the compass swing 10–30° next to a car? The entire honesty cap (Q ≤ 5) rests on that number.
 - Does declination land at ~15.2° in Bellingham? (The library computes 15.18° for 2026 — checked in
@@ -163,15 +169,43 @@ are behavioural:
   decision. The plan says: *"If the blank map proves useless outdoors, the field gate will say so —
   and that answer is worth more than a tile pipeline built on a guess."*
 
-### T067–T069 — deploy
-The blueprint (`render.yaml`) and the image are written, and the image was **built and run**: it
-serves the app, the API, the service worker, the SPA fallback for a hunt link, and an unbuffered
-SSE stream with the right headers. What has not happened is a deploy to Render — that needs an
-account and is the maintainer's to trigger.
+### ~~T067–T069 — deploy~~ — DONE 2026-07-16. `https://foxmapper.onrender.com`
 
-**T069 remains open and matters**: `curl -N` must be re-run against the deployed URL. Buffered SSE
-fails SC-002 *silently and only in production*, and every check so far has been against localhost
-or a local container. Passing here proves nothing about Render's proxy.
+Deployed from the blueprint with no code change. Postgres 18, migrations ran on first boot, one
+image serving the PWA and the API from the same origin. `/health` green in ~8 minutes — a cold Rust
+release build.
+
+**T069 passed against the deployed URL, and this is the number that mattered.** Three reports posted
+3 s apart, arrival timestamped at the `curl -N` end:
+
+| posted | arrived | latency |
+|---|---|---|
+| `…891.618` | `…891.782` | **164 ms** |
+| `…894.831` | `…894.942` | **111 ms** |
+| `…897.993` | `…898.129` | **136 ms** |
+
+Events arrived 3.2 s apart — tracking the posts, one at a time, not a burst. **Nothing in Render's
+path buffers.** SC-002 budgets 5 s; production delivers in ~130 ms, a ~35x margin. The section this
+replaces said "passing locally proves nothing about Render's proxy", which was right, and is why
+this was worth running before anyone else was involved.
+
+Verified in production at the same time, all from the plan's Stage 2.5/2.6 "Done when" column:
+
+- `id:` **is** the server sequence, and `Last-Event-ID: 1` replays exactly 2 and 3 — catch-up after
+  an offline gap and live push really are one code path, as the plan bet.
+- `since=0` returns the whole hunt — the poll fallback works.
+- An unknown hunt streams **204**, which is what drives a participant out of a purged hunt.
+- **HTTP/2** on both `/health` and the stream (T068).
+
+One thing worth writing down because it looks like a failure and is not: `x-accel-buffering` does
+**not** appear in the response headers. An nginx-family proxy reads that header and strips it, so
+its absence is consistent with it having been honoured — and the timing above settles the question
+regardless of what the headers say.
+
+**`autoDeployTrigger` was wrong by default.** The blueprint did not set it, so the service came up
+on `commit` — deploying every push to main whether CI passed or not, for a service whose whole
+purpose is to be running while nobody is watching a dashboard. Fixed to `checksPass` (PR #29),
+matching what the maintainer's other service already does.
 
 ### T071 — the palette
 The twelve swatches are provisional and have had **no colour-vision-deficiency check and no
