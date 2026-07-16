@@ -2,6 +2,11 @@
 
 FROM rust:1.97-slim AS base
 WORKDIR /app
+# Before any cargo call, so dev's cargo-watch and the builder's dependency layer resolve the same
+# compiler. rust-toolchain.toml is the source of truth; the tag above is only the base layer. When
+# they agree this costs nothing, and when Dependabot bumps one first rustup fetches the pinned
+# toolchain rather than quietly building with the other one.
+COPY rust-toolchain.toml ./
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*

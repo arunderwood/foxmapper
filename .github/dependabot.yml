@@ -28,6 +28,13 @@ updates:
         patterns: ['*']
         update-types: [minor, patch]
 
+  # The compiler pin itself. Ungrouped and on its own: a toolchain bump rebuilds the world and can
+  # surface new clippy lints, so it deserves to fail in a PR of its own rather than inside a batch.
+  - package-ecosystem: rust-toolchain
+    directory: /server
+    schedule:
+      interval: weekly
+
   # Root Dockerfile builds the single deploy image; server/Dockerfile is the compose dev build.
   - package-ecosystem: docker
     directories:

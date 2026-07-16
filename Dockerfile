@@ -17,7 +17,9 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
     && rm -rf /var/lib/apt/lists/*
-COPY server/Cargo.toml server/Cargo.lock ./
+# rust-toolchain.toml rides along with the manifests: it must be here before the stub build below,
+# or the dependency layer compiles with the base image's toolchain instead of the pinned one.
+COPY server/Cargo.toml server/Cargo.lock server/rust-toolchain.toml ./
 # Cache the dependency build against a stub, so a source edit does not rebuild the world.
 RUN mkdir src \
     && echo 'fn main() {}' > src/main.rs \

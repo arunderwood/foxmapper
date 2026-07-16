@@ -1,0 +1,10 @@
+# The single source of truth for the compiler, for CI, both Dockerfiles and local dev alike.
+#
+# It lives in server/ rather than the repo root because the compose dev build has ./server as its
+# build context — a root-level file would be invisible to it.
+#
+# This is the toolchain we build with. Cargo.toml's `rust-version` is a different claim: the
+# oldest compiler the crate supports. The two are allowed to diverge.
+[toolchain]
+channel = "1.97.0"
+components = ["clippy", "rustfmt"]

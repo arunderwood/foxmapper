@@ -1,0 +1,35 @@
+name: Rust toolchain
+description: Install the toolchain pinned by server/rust-toolchain.toml — and only that toolchain.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: server
+      run: |
+        set -euo pipefail
+
+        # `rustup toolchain install` with no argument reads rust-toolchain.toml, components and
+        # all. No version appears here on purpose: the file is the only place it is written down.
+        rustup toolchain install
+
+        pinned=$(rustup show active-toolchain | cut -d' ' -f1)
+
+        # Make the pin the default too. Jobs that run cargo from the repo root — the E2E relay
+        # build — sit above rust-toolchain.toml and would otherwise fall back to whatever the
+        # runner image shipped.
+        rustup default "$pinned"
+
+        # Then remove every other toolchain, which is load-bearing rather than tidiness.
+        #
+        # Swatinem/rust-cache >= 2.9.0 hashes *every* installed rustup toolchain into its cache
+        # key. The runner image preinstalls its own `stable`, which lags (1.96.1 as of ubuntu-24.04
+        # today) and moves independently of us. Leaving it installed means the key depends on which
+        # image version the job happens to land on: `server` and `e2e` stop sharing a cache, and an
+        # image roll invalidates it for nothing. Pruning makes the key a function of the pin alone.
+        #
+        # `|| true` because grep exits 1 when it matches nothing, which under pipefail would fail
+        # the step precisely when there was nothing to prune — the good case.
+        rustup toolchain list | cut -d' ' -f1 | { grep -vFx "$pinned" || true; } | xargs -r -n1 rustup toolchain uninstall
+
+        rustup toolchain list
