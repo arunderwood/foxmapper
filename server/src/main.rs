@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     let (notify_tx, _) = broadcast::channel(1024);
-    spawn_listener(database_url.clone(), notify_tx.clone());
+    spawn_listener(database_url.clone(), notify_tx.clone(), None);
     store::purge::spawn(pool.clone(), PURGE_INTERVAL);
 
     let state = AppState {

@@ -199,7 +199,9 @@ async fn the_stream_replays_from_last_event_id_and_then_pushes_live() {
         .rsplit_once('/')
         .map(|(p, _)| format!("{p}/{}", db.name))
         .expect("url");
-    spawn_listener(listener_url, state.notify_tx.clone());
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    spawn_listener(listener_url, state.notify_tx.clone(), Some(ready_tx));
+    ready_rx.await.expect("listener ready");
 
     let base = serve(state).await;
     let http = reqwest::Client::new();
