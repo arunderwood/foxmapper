@@ -13,6 +13,10 @@ services:
     dockerContext: .
     plan: starter
     healthCheckPath: /health
+    # Wait for CI. The default is `commit`, which ships every push to main whether the tests
+    # passed or not — and the one thing this service exists for is a hunt happening outdoors,
+    # where nobody is watching the dashboard and a red build looks exactly like a green one.
+    autoDeployTrigger: checksPass
     envVars:
       - key: DATABASE_URL
         fromDatabase:
