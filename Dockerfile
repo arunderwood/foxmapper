@@ -12,7 +12,7 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM rust:1.90-slim AS server
+FROM rust:1.97-slim AS server
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
