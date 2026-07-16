@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use rand::{rngs::OsRng, Rng};
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 use crate::{model::Target, now_ms, store, AppState};
@@ -57,16 +57,16 @@ pub fn code_entropy_bits() -> f64 {
 /// script enumerates that. The suffix is what the contract sanctions to reach the floor, and the
 /// words are what keep the code speakable.
 ///
-/// Drawn from `OsRng` (the OS CSPRNG) via `gen_range`, which rejects rather than taking a modulo,
-/// so every code is uniform over the space the entropy calculation claims.
+/// Drawn from the thread-local CSPRNG via `random_range`, which rejects rather than taking a
+/// modulo, so every code is uniform over the space the entropy calculation claims.
 #[must_use]
 pub fn generate_code() -> String {
-    let mut rng = OsRng;
-    let adjective = ADJECTIVES[rng.gen_range(0..ADJECTIVES.len())];
-    let noun = NOUNS[rng.gen_range(0..NOUNS.len())];
-    let number: u32 = rng.gen_range(0..10u32.pow(DIGITS));
+    let mut rng = rand::rng();
+    let adjective = ADJECTIVES[rng.random_range(0..ADJECTIVES.len())];
+    let noun = NOUNS[rng.random_range(0..NOUNS.len())];
+    let number: u32 = rng.random_range(0..10u32.pow(DIGITS));
     let suffix: String = (0..SUFFIX_LEN)
-        .map(|_| SUFFIX_ALPHABET[rng.gen_range(0..SUFFIX_ALPHABET.len())] as char)
+        .map(|_| SUFFIX_ALPHABET[rng.random_range(0..SUFFIX_ALPHABET.len())] as char)
         .collect();
     format!("{adjective}-{noun}-{number:04}-{suffix}")
 }
