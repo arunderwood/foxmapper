@@ -20,7 +20,7 @@ use axum::{
 };
 use sqlx::{postgres::PgListener, PgPool};
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -77,8 +77,17 @@ async fn health() -> impl axum::response::IntoResponse {
 ///
 /// One LISTEN connection per process, fanned out to every open stream. Reconnects on error: a
 /// dropped listener means live push stops, and the streams would sit silent with no way to know.
-pub fn spawn_listener(database_url: String, notify_tx: broadcast::Sender<String>) {
+///
+/// `ready` fires once, after the first successful `LISTEN`: a NOTIFY sent before that point is
+/// never delivered, so anything that needs to guarantee delivery (namely: tests) can wait on it
+/// rather than race the connection.
+pub fn spawn_listener(
+    database_url: String,
+    notify_tx: broadcast::Sender<String>,
+    ready: Option<oneshot::Sender<()>>,
+) {
     tokio::spawn(async move {
+        let mut ready = ready;
         loop {
             match PgListener::connect(&database_url).await {
                 Ok(mut listener) => {
@@ -88,6 +97,9 @@ pub fn spawn_listener(database_url: String, notify_tx: broadcast::Sender<String>
                         continue;
                     }
                     tracing::info!("listening for report notifications");
+                    if let Some(tx) = ready.take() {
+                        let _ = tx.send(());
+                    }
                     loop {
                         match listener.recv().await {
                             Ok(notification) => {
