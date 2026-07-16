@@ -7,7 +7,7 @@
  * colours. The callsign is the only key that gives one person one colour everywhere.
  */
 import { sha256Utf8 } from './sha256.js';
-import type { ObservationReport } from './types.js';
+import { isRelayed, type ObservationReport } from './types.js';
 
 /**
  * Normative and ordered. Changing this list, or its order, repaints every hunt — it is versioned
@@ -94,4 +94,19 @@ export function displayName(
 ): string {
   if (!ambiguous.has(callsign)) return callsign;
   return `${callsign} ·${suffixFor(enteringParticipantId)}`;
+}
+
+/**
+ * The name to put on a report, which is `displayName` for a self-report and **the bare callsign for
+ * a relayed one**.
+ *
+ * A relayed report carries the *relayer's* `participant_id`, so passing it to `displayName` would
+ * suffix the observer with a marker identifying who typed it — a distinction the observer never
+ * made and the voice call never carried. `ambiguousCallsigns` already excludes relayed reports from
+ * detection; this is the other half of that rule, and it belongs here rather than at the call site
+ * where it was missed once already.
+ */
+export function labelFor(report: ObservationReport, ambiguous: ReadonlySet<string>): string {
+  if (isRelayed(report)) return report.observer.callsign;
+  return displayName(report.observer.callsign, report.entered_by.participant_id, ambiguous);
 }

@@ -27,12 +27,6 @@ export function merge(a: Log, b: Log): Log {
   return merged;
 }
 
-export function mergeAll(logs: Iterable<Log>): Log {
-  let acc: Log = new Map<string, Report>();
-  for (const log of logs) acc = merge(acc, log);
-  return acc;
-}
-
 /** Add one report. Adding a known id is a no-op, which is what makes retry-forever safe. */
 export function add(log: Log, report: Report): Log {
   if (log.has(report.id)) return log;

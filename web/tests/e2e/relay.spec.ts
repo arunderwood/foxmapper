@@ -9,7 +9,14 @@
  * have passed while net control had no way to relay anything at all.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { createHunt, grantPosition, joinAs, localReports, renderedFeatures, RELAY } from './helpers.js';
+import {
+  createHunt,
+  grantPosition,
+  joinAs,
+  localReports,
+  renderedFeatures,
+  RELAY,
+} from './helpers.js';
 
 const NET_CONTROL_AT = { latitude: 48.7519, longitude: -122.4787 };
 const OBSERVER_AT = { lat: 48.9, lon: -122.6 };
@@ -28,6 +35,151 @@ async function relayBearing(page: Page, observer: string, at = OBSERVER_AT): Pro
 
   await page.getByTestId('send-bearing').click();
 }
+
+test('a half-filled relay files nothing at all — FR-008, Constitution I', async ({
+  page,
+  context,
+}) => {
+  // `Number('')` is 0, not NaN, so a blank coordinate used to pass the guard and put the observer
+  // at lat 0, lon 0 — Null Island — marked "set by hand", under their own callsign. The observer
+  // cannot correct it: they are not in the app.
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  await page.getByTestId('report-null').click();
+  await page.getByTestId('relay-toggle').click();
+  await page.getByTestId('relay-callsign').fill('KI7XYZ');
+  // Position left blank — the operator got interrupted by the next call.
+  await page.getByTestId('send-null').click();
+
+  await expect(page.getByTestId('sheet-problem')).toContainText('their latitude');
+  await expect(page.getByTestId('sheet-problem')).toContainText('their longitude');
+  expect(await localReports(page)).toHaveLength(0);
+});
+
+test('a half-filled relay is never filed as net control’s own — SC-011, FR-007b', async ({
+  page,
+  context,
+}) => {
+  // The failure that mattered more: with any field blank the report used to fall back to the
+  // entering operator's own context — filed as *their* observation, from *their* position, with
+  // the relay toggle visibly on. SC-011 puts the acceptable number of those at zero.
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  await page.getByTestId('report-omni').click();
+  await page.getByTestId('relay-toggle').click();
+  // Callsign left blank; the position is filled in.
+  await page.getByTestId('relay-lat').fill(String(OBSERVER_AT.lat));
+  await page.getByTestId('relay-lon').fill(String(OBSERVER_AT.lon));
+  await page.getByTestId('strength-1').click();
+
+  await expect(page.getByTestId('sheet-problem')).toContainText('their callsign');
+  // Nothing was filed — and in particular nothing wearing W7NET's name.
+  expect(await localReports(page)).toHaveLength(0);
+  expect(await renderedFeatures(page)).toHaveLength(0);
+});
+
+test('a coordinate that is not a coordinate is refused — FR-008', async ({ page, context }) => {
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  await page.getByTestId('report-null').click();
+  await page.getByTestId('relay-toggle').click();
+  await page.getByTestId('relay-callsign').fill('KI7XYZ');
+  // 480° of latitude is not a place. A number input accepts it; the Earth does not.
+  await page.getByTestId('relay-lat').fill('480');
+  await page.getByTestId('relay-lon').fill(String(OBSERVER_AT.lon));
+  await page.getByTestId('send-null').click();
+
+  await expect(page.getByTestId('sheet-problem')).toContainText('their latitude');
+  expect(await localReports(page)).toHaveLength(0);
+});
+
+test('net control can relay a signal report, not only a bearing — FR-007a/b', async ({
+  page,
+  context,
+}) => {
+  // The hunter most likely to be calling their report in over voice is the one with a handheld and
+  // a rubber duck — exactly the person Principle II exists for. The relay path lived on the bearing
+  // sheet alone, so their contribution was the one kind net control could not enter.
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  await page.getByTestId('report-omni').click();
+  await page.getByTestId('relay-toggle').click();
+  await page.getByTestId('relay-callsign').fill('KI7XYZ');
+  await page.getByTestId('relay-lat').fill(String(OBSERVER_AT.lat));
+  await page.getByTestId('relay-lon').fill(String(OBSERVER_AT.lon));
+  await page.getByTestId('strength-1').click();
+
+  await expect.poll(async () => (await renderedFeatures(page)).length, { timeout: 5_000 }).toBe(1);
+  const [feature] = await renderedFeatures(page);
+  expect(feature!.kind).toBe('omni');
+  expect(feature!.label).toBe('KI7XYZ');
+  expect(feature!.relayed).toBe(true);
+  expect(feature!.entered_by).toBe('W7NET');
+});
+
+test('net control can relay a heard-nothing report — FR-007a/b', async ({ page, context }) => {
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  await page.getByTestId('report-null').click();
+  await page.getByTestId('relay-toggle').click();
+  await page.getByTestId('relay-callsign').fill('KI7XYZ');
+  await page.getByTestId('relay-lat').fill(String(OBSERVER_AT.lat));
+  await page.getByTestId('relay-lon').fill(String(OBSERVER_AT.lon));
+  await page.getByTestId('send-null').click();
+
+  await expect.poll(async () => (await renderedFeatures(page)).length, { timeout: 5_000 }).toBe(1);
+  const [feature] = await renderedFeatures(page);
+  expect(feature!.kind).toBe('null');
+  expect(feature!.label).toBe('KI7XYZ');
+  expect(feature!.relayed).toBe(true);
+});
+
+test('a relayed report records when the observation was taken, not when it was typed — FR-007', async ({
+  page,
+  context,
+}) => {
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  const before = Date.now();
+  await page.getByTestId('report-null').click();
+  await page.getByTestId('relay-toggle').click();
+  await page.getByTestId('relay-callsign').fill('KI7XYZ');
+  await page.getByTestId('relay-lat').fill(String(OBSERVER_AT.lat));
+  await page.getByTestId('relay-lon').fill(String(OBSERVER_AT.lon));
+  // The operator heard this called five minutes ago. Recording "now" would file every relayed
+  // report late by however long the voice traffic took.
+  await page.getByTestId('relay-minutes-ago').fill('5');
+  await page.getByTestId('send-null').click();
+
+  await expect.poll(async () => (await localReports(page)).length, { timeout: 5_000 }).toBe(1);
+  const observedAt = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open('foxmapper');
+      request.onsuccess = () => resolve(request.result);
+    });
+    const all: { observed_at: number }[] = await new Promise((resolve) => {
+      const request = db.transaction('reports', 'readonly').objectStore('reports').getAll();
+      request.onsuccess = () => resolve(request.result);
+    });
+    return all[0]!.observed_at;
+  });
+
+  // Five minutes back, give or take the test's own runtime.
+  expect(observedAt).toBeLessThan(before - 4 * 60_000);
+  expect(observedAt).toBeGreaterThan(before - 6 * 60_000);
+});
 
 test('a relayed report is attributed to the observer, never the operator — SC-011', async ({
   page,
@@ -63,7 +215,10 @@ test('the relay marking is visible, and names the entering operator', async ({ p
   expect(feature!.placed).toBe(true);
 });
 
-test('a relayed report carries the observers position, not net controls', async ({ page, context }) => {
+test('a relayed report carries the observers position, not net controls', async ({
+  page,
+  context,
+}) => {
   await grantPosition(context, NET_CONTROL_AT);
   const code = await createHunt();
   await joinAs(page, code, 'W7NET');
@@ -110,10 +265,12 @@ test('the observer need not be a participant', async ({ page, context }) => {
       const request = indexedDB.open('foxmapper');
       request.onsuccess = () => resolve(request.result);
     });
-    const all: { kind: string; observer: Record<string, unknown> }[] = await new Promise((resolve) => {
-      const rq = db.transaction('reports', 'readonly').objectStore('reports').getAll();
-      rq.onsuccess = () => resolve(rq.result);
-    });
+    const all: { kind: string; observer: Record<string, unknown> }[] = await new Promise(
+      (resolve) => {
+        const rq = db.transaction('reports', 'readonly').objectStore('reports').getAll();
+        rq.onsuccess = () => resolve(rq.result);
+      },
+    );
     return all.find((r) => r.kind === 'bearing')?.observer;
   });
 
@@ -121,7 +278,10 @@ test('the observer need not be a participant', async ({ page, context }) => {
   expect(observer).not.toHaveProperty('participant_id');
 });
 
-test('net control reporting their own observation is not marked relayed', async ({ page, context }) => {
+test('net control reporting their own observation is not marked relayed', async ({
+  page,
+  context,
+}) => {
   await grantPosition(context, NET_CONTROL_AT);
   const code = await createHunt();
   await joinAs(page, code, 'W7NET');

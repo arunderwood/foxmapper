@@ -41,6 +41,48 @@ test('the target is shown before any report arrives', async ({ page, context }) 
   await expect(page.getByTestId('join-target')).toContainText('Stuck mic on the 146.96 machine');
 });
 
+test('the join screen does not wait for the network — FR-002, Constitution III', async ({
+  page,
+  context,
+}) => {
+  // The target fetch used to be awaited before the join screen was rendered, under a comment
+  // claiming it never blocked. Offline it rejected fast and the claim held by luck; a captive
+  // portal or a weak link — which is what "out of coverage" usually looks like — left the
+  // participant staring at nothing for the life of the request. Joining is a purely local act.
+  await grantPosition(context);
+  const code = await createHunt('Saturday fox');
+
+  // A relay that accepts the connection and then says nothing at all.
+  await page.route(/\/api\/hunts\/[^/]+$/, () => {
+    /* never resolves */
+  });
+
+  await page.goto(`/h/${code}`);
+  await expect(page.getByTestId('callsign-input')).toBeVisible({ timeout: 10_000 });
+  // The code stands in until the target lands, so the hunter knows which hunt they are joining.
+  await expect(page.getByTestId('join-target')).toContainText(code);
+});
+
+test('joining is not interrupted by the target arriving', async ({ page, context }) => {
+  // The target fills the line in place. Re-rendering the screen instead raced the hunter: it wiped
+  // a half-typed callsign, and if they had already joined it replaced the map with a join screen
+  // for the hunt they were in — a hang that reproduced about once in twenty-four runs.
+  await grantPosition(context);
+  const code = await createHunt('Saturday fox');
+  await page.goto(`/h/${code}`);
+
+  await page.getByTestId('callsign-input').fill('KI7XYZ');
+  await page.getByTestId('join-button').click();
+
+  // The map comes up and stays up.
+  await page.getByTestId('report-bar').waitFor();
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId('report-bar')).toBeVisible();
+  await expect(page.getByTestId('join-screen')).toHaveCount(0);
+  // ...and the target reaches the map even though it landed after the join.
+  await expect(page.getByTestId('target-label')).toHaveText('Saturday fox');
+});
+
 test('the limits are in the interface, not in terms of service', async ({ page, context }) => {
   await grantPosition(context);
   const code = await createHunt();

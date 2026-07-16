@@ -19,6 +19,19 @@ export interface JoinOptions {
   onJoined: (callsign: string) => void;
 }
 
+/**
+ * What the join screen says you are chasing: the target once known, the bare code until then.
+ *
+ * Exported so the caller can update the line in place. The alternative — re-rendering the screen
+ * when the target arrives — races the hunter: it wipes a half-typed callsign, and if they have
+ * already joined it replaces the map they are looking at with a join screen for a hunt they are
+ * in.
+ */
+export function targetLine(target: Target | undefined, huntCode: string): string {
+  if (!target) return `Hunt ${huntCode}`;
+  return `${target.label}${target.frequency.trim() ? ` · ${target.frequency}` : ''}`;
+}
+
 export function joinScreen(options: JoinOptions): HTMLElement {
   const input = el('input', {
     id: 'callsign',
@@ -61,16 +74,21 @@ export function joinScreen(options: JoinOptions): HTMLElement {
     { class: 'screen', 'data-testid': 'join-screen' },
     el('h1', {}, 'FoxMapper'),
     // The target is shown before any report arrives, so a joining hunter knows what they are
-    // chasing. Offline, it is simply absent — which does not block joining.
-    options.target
-      ? el(
-          'p',
-          { class: 'dim', 'data-testid': 'join-target' },
-          `${options.target.label}${options.target.frequency ? ` · ${options.target.frequency}` : ''}`,
-        )
-      : el('p', { class: 'dim' }, `Hunt ${options.huntCode}`),
+    // chasing. Offline it is simply the code — which does not block joining.
+    //
+    // Always the same element, so the caller can fill the target in when it lands rather than
+    // re-rendering this screen underneath someone who is typing their callsign into it.
+    el(
+      'p',
+      { class: 'dim', 'data-testid': 'join-target' },
+      targetLine(options.target, options.huntCode),
+    ),
     form,
-    el('p', { class: 'small dim' }, 'No account. No app to install. Your callsign stays on your phone.'),
+    el(
+      'p',
+      { class: 'small dim' },
+      'No account. No app to install. Your callsign stays on your phone.',
+    ),
     limitsNotice(),
   );
 }

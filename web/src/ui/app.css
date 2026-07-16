@@ -235,9 +235,14 @@ input {
 }
 
 /* The licence requires the attribution be present, so it is lifted clear of the report bar
-   rather than sitting under it. */
-.maplibregl-ctrl-bottom-right,
-.maplibregl-ctrl-bottom-left {
+   rather than sitting under it.
+ *
+ * Scoped under `.maplibregl-map` to outrank MapLibre's own `bottom: 0` on specificity rather than
+ * on load order: index.html links this file in <head> while MapLibre's stylesheet arrives with the
+ * bundle, so an equally-specific rule here loses and the attribution goes back under the report
+ * bar — which is the licence unmet, not a cosmetic fault. */
+.maplibregl-map .maplibregl-ctrl-bottom-right,
+.maplibregl-map .maplibregl-ctrl-bottom-left {
   bottom: calc(var(--touch) + 1rem);
 }
 
@@ -270,6 +275,99 @@ input {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 0.5rem;
+}
+
+/* ---- Chips that do something ---- */
+
+/* The status bar lets taps through to the map, so anything inside it that is actually a control
+   has to take them back. Without this the share button and the hand-placement button are painted
+   on and dead. */
+.chip button {
+  pointer-events: auto;
+  min-height: 0;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+}
+
+.chip [data-testid='share-hunt'] {
+  margin-left: 0;
+  border: 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Placing a position by hand ---- */
+
+.banner {
+  position: absolute;
+  z-index: 3;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.banner button {
+  min-height: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* A crosshair says "this tap is an answer", which a grab hand does not. */
+#map.placing canvas {
+  cursor: crosshair;
+}
+
+/* ---- Report detail ---- */
+
+.popup p {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.popup button {
+  margin-top: 0.5rem;
+  min-height: 0;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  border-color: var(--danger);
+  color: var(--danger);
+  background: transparent;
+}
+
+/* MapLibre's popup is white by default and would be unreadable against this palette. Scoped for
+   specificity, for the same reason as the attribution above. */
+.maplibregl-popup .maplibregl-popup-content {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+}
+
+.maplibregl-popup .maplibregl-popup-tip {
+  border-top-color: var(--surface);
+  border-bottom-color: var(--surface);
+}
+
+.maplibregl-popup .maplibregl-popup-close-button {
+  color: var(--text);
+  font-size: 1.1rem;
+  padding: 0 0.35rem;
 }
 
 /* ---- Notices ---- */

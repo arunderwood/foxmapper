@@ -16,8 +16,8 @@
  */
 import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import type { FoldResult } from '../log/fold.js';
-import { ambiguousCallsigns, colourFor, displayName } from '../log/colour.js';
-import { displayTime, type ClockOffset } from '../log/clock.js';
+import { ambiguousCallsigns, colourFor, labelFor } from '../log/colour.js';
+import { displayTime, isSkewed, type ClockOffset } from '../log/clock.js';
 import { isRelayed, type ObservationReport } from '../log/types.js';
 import { wedgeFor } from './wedge.js';
 
@@ -27,6 +27,13 @@ export interface ReportProperties {
   kind: ObservationReport['kind'];
   /** Callsign, with the collision suffix only when a collision actually exists. */
   label: string;
+  /**
+   * What the map draws beside the report: the callsign, plus every caveat that must not wait for a
+   * tap — the voice hop and its operator (FR-012b), and a position nobody measured (FR-008).
+   *
+   * Multi-line. Distinct from `label`, which is one line and names the observer only.
+   */
+  map_label: string;
   colour: string;
   /** Derived, never stored: observer.callsign !== entered_by.callsign. */
   relayed: boolean;
@@ -41,11 +48,14 @@ export interface ReportProperties {
   clock_unknown: boolean;
   /** True when the authoring device knew its clock was more than two minutes out. */
   clock_suspect: boolean;
-  /** omni only. */
-  strength_s?: number;
+  /**
+   * omni only: how strong the signal was, as the raw on-air digit.
+   *
+   * Named for the claim rather than the protocol field it comes from, because the map styles on it
+   * and every string in a rendering module is one copy-paste from a screen.
+   */
+  strength?: number;
 }
-
-const SKEW_WARNING_MS = 2 * 60 * 1_000;
 
 export interface RenderedLog {
   /** Bearing wedges. */
@@ -88,28 +98,47 @@ export function render(fold: FoldResult): RenderedLog {
   };
 }
 
-function propertiesOf(
-  report: ObservationReport,
-  ambiguous: ReadonlySet<string>,
-): ReportProperties {
+function propertiesOf(report: ObservationReport, ambiguous: ReadonlySet<string>): ReportProperties {
   const offset: ClockOffset = report.clock_offset_ms;
   const relayed = isRelayed(report);
+  const placed = report.position_source === 'placed';
+
+  // The callsign is the identifier; colour is only an aid. FR-012 requires the callsign on every
+  // report, so identity never rests on colour alone — which matters, because with twelve
+  // swatches a hunt of eight will usually contain a collision.
+  const label = labelFor(report, ambiguous);
 
   return {
     report_id: report.id,
     kind: report.kind,
-    // The callsign is the identifier; colour is only an aid. FR-012 requires the callsign on every
-    // report, so identity never rests on colour alone — which matters, because with twelve
-    // swatches a hunt of eight will usually contain a collision.
-    label: displayName(report.observer.callsign, report.entered_by.participant_id, ambiguous),
+    label,
+    map_label: mapLabel(label, relayed ? report.entered_by.callsign : undefined, placed),
     colour: colourFor(report.observer.callsign),
     relayed,
     ...(relayed ? { entered_by: report.entered_by.callsign } : {}),
-    placed: report.position_source === 'placed',
+    placed,
     observed_at: report.observed_at,
     display_at: displayTime(report.observed_at, offset),
     clock_unknown: offset === null,
-    clock_suspect: offset !== null && Math.abs(offset) > SKEW_WARNING_MS,
-    ...(report.kind === 'omni' ? { strength_s: report.payload.strength_s } : {}),
+    // `isSkewed`, not a second copy of the two minutes FR-009c names: the chip that warns the
+    // reporter and the caveat this puts on their report have to mean the same thing forever.
+    clock_suspect: isSkewed(offset),
+    ...(report.kind === 'omni' ? { strength: report.payload.strength_s } : {}),
   };
+}
+
+/**
+ * The text drawn beside a report.
+ *
+ * Both caveats are here rather than in the popup because the constitution puts them in the primary
+ * view: a relayed report crossed a voice hop where error enters, and a hand-placed position is
+ * somebody's estimate of where they stood. A reader who has to tap to learn either one is reading a
+ * map that looks more certain than it is.
+ */
+function mapLabel(label: string, enteredBy: string | undefined, placed: boolean): string {
+  const lines = [label];
+  // Names the operator as well as marking the hop — a shape can mark it, but only words can say who.
+  if (enteredBy) lines.push(`via ${enteredBy}`);
+  if (placed) lines.push('set by hand');
+  return lines.join('\n');
 }

@@ -10,32 +10,44 @@
  */
 import sector from '@turf/sector';
 import type { Feature, Polygon } from 'geojson';
-import type { BearingReport } from '../log/types.js';
+import type { BearingReport, WireDigit } from '../log/types.js';
+// From the log layer, never from `aprs/mapping` — nothing that renders may import that module, and
+// the shared table exists so this one does not have to.
+import { rangeMiles, wedgeHalfWidthDegrees, WIDEST_HALF_WIDTH_DEGREES } from '../log/confidence.js';
 import { normalizeHeading } from '../sensors/declination.js';
 
+const MILES_TO_KM = 1.609_344;
+
 /**
- * Half-width per confidence bucket, from APRS101's Q table — normative for display, because
+ * Range = 2^R miles. Ours is always 1, 3 or 5 → 2, 8 or 32 miles.
+ *
+ * The table lives in the log layer and is read from there rather than copied: two normative copies
+ * of a table agree right up until the day one is edited.
+ */
+export function rangeKm(maxRangeR: number): number {
+  return rangeMiles(maxRangeR as WireDigit) * MILES_TO_KM;
+}
+
+/**
+ * Half of the wedge's angular width, from APRS101's Q table — normative for display, because
  * Xastir (the reference implementation) implements it exactly.
  *
  * The narrowest claim the interface can make is Q=5, <16°. The scale reaches Q=9 (<1°) and we
  * deliberately cannot: compass error is 10–30° near a vehicle or antenna, and a needle-thin wedge
  * would look authoritative and be fiction.
+ *
+ * **Q=0 is the one digit with no width**: the two specs disagree on whether it means "useless" or
+ * "OMNI", so the table has no entry and the mapping returns null rather than guessing. It cannot be
+ * authored here and can only arrive from the air.
+ *
+ * The fallback is the widest width the scale defines — Q=1's 240°, so a half-width of 120°. This
+ * used to be 32° (a 64° wedge) under a comment claiming it was "the widest... it claims the least":
+ * 64° is Q=3, the width of a *rough guess*, so a confidence nobody can read was drawn exactly as
+ * confidently as one somebody stated. Principle I is the whole reason the buckets are capped, and
+ * it applies hardest to the digit whose meaning is contested.
  */
-const HALF_WIDTH_DEGREES: Readonly<Record<number, number>> = {
-  3: 32, // <64°
-  4: 16, // <32°
-  5: 8, // <16°
-};
-
-const MILES_TO_KM = 1.609_344;
-
-/** Range = 2^R miles. Ours is always 1, 3 or 5 → 2, 8 or 32 miles. */
-export function rangeKm(maxRangeR: number): number {
-  return 2 ** maxRangeR * MILES_TO_KM;
-}
-
 export function halfWidthDegrees(confidenceQ: number): number {
-  return HALF_WIDTH_DEGREES[confidenceQ] ?? 32;
+  return wedgeHalfWidthDegrees(confidenceQ as WireDigit) ?? WIDEST_HALF_WIDTH_DEGREES;
 }
 
 /**

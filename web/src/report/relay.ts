@@ -9,7 +9,7 @@
  * someone other than the operator who typed it, so every kind can be relayed and nothing in the
  * fold or the merge special-cases it.
  */
-import type { Position, Report } from '../log/types.js';
+import type { Position } from '../log/types.js';
 import type { AuthorContext } from './author.js';
 
 export interface RelayDetails {
@@ -43,10 +43,6 @@ export function relayContext(context: AuthorContext, details: RelayDetails): Aut
   };
 }
 
-/**
- * Derived, never stored. A stored flag can disagree with the two names it summarises, and net
- * control relaying their own observation is automatically *not* relayed — no special case needed.
- */
-export function isRelayedReport(report: Report): boolean {
-  return report.observer.callsign !== report.entered_by.callsign;
-}
+// Whether a report is relayed is answered by `isRelayed` in log/types.ts, which is what every call
+// site uses. A second implementation lived here, byte-identical and called by nothing: two
+// definitions of one predicate is how the map and the log start disagreeing about who said what.

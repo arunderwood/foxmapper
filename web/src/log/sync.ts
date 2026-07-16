@@ -11,6 +11,7 @@ import {
   getMeta,
   getReports,
   outboxIds,
+  putAuthored,
   putRemote,
   setMeta,
   type FoxmapperDb,
@@ -103,7 +104,10 @@ export class Sync {
       if (response.ok) {
         // The server is idempotent by id, so re-sending a report it already has is harmless. That
         // is what lets this queue be dumb and retry blindly forever.
-        await clearOutbox(db, reports.map((r) => r.id));
+        await clearOutbox(
+          db,
+          reports.map((r) => r.id),
+        );
         this.#options.onQueueDepth?.(await outboxIds(db, huntCode).then((r) => r.length));
         return;
       }
@@ -162,15 +166,40 @@ export class Sync {
     }
   }
 
-  async #poll(): Promise<void> {
+  /**
+   * Repairs a divergence the audit found.
+   *
+   * Both directions are blunt on purpose. **Pull**: read the hunt from the beginning — the merge is
+   * a union, so re-reading a report this device already holds cannot lose or duplicate anything,
+   * and divergence is rare enough that the bandwidth does not matter.
+   * **Push**: re-queue the reports the server never received, which is the case that actually loses
+   * a report and the reason the audit exists.
+   *
+   * The read is `#poll(0)` rather than a rewind of the stored cursor. Rewinding raced the stream it
+   * runs alongside: an SSE event landing between the rewind and the poll raised the cursor back to
+   * its own `seq`, and the poll then read *that* — so the repair quietly fetched nothing and the
+   * missing reports stayed missing. The cursor is never lowered now; it does not need to be.
+   */
+  async repair(missingRemotely: readonly Report[]): Promise<void> {
+    const { db, huntCode } = this.#options;
+    for (const report of missingRemotely) await putAuthored(db, report);
+    this.#options.onQueueDepth?.((await outboxIds(db, huntCode)).length);
+
+    await this.flush();
+    await this.#poll(0);
+  }
+
+  /**
+   * @param from Read from this sequence instead of the stored cursor. The repair passes 0.
+   */
+  async #poll(from?: number): Promise<void> {
     if (this.#stopped) return;
     const { db, huntCode, apiOrigin } = this.#options;
     try {
-      const cursor = (await getMeta<number>(db, cursorKey(huntCode))) ?? 0;
-      const response = await fetch(
-        `${apiOrigin}/api/hunts/${huntCode}/reports?since=${cursor}`,
-        { cache: 'no-store' },
-      );
+      const cursor = from ?? (await getMeta<number>(db, cursorKey(huntCode))) ?? 0;
+      const response = await fetch(`${apiOrigin}/api/hunts/${huntCode}/reports?since=${cursor}`, {
+        cache: 'no-store',
+      });
       if (response.status === 404) {
         this.#options.onHuntGone?.();
         return;

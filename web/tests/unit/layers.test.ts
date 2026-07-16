@@ -84,8 +84,66 @@ describe('each kind renders as its rule says', () => {
     // Strength is legible on an omni report and absent on a null one — silence is not "strength
     // zero" in the domain, even though it is s=0 on the wire.
     const nullFeature = markers.features.find((f) => f.properties.kind === 'null')!;
-    expect(nullFeature.properties.strength_s).toBeUndefined();
-    expect(markers.features.find((f) => f.properties.kind === 'omni')!.properties.strength_s).toBe(5);
+    expect(nullFeature.properties.strength).toBeUndefined();
+    expect(markers.features.find((f) => f.properties.kind === 'omni')!.properties.strength).toBe(5);
+  });
+
+  describe('what the map draws beside a report', () => {
+    const twin = (id: string): Report => ({
+      ...bearing(id),
+      entered_by: { participant_id: B, callsign: 'KI7XYZ' },
+    });
+    const relayed = (id: string): Report => ({
+      ...bearing(id),
+      observer: { callsign: 'KI7XYZ' },
+      entered_by: { participant_id: B, callsign: 'W7NET' },
+    });
+
+    it('names the observer on a bearing, not just on a marker', () => {
+      // FR-012/FR-002b: the wedge layer had no text at all, so the feature's own label was
+      // computed and dropped — leaving the headline report kind identified by colour alone.
+      const { wedges } = renderOf([bearing('a')]);
+      expect(wedges.features[0]!.properties.map_label).toBe('KI7XYZ');
+    });
+
+    it('marks a relayed report and names the operator who typed it', () => {
+      // FR-012b. Not in a tooltip: this is the text the primary view draws.
+      const { wedges } = renderOf([relayed('a')]);
+      const properties = wedges.features[0]!.properties;
+      expect(properties.relayed).toBe(true);
+      expect(properties.map_label).toBe('KI7XYZ\nvia W7NET');
+    });
+
+    it('does not suffix a relayed report, even when the callsign is ambiguous', () => {
+      // The regression that mattered: two KI7XYZs make the callsign ambiguous, and the relayed
+      // report was rendered with net control's suffix — a claim the radio never made.
+      const { wedges } = renderOf([bearing('a'), twin('b'), relayed('c')]);
+      const relayedFeature = wedges.features.find((f) => f.properties.relayed)!;
+      expect(relayedFeature.properties.label).toBe('KI7XYZ');
+      expect(relayedFeature.properties.map_label).not.toContain('·');
+
+      // ...while the two who really are distinct still get theirs.
+      const selfLabels = wedges.features
+        .filter((f) => !f.properties.relayed)
+        .map((f) => f.properties.label)
+        .sort();
+      expect(selfLabels).toEqual(['KI7XYZ ·11', 'KI7XYZ ·22']);
+    });
+
+    it('says when a position was set by hand', () => {
+      // FR-008: measured and hand-placed are distinguished on the map, not on a tap.
+      const placed: Report = { ...bearing('a'), position_source: 'placed' };
+      expect(renderOf([placed]).wedges.features[0]!.properties.map_label).toBe(
+        'KI7XYZ\nset by hand',
+      );
+    });
+
+    it('carries both caveats at once when both apply', () => {
+      const both: Report = { ...relayed('a'), position_source: 'placed' };
+      expect(renderOf([both]).wedges.features[0]!.properties.map_label).toBe(
+        'KI7XYZ\nvia W7NET\nset by hand',
+      );
+    });
   });
 
   it('never renders a retraction', () => {

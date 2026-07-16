@@ -19,6 +19,7 @@ import {
   encodeThirdParty,
   bearingFieldsFromWire,
   strengthFromWire,
+  toWireFields,
 } from '../../src/aprs/mapping.js';
 import type { WireDigit } from '../../src/log/types.js';
 import { bearingReportArb, digitArb, omniReportArb, nullReportArb } from './arbitraries.js';
@@ -212,5 +213,44 @@ describe('relayed reports → third-party traffic', () => {
     expect(wire.format).toBe('third-party');
     expect(wire.raw).toBe(raw);
     expect(emitFromDigits(wire)).toBe(raw);
+  });
+});
+
+/**
+ * The `wire` object a report carries once ingested — log-format.md § 7.
+ *
+ * P1 ships no gateway, so nothing calls this at runtime. FR-006b still promises an ingested report
+ * "retains the precision it arrived with", and that promise is only true if the raw digits survive
+ * being put into the log's shape. Tested here rather than trusted.
+ */
+describe('the stored wire object', () => {
+  it('keeps every digit the air handed us, including ones we cannot author', () => {
+    // Q=9 (<1°) is unreachable from our interface — the cap stops at 5 — and legal on the air.
+    // s=0 likewise: it is a `null` report, never an omni we could author.
+    const fields = toWireFields(decodeWire('000/000/090/919'));
+    expect(fields).toMatchObject({ format: 'DF', n: 9, r: 1, q: 9 });
+    expect(fields.raw).toBe('000/000/090/919');
+
+    expect(toWireFields(decodeWire('DFS0360'))).toMatchObject({
+      format: 'DFS',
+      s: 0,
+      h: 3,
+      g: 6,
+      d: 0,
+    });
+  });
+
+  it('carries the raw string, so a wrong parse never destroys the original', () => {
+    fc.assert(
+      fc.property(digitArb, digitArb, digitArb, (n, r, q) => {
+        const raw = `000/000/090/${n}${r}${q}`;
+        expect(toWireFields(decodeWire(raw)).raw).toBe(raw);
+      }),
+    );
+  });
+
+  it('keeps a third-party header whole', () => {
+    const raw = '}KI7XYZ>APRS,TCPIP,W7NET*:DFS5000';
+    expect(toWireFields(decodeWire(raw))).toEqual({ format: 'third-party', raw });
   });
 });

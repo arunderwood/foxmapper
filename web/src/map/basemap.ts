@@ -27,8 +27,11 @@ export const ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap'
 const BLANK_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
-  // The label font. Fetched from the same host, so offline the callsigns fall back to whatever is
-  // cached — the shapes and colours still carry the report either way.
+  // The label font, from the tile host — which is fine, and is *not* what the callsigns depend on.
+  // When a glyph range cannot be fetched MapLibre shapes the codepoints locally instead, so a
+  // report keeps its callsign with this host unreachable. Verified rather than assumed, on both
+  // engines, in tests/e2e/basemap.spec.ts — FR-002b ("no interface may rely on colour alone")
+  // rests on it, and it is a behaviour of a dependency rather than of our code.
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   layers: [
     {
@@ -64,11 +67,19 @@ export function createBasemap(options: BasemapOptions): MapLibreMap {
 
   // The style's own sources carry the required attribution once they load. Until then ours stands
   // in, so the licence is honoured even on a map that never fetches a tile.
-  map.addControl(
-    new maplibregl.AttributionControl({ compact: true, customAttribution: ATTRIBUTION }),
-  );
+  const standIn = new maplibregl.AttributionControl({
+    compact: true,
+    customAttribution: ATTRIBUTION,
+  });
+  map.addControl(standIn);
 
-  void upgradeToStreets(map, options.onTilesUnavailable);
+  void upgradeToStreets(map, options.onTilesUnavailable, () => {
+    // The streets are in, and their sources name the licence themselves. Keeping ours as well
+    // printed the same sentence twice, side by side, across most of the width of a phone — the one
+    // piece of furniture already competing with the map for room.
+    map.removeControl(standIn);
+    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+  });
   return map;
 }
 
@@ -76,7 +87,11 @@ export function createBasemap(options: BasemapOptions): MapLibreMap {
  * Fetches the real style and swaps it in. Never awaited by the caller: the map is already usable,
  * and this only adds context.
  */
-async function upgradeToStreets(map: MapLibreMap, onUnavailable?: () => void): Promise<void> {
+async function upgradeToStreets(
+  map: MapLibreMap,
+  onUnavailable?: () => void,
+  onUpgraded?: () => void,
+): Promise<void> {
   try {
     const response = await fetch(STYLE_URL);
     if (!response.ok) throw new Error(`style ${response.status}`);
@@ -88,6 +103,11 @@ async function upgradeToStreets(map: MapLibreMap, onUnavailable?: () => void): P
     // `diff: false` because the two styles share nothing. The report layers are re-added by the
     // view on `styledata`, which fires for the new style as well as the blank one.
     map.setStyle(style, { diff: false });
+
+    // Only hand over the licence to a style that actually carries it. A style whose sources named
+    // no attribution would leave the map with none at all, which is the one outcome worse than
+    // saying it twice.
+    if (Object.values(style.sources).some((source) => 'attribution' in source)) onUpgraded?.();
   } catch {
     // No basemap. The map keeps working, the reports keep drawing, and the hunter is told once —
     // as a fact about the ground, not as an error to dismiss.
