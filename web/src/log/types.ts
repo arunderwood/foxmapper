@@ -157,6 +157,6 @@ export function isRelayed(report: Report): boolean {
   return report.observer.callsign !== report.entered_by.callsign;
 }
 
-export function isRetraction(report: Report): report is RetractionReport {
-  return report.kind === 'retraction';
-}
+// There is deliberately no `isRetraction` guard. `kind === 'retraction'` narrows the union on its
+// own everywhere it is asked (see fold.ts), and a guard that only restates the discriminant is one
+// more place for the two to drift apart.

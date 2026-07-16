@@ -44,11 +44,33 @@ function literals(source: string): string[] {
 }
 
 describe('the vocabulary firewall', () => {
-  const surfaces = [...sourceFiles('src/ui'), ...sourceFiles('src/report')];
+  /**
+   * Every module that renders. `main.ts` is here because it draws the entire start screen — the
+   * first thing a hunter sees, and for a long time the one screen this suite did not look at.
+   *
+   * `src/map` renders too: its styling expressions name feature properties as string literals, so
+   * a property named after an on-air digit is one `['get', …]` away from a screen.
+   *
+   * **`src/log` and `src/aprs` are deliberately absent.** They carry the wire format — `types.ts`
+   * names `DFS` in a union, and `mapping.ts` is the mapping — and neither reaches a participant.
+   * The firewall is about what is shown, not what is stored.
+   */
+  const surfaces = [
+    ...sourceFiles('src/ui'),
+    ...sourceFiles('src/report'),
+    ...sourceFiles('src/map'),
+    'src/main.ts',
+  ];
 
   it('covers every module that can reach a screen', () => {
     // A guard on the guard: if the UI moves, this suite must follow it.
     expect(surfaces.length).toBeGreaterThan(8);
+  });
+
+  it('covers the start screen, which lives outside the ui directory', () => {
+    // Named rather than counted: this file rendered headings, placeholders and an error notice
+    // while sitting outside the scan, and a count would not have noticed.
+    expect(surfaces).toContain('src/main.ts');
   });
 
   it.each(surfaces)('%s speaks no protocol vocabulary', (file) => {

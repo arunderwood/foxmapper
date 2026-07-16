@@ -5,7 +5,17 @@
  * contexts, two devices, one hunt.
  */
 import { expect, test, type Browser } from '@playwright/test';
-import { createHunt, grantPosition, joinAs, renderedFeatures, reportBearing, reportHeardNothing } from './helpers.js';
+import {
+  createHunt,
+  grantPosition,
+  joinAs,
+  localReports,
+  renderedFeatures,
+  reportBearing,
+  reportHeardNothing,
+  retractOwnReport,
+  tapReport,
+} from './helpers.js';
 
 /** A second device: its own storage, its own identity, its own log. */
 async function secondDevice(browser: Browser, code: string, callsign: string) {
@@ -65,7 +75,9 @@ test('omni and null render without implying a direction', async ({ browser }) =>
   await a.page.getByTestId('strength-1').click();
 
   await expect
-    .poll(async () => (await renderedFeatures(b.page)).map((f) => f.kind).sort(), { timeout: 5_000 })
+    .poll(async () => (await renderedFeatures(b.page)).map((f) => f.kind).sort(), {
+      timeout: 5_000,
+    })
     .toEqual(['null', 'omni']);
 
   // FR-011a: neither is a wedge. A marker at a position claims no direction.
@@ -86,41 +98,44 @@ test('a retraction propagates and removes the report from every map', async ({ b
     .poll(async () => (await renderedFeatures(b.page)).length, { timeout: 5_000 })
     .toBe(1);
 
-  // Retract by appending a retraction directly: the UI for this is not built (T048 composes it),
-  // and the property under test is that a retraction propagates and folds, not how it is typed.
-  await a.page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve) => {
-      const request = indexedDB.open('foxmapper');
-      request.onsuccess = () => resolve(request.result);
-    });
-    const reports: { id: string; kind: string; hunt_code: string }[] = await new Promise((resolve) => {
-      const all = db.transaction('reports', 'readonly').objectStore('reports').getAll();
-      all.onsuccess = () => resolve(all.result);
-    });
-    const target = reports.find((r) => r.kind === 'null')!;
-    const retraction = {
-      v: 1,
-      id: crypto.randomUUID(),
-      hunt_code: target.hunt_code,
-      kind: 'retraction',
-      observer: { callsign: 'KI7XYZ' },
-      position: { lat: 48.75, lon: -122.47 },
-      position_source: 'measured',
-      observed_at: Date.now(),
-      clock_offset_ms: null,
-      entered_by: { participant_id: 'e2e', callsign: 'KI7XYZ' },
-      payload: { retracts_id: target.id },
-    };
-    await fetch(`/api/hunts/${target.hunt_code}/reports`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(retraction),
-    });
-  });
+  // Through the interface a hunter actually has: tap your own report, take it back. This used to
+  // POST a hand-built retraction because no UI existed to do it — which meant the requirement
+  // (FR-010: a participant *can* retract) was never under test at all, only the fold was.
+  await retractOwnReport(a.page);
 
   await expect
     .poll(async () => (await renderedFeatures(b.page)).length, { timeout: 5_000 })
     .toBe(0);
+
+  // The original is still a fact in the log on both devices. A retraction withdraws a report; it
+  // does not erase what someone said.
+  expect((await localReports(a.page)).filter((r) => r.kind === 'null')).toHaveLength(1);
+  expect((await localReports(a.page)).filter((r) => r.kind === 'retraction')).toHaveLength(1);
+
+  await a.context.close();
+  await b.context.close();
+});
+
+test('a participant cannot retract someone else’s report — FR-025', async ({ browser }) => {
+  // There is no moderator, no creator privilege and no appeal. The interface offers the button
+  // only on a report this phone entered, and that is the whole of the guarantee: the log is a set
+  // of facts about what people said, and only the person who said it may withdraw it.
+  const code = await createHunt();
+  const a = await secondDevice(browser, code, 'KI7XYZ');
+  const b = await secondDevice(browser, code, 'W7ABC');
+
+  await reportHeardNothing(a.page);
+  await expect
+    .poll(async () => (await renderedFeatures(b.page)).length, { timeout: 5_000 })
+    .toBe(1);
+
+  // B is looking at A's report. There is nothing to press.
+  await tapReport(b.page);
+  await expect(b.page.getByTestId('retract')).toHaveCount(0);
+
+  // ...and A, looking at their own, has the button.
+  await tapReport(a.page);
+  await expect(a.page.getByTestId('retract')).toHaveCount(1);
 
   await a.context.close();
   await b.context.close();

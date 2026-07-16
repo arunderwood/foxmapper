@@ -188,47 +188,45 @@ export function strengthFromWire(wire: Wire): WireDigit {
   return wire.s;
 }
 
-/** APRS101's Q table, for display only. Never written to the log. */
-const Q_DEGREES: Readonly<Record<number, string>> = {
-  0: 'useless',
-  1: '<240°',
-  2: '<120°',
-  3: '<64°',
-  4: '<32°',
-  5: '<16°',
-  6: '<8°',
-  7: '<4°',
-  8: '<2°',
-  9: '<1°',
-};
+/**
+ * The Q and R tables live in [`log/confidence.ts`](../log/confidence.ts). They are **not** defined
+ * here and **not** re-exported from here.
+ *
+ * Not defined, because the rendering path needs them too and **nothing that renders may import this
+ * module** — that structural rule is the only reason no protocol vocabulary reaches the shipped
+ * bundle. Not re-exported, because a re-export is a second way to reach one table, and this one had
+ * no callers at all: `map/wedge.ts` imports the table from the log layer directly, which is the
+ * only route that respects the rule above.
+ *
+ * There is deliberately no human-readable rendering of a Q digit ("<64°" and friends). Nothing
+ * needs one: the interface speaks in "rough guess" and "pretty sure", and a helper that turns a
+ * digit into degrees is a loaded gun pointed at the vocabulary firewall.
+ */
 
 /**
- * Half-width of the wedge in degrees, for rendering. Q=0 is overloaded between the two specs
- * ("useless" vs "OMNI") and we never emit it; on ingest we retain the digit and render nothing
- * directional, which is why this returns null rather than guessing.
+ * Compile-time proof the authored ranges are subsets of the wire digit range.
+ *
+ * The annotations are the whole point: if `ConfidenceQ` ever admitted an 8, this stops compiling.
+ * Nothing reads the values at runtime, and there is deliberately no exported object built from them
+ * — that object existed, had no callers, and only made the proof look like data.
  */
-export function wedgeHalfWidthDegrees(q: WireDigit | ConfidenceQ): number | null {
-  const widths: Readonly<Record<number, number>> = { 1: 240, 2: 120, 3: 64, 4: 32, 5: 16, 6: 8, 7: 4, 8: 2, 9: 1 };
-  const full = widths[q];
-  return full === undefined ? null : full / 2;
-}
-
-/** Range in miles: 2^R. Ours is always 1, 3 or 5 → 2, 8 or 32 miles. */
-export function rangeMiles(r: WireDigit | MaxRangeR): number {
-  return 2 ** r;
-}
-
-export function qDescription(q: WireDigit): string {
-  return Q_DEGREES[q] ?? 'unknown';
-}
-
-/** Compile-time proof the authored ranges are subsets of the wire digit range. */
 const _authoredQ: readonly ConfidenceQ[] = [3, 4, 5];
 const _authoredR: readonly MaxRangeR[] = [1, 3, 5];
 const _authoredS: readonly StrengthS[] = [2, 5, 8];
-export const AUTHORED = { q: _authoredQ, r: _authoredR, s: _authoredS } as const;
+void _authoredQ;
+void _authoredR;
+void _authoredS;
 
-/** Build the `wire` object stored on an ingested report. */
+/**
+ * Build the `wire` object stored on an ingested report — [log-format.md § 7](../../../docs/log-format.md).
+ *
+ * **No runtime caller, and that is the point rather than an oversight.** P1 ships no gateway, so
+ * nothing ingests; this is the function the format's retention rule is written against, and FR-006b
+ * ("a report ingested from an on-air format MUST retain the precision it arrived with") is only
+ * true if the raw digits can actually be carried across. It is exercised by the round-trip
+ * properties instead of by the app — which is the same reason the whole mapping module exists
+ * ahead of the gateway (see plan.md § Complexity Tracking).
+ */
 export function toWireFields(wire: Wire): WireFields {
   switch (wire.format) {
     case 'DF':

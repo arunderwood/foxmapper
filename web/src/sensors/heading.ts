@@ -34,10 +34,9 @@ interface IosDeviceOrientation {
   requestPermission?: () => Promise<'granted' | 'denied' | 'prompt'>;
 }
 
-/** True when the platform can produce an absolute heading at all. */
-export function isCompassAvailable(): boolean {
-  return typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
-}
+// There is deliberately no `isCompassAvailable`. Nothing branches on it: manual entry is always
+// offered (FR-008c), so a phone with no compass takes the same path as a phone next to a car whose
+// compass is lying. Asking the question would imply the answer changes something.
 
 /** True when a user gesture must precede any reading (iOS 13+). */
 export function needsPermission(): boolean {

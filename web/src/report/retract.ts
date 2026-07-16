@@ -8,7 +8,7 @@
 import type { Report, RetractionReport } from '../log/types.js';
 import { envelope, type AuthorContext } from './author.js';
 
-export const LABEL = 'Take that back';
+export const RETRACT_LABEL = 'Take that back';
 
 /**
  * Appends a retraction. It removes nothing: the retracted report stays in the log forever, and any

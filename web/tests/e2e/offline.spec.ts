@@ -10,7 +10,15 @@
  * for T061's field check, and it cannot evict iOS storage.
  */
 import { expect, test } from '@playwright/test';
-import { createHunt, grantPosition, joinAs, localReports, renderedFeatures, reportHeardNothing, RELAY } from './helpers.js';
+import {
+  createHunt,
+  grantPosition,
+  joinAs,
+  localReports,
+  renderedFeatures,
+  reportHeardNothing,
+  RELAY,
+} from './helpers.js';
 
 test('three reports are accepted and rendered with no network', async ({ page, context }) => {
   await grantPosition(context);
@@ -28,7 +36,10 @@ test('three reports are accepted and rendered with no network', async ({ page, c
   await context.setOffline(false);
 });
 
-test('the queue depth tells the hunter reports are stuck on this phone', async ({ page, context }) => {
+test('the queue depth tells the hunter reports are stuck on this phone', async ({
+  page,
+  context,
+}) => {
   await grantPosition(context);
   const code = await createHunt();
   await joinAs(page, code, 'KI7XYZ');
@@ -42,7 +53,10 @@ test('the queue depth tells the hunter reports are stuck on this phone', async (
   await context.setOffline(false);
 });
 
-test('100% of offline reports reach the server after reconnect — SC-005', async ({ page, context }) => {
+test('100% of offline reports reach the server after reconnect — SC-005', async ({
+  page,
+  context,
+}) => {
   await grantPosition(context);
   const code = await createHunt();
   await joinAs(page, code, 'KI7XYZ');
@@ -53,7 +67,9 @@ test('100% of offline reports reach the server after reconnect — SC-005', asyn
 
   await context.setOffline(false);
   // The queue drains on reconnect. A dropped report is the one unacceptable outcome.
-  await expect.poll(async () => page.getByTestId('queue-depth').count(), { timeout: 20_000 }).toBe(0);
+  await expect
+    .poll(async () => page.getByTestId('queue-depth').count(), { timeout: 20_000 })
+    .toBe(0);
 
   const response = await fetch(`${RELAY}/api/hunts/${code}/ids`);
   const { ids } = (await response.json()) as { ids: string[] };

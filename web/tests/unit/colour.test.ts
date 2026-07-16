@@ -7,10 +7,17 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { createHash } from 'node:crypto';
-import { PALETTE, ambiguousCallsigns, colourFor, displayName, suffixFor } from '../../src/log/colour.js';
+import {
+  PALETTE,
+  ambiguousCallsigns,
+  colourFor,
+  displayName,
+  labelFor,
+  suffixFor,
+} from '../../src/log/colour.js';
 import { toLog } from '../../src/log/gset.js';
 import { fold } from '../../src/log/fold.js';
-import type { Report } from '../../src/log/types.js';
+import type { ObservationReport, Report } from '../../src/log/types.js';
 import { bearingReportArb, callsignArb, uuidArb } from './arbitraries.js';
 
 describe('colour is a pure function of the callsign', () => {
@@ -104,6 +111,43 @@ describe('duplicate callsign detection', () => {
   it('a suffix is the first 2 hex chars of the entering participant_id', () => {
     expect(suffixFor(A)).toBe('11');
     expect(suffixFor(B)).toBe('22');
+  });
+
+  describe('the name actually put on a report', () => {
+    /**
+     * `ambiguousCallsigns` excluding relayed reports is only half the rule. The other half is what
+     * gets *drawn* — and the map called `displayName` with `entered_by.participant_id` for every
+     * report, relayed or not. Detection was tested; rendering was not, and that is exactly where
+     * the rule broke.
+     */
+    const own = selfReport('a0000000-0000-4000-8000-000000000001', 'KI7XYZ', A);
+    const twin = selfReport('a0000000-0000-4000-8000-000000000002', 'KI7XYZ', B);
+    const relayed = {
+      ...own,
+      id: 'a0000000-0000-4000-8000-000000000003',
+      observer: { callsign: 'KI7XYZ' },
+      entered_by: { participant_id: B, callsign: 'W7NET' },
+    } as Report;
+
+    it('suffixes a self-report when the callsign really is ambiguous', () => {
+      const ambiguous = ambiguousCallsigns(fold(toLog([own, twin])).active);
+      expect(labelFor(own as ObservationReport, ambiguous)).toBe('KI7XYZ ·11');
+      expect(labelFor(twin as ObservationReport, ambiguous)).toBe('KI7XYZ ·22');
+    });
+
+    it('never suffixes a relayed report, even when the callsign is ambiguous', () => {
+      // The suffix identifies the participant who *typed* it. On a relayed report that is net
+      // control, so suffixing would mark the observer with the relayer's identity — a distinction
+      // the observer never made and the voice call never carried.
+      const ambiguous = ambiguousCallsigns(fold(toLog([own, twin, relayed])).active);
+      expect(ambiguous).toEqual(new Set(['KI7XYZ']));
+      expect(labelFor(relayed as ObservationReport, ambiguous)).toBe('KI7XYZ');
+    });
+
+    it('leaves an unambiguous callsign alone', () => {
+      expect(labelFor(own as ObservationReport, new Set())).toBe('KI7XYZ');
+      expect(labelFor(relayed as ObservationReport, new Set())).toBe('KI7XYZ');
+    });
   });
 
   it('colour does not distinguish duplicates — same callsign, same colour, by construction', () => {
