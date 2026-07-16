@@ -1,0 +1,42 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      # Majors stay separate so a breaking change lands in a PR of its own.
+      web-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /server
+    schedule:
+      interval: weekly
+    groups:
+      server-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # Root Dockerfile builds the single deploy image; server/Dockerfile is the compose dev build.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
