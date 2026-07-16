@@ -42,7 +42,7 @@ services:
       - target-cache:/app/target
 
   web:
-    image: node:22-alpine
+    image: node:26-alpine
     working_dir: /app
     environment:
       # Vite proxies /api to the relay, so the browser sees one origin and SSE needs no CORS.
