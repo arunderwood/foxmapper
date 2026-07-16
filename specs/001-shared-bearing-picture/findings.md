@@ -23,7 +23,7 @@ after, because the point of the field gate is that it can still change the answe
 | A report survives a force-quit and reaches the server (SC-005) | E2E, offline then reconnect | `web/tests/e2e/offline.spec.ts` |
 | 0 relayed reports attributed to the operator (SC-011) | E2E driving the real relay UI | `web/tests/e2e/relay.spec.ts` |
 | SSE is not buffered (SC-002 locally) | `curl -N` shows events 2s apart, not a burst | T062, and against the deploy image |
-| **SSE is not buffered in production (SC-002)** | `curl -N` against the deployed URL: ~130 ms delivery, events tracking the posts | **T069, `foxmapper.onrender.com`** |
+| **SSE is not buffered in production (SC-002)** | `curl -N` against the deployed URL: ~130 ms delivery, events tracking the posts | **T069, on `foxmapper.com` itself** |
 | No protocol vocabulary reaches a screen (SC-008, in part) | Literal scan of every UI module + the shipped bundle | `web/tests/unit/vocabulary.test.ts` |
 
 **Totals**: 153 web unit tests, 47 server tests, 23 E2E. All green.
@@ -169,11 +169,27 @@ are behavioural:
   decision. The plan says: *"If the blank map proves useless outdoors, the field gate will say so —
   and that answer is worth more than a tile pipeline built on a guess."*
 
-### ~~T067–T069 — deploy~~ — DONE 2026-07-16. `https://foxmapper.onrender.com`
+### ~~T067–T069 — deploy~~ — DONE 2026-07-16. **`https://foxmapper.com`**
 
 Deployed from the blueprint with no code change. Postgres 18, migrations ran on first boot, one
 image serving the PWA and the API from the same origin. `/health` green in ~8 minutes — a cold Rust
 release build.
+
+**The custom domain is on the canonical origin, and it was set before any field work on purpose.**
+IndexedDB, `localStorage` and the service worker are all scoped per-origin, so a hunt tested on
+`foxmapper.onrender.com` and then moved to `foxmapper.com` would silently forget every device's
+remembered hunt (FR-004c), its `participant_id`, and its whole local log — no error, just a fresh
+install for everyone. It cost nothing to do now and would have cost the field gate to do later.
+
+Nothing in the app needed changing: `API_ORIGIN` falls back to `window.location.origin`, `huntLink()`
+reads it too, and the manifest is relative — so **the link now reads `foxmapper.com/h/{code}`**,
+which is the thing that actually gets said out loud on a repeater. The apex is canonical and `www`
+301s to it, because "double-you double-you double-you" is three syllables nobody wants to key up.
+
+Route 53 note for whoever renews this: the apex is an **A record to `216.24.57.1`**, not an ALIAS.
+Route 53's ALIAS only targets AWS resources, so it cannot point at `foxmapper.onrender.com`, and a
+CNAME is illegal at a zone apex. That pins the apex to an IP Render could renumber — accepted, and
+the documented path, but that is where the fragility sits. `www` is a CNAME and would survive it.
 
 **T069 passed against the deployed URL, and this is the number that mattered.** Three reports posted
 3 s apart, arrival timestamped at the `curl -N` end:
