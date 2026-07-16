@@ -38,9 +38,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
-          # Same crate as the e2e job. Without this, rust-cache appends the job id and the two
-          # jobs keep separate caches of identical dependency builds.
-          shared-key: server
+          # No shared-key with the e2e job, deliberately. The two caches look redundant and are
+          # not: this job builds --all-targets and the test binaries, e2e builds only the bin.
+          # Sharing one key means whichever job finishes first writes the cache and the other's
+          # save is rejected — e2e always wins, so this job would restore a target/ with no test
+          # artifacts and recompile them every run.
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
@@ -85,7 +87,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
-          shared-key: server
       - uses: actions/setup-node@v7
         with:
           node-version: 22
