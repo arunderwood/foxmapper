@@ -8,7 +8,7 @@
 //! global state (`seq` ordering, which hunts still exist), and a shared database would let one
 //! test's rows make another's assertion pass for the wrong reason.
 
-use sqlx::{Connection, Executor, PgConnection, PgPool};
+use sqlx::{AssertSqlSafe, Connection, Executor, PgConnection, PgPool};
 use std::sync::atomic::{AtomicU32, Ordering};
 use uuid::Uuid;
 
@@ -39,7 +39,7 @@ impl TestDb {
             .await
             .expect("connect to base database");
         admin
-            .execute(format!(r#"CREATE DATABASE "{name}""#).as_str())
+            .execute(AssertSqlSafe(format!(r#"CREATE DATABASE "{name}""#)))
             .await
             .expect("create test database");
 
@@ -79,7 +79,9 @@ impl TestDb {
         pool.close().await;
         if let Ok(mut admin) = PgConnection::connect(&base).await {
             let _ = admin
-                .execute(format!(r#"DROP DATABASE IF EXISTS "{name}" WITH (FORCE)"#).as_str())
+                .execute(AssertSqlSafe(format!(
+                    r#"DROP DATABASE IF EXISTS "{name}" WITH (FORCE)"#
+                )))
                 .await;
         }
     }
