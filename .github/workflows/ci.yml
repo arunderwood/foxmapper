@@ -34,12 +34,7 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v7
-      # Pinned, not `stable`: clippy::pedantic is on and CI denies warnings, so a new stable
-      # release can redden main with no change from us. Tracks server/Dockerfile — CI should
-      # compile with what ships. Bump both together.
-      - uses: dtolnay/rust-toolchain@1.97.0
-        with:
-          components: clippy, rustfmt
+      - uses: ./.github/actions/rust
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
@@ -86,7 +81,7 @@ jobs:
       DATABASE_URL: postgres://foxmapper:foxmapper@localhost:5432/foxmapper
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.0
+      - uses: ./.github/actions/rust
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
