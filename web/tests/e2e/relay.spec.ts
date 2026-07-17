@@ -36,6 +36,33 @@ async function relayBearing(page: Page, observer: string, at = OBSERVER_AT): Pro
   await page.getByTestId('send-bearing').click();
 }
 
+test('every sheet opens with the relay fields collapsed — FR-005d', async ({ page, context }) => {
+  // The fields have always carried `hidden`, but `.stack { display: flex }` outranked the
+  // browser's `[hidden] { display: none }`, so all four sheets opened with four relay fields
+  // spread under them — a report about someone else demanding answers from a hunter reporting
+  // their own. Every other test in this file clicks the toggle first, so none of them ever
+  // looked at the collapsed state, and the toggle went untested in the direction that matters.
+  await grantPosition(context, NET_CONTROL_AT);
+  const code = await createHunt();
+  await joinAs(page, code, 'W7NET');
+
+  for (const kind of ['bearing', 'omni', 'null', 'fix'] as const) {
+    await page.getByTestId(`report-${kind}`).click();
+
+    await expect(page.getByTestId('relay-fields')).toBeHidden();
+    await expect(page.getByTestId('relay-callsign')).toBeHidden();
+    await expect(page.getByTestId('relay-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+    // And the toggle still reveals them — collapsed by default is not the same as unreachable.
+    await page.getByTestId('relay-toggle').click();
+    await expect(page.getByTestId('relay-fields')).toBeVisible();
+    await expect(page.getByTestId('relay-callsign')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByTestId('sheet')).toHaveCount(0);
+  }
+});
+
 test('a half-filled relay files nothing at all — FR-008, Constitution I', async ({
   page,
   context,
