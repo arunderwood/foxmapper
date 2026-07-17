@@ -27,6 +27,13 @@
   box-sizing: border-box;
 }
 
+/* The browser's own `[hidden] { display: none }` is the weakest rule on the page, so any class
+   that sets `display` silently outranks it and the element stays on screen. `hidden` is how this
+   app collapses things nobody asked for yet; it has to actually collapse them. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
