@@ -25,6 +25,8 @@ after, because the point of the field gate is that it can still change the answe
 | SSE is not buffered (SC-002 locally) | `curl -N` shows events 2s apart, not a burst | T062, and against the deploy image |
 | **SSE is not buffered in production (SC-002)** | `curl -N` against the deployed URL: ~130 ms delivery, events tracking the posts | **T069, on `foxmapper.com` itself** |
 | No protocol vocabulary reaches a screen (SC-008, in part) | Literal scan of every UI module + the shipped bundle | `web/tests/unit/vocabulary.test.ts` |
+| **SC-008 in full — 0 jargon on all 13 reachable screens** | A human reading every screen of the live app, which the scan cannot do | **T065, on `foxmapper.com`** |
+| **SC-003 — four devices, no report missing** | Four independent contexts from four locations; each asserted to hold all four | **`web/tests/e2e/four-devices.spec.ts`** |
 
 **Totals**: 153 web unit tests, 47 server tests, 23 E2E. All green.
 
@@ -104,11 +106,32 @@ the lever is a lighter map, not code-splitting around it.
 
 ---
 
-## Still unknown — and only a field test can answer
+## Still unknown — DEFERRED 2026-07-16, and still unknown
 
-**T063, T064, T069a, T066 and T070 cannot be done from here.** They need real phones, real terrain,
-and — for the last two — real people. Nothing below is a defect; each is a question the plan
-deliberately left to the field.
+**These were never answered.** The field-gate was amended from a sequencing gate to an obligation
+(constitution 1.1.0) because there is no base of people to recruit for repeated hunts, and a gate
+nobody can pass is a stop-work order rather than a quality bar.
+
+**Deferring the question does not answer it.** Everything below is still open, still a real risk, and
+recorded here rather than deleted precisely so that "we never asked" is never mistaken for "we asked
+and it was fine". US1 closes as **built and verified**, not as proven.
+
+**Unmeasured, not passing** — the success criteria that went with them:
+
+| | asks |
+|---|---|
+| SC-001a/b | under 10 s, one-handed, gloved, on a screen you can barely see |
+| ~~SC-003~~ | **mechanism proven** by `four-devices.spec.ts` (four contexts, four locations, every device holds all four). Four *real phones* on real cell is still owed |
+| SC-006 | can a hunter say whose bearing they trusted, and why |
+| SC-007 | did anyone fall back to voice because the interface was slower than talking |
+| SC-009 | did the stock-antenna hunter contribute, or spectate |
+| SC-012 | did net control keep up with voice traffic |
+
+SC-002, SC-004, SC-005, SC-008 and SC-011 **are** proven — by tests, by T069 in production, and by
+T065's screen-by-screen review.
+
+**T063 is not in the deferred set.** It needs a phone and a car park, not a field or people, and the
+honesty cap (Q ≤ 5) rests on its answer.
 
 **The order matters more than the list.** Added after review: the ladder runs deploy → T069 →
 T063/T064 → **T069a (the solo hunt)** → T066 → T070, in ascending order of what a mistake costs.
@@ -117,10 +140,10 @@ whether the product survived people, and nothing in between asked whether it wor
 outdoors. It is not the gate and does not close the story; it is what makes the invitation in T070
 worth spending.
 
-**Deploy and T069 are done (2026-07-16); the ladder now starts at T063/T064.** Everything below
-needs hardware or people. **T064 is the long pole and should start today**: it has a seven-day clock
-and no dependants, so it is the one item that can put itself on the critical path by being started
-late.
+**Deploy and T069 are done (2026-07-16). The ladder above T063 is now deferred**, so the order below
+is preserved for whoever picks it up rather than as a plan for this week. When a tester base exists,
+it still runs deploy → T069 → T063/T064 → T069a → T066 → T070, in ascending order of what a mistake
+costs. T064 remains the long pole: a seven-day clock and no dependants.
 
 ### T063 — sensors, on real iOS and Android
 - Does the compass swing 10–30° next to a car? The entire honesty cap (Q ≤ 5) rests on that number.
@@ -139,13 +162,39 @@ Both are recorded in Complexity Tracking as assumptions the design explicitly re
 exposed case is a report authored offline, never synced, on a phone that gets evicted — SC-005's
 "100% present" would be false.
 
-### T065 — jargon review (half done)
-A mechanical scan of every UI and report module, and of the shipped bundle, finds **0 occurrences**
-of NRQ, DFS, PHG, Q-value or S-point, and it is now a permanent test.
+### ~~T065 — jargon review~~ — **DONE 2026-07-16, against the live app. SC-008 passes.**
 
-What a scan cannot do is judge *reachable*. An error path, a popup, or a phrase that is technically
-jargon-free but still means nothing to a hunter will all pass it. SC-008 wants a human reading every
-screen they can get to; that half is still open.
+The mechanical scan (a permanent test) finds 0 occurrences of NRQ, DFS, PHG, Q-value or S-point.
+This was the other half: driving `foxmapper.com` through **all thirteen reachable screens** — start,
+join, status bar, report bar, the four report sheets, the relay fields, the incomplete-relay refusal,
+the report detail popup, the placing banner, share, and the offline status bar — and reading every
+word.
+
+**0 protocol vocabulary. SC-008 passes in full.** The language is genuinely hunters': *"Rough guess /
+Fairly sure / Very sure"*, *"Full quieting — loud and clean"*, *"I hear nothing here"*, *"Take that
+back"*, *"Knowing where the fox is not heard rules out ground for everyone."*
+
+**The review found the thing the scan cannot: the app said "Heading" where the constitution says
+"bearing".** Principle V's own word list names *fox, bunny, sniffer, attenuator, body fade, **bearing**,
+null, S-meter*. The report bar button said Bearing; the sheet then asked for a Heading. Jargon-free,
+and still not the word a hunter uses — you *take a bearing*; a heading is where you are pointed.
+Fixed on the participant-facing strings only: `heading.ts` and the `data-testid`s keep their names,
+because "heading" is correct for the *sensor* (where the phone points) and "bearing" is correct for
+the *claim* (what the hunter asserts). That distinction is the whole reason the bug was invisible.
+
+**Two findings recorded rather than fixed**, because both are design questions rather than wording:
+
+1. **A relayed position is typed as latitude and longitude.** That is not how a position arrives over
+   voice. Net control hears "I'm at the corner of Alabama and Yew" or a grid square, not six decimal
+   places, and has to convert while the next call is already coming. FR-007d is satisfied — the
+   position *is* set by hand — but this is exactly the sort of thing T069a/T070 were meant to catch,
+   and those are now deferred. Recorded so it is not lost.
+2. **"Middling — within about eight miles"** is clear but archaic. Harmless; noted only because a
+   review that finds nothing to mention usually was not a review.
+
+**What this half still cannot do**: I am not a hunter, and reading every screen is not the same as
+using them cold, outdoors, with a radio in the other hand. SC-008 is satisfied on its literal terms
+("0 jargon terms on any reachable screen"). Whether the words *land* is a T070 question.
 
 ### T069a — the solo hunt (added after review)
 Hide a transmitter, hunt it yourself, two phones, nobody else. The only rung where **ground truth
