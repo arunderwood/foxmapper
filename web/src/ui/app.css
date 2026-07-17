@@ -3,24 +3,29 @@
  *
  * The screen is dimmed, the sun is on it, the hunter has one hand free and gloves on. That sets
  * the contrast, the target size, and the refusal to put anything important behind a tap.
+ *
+ * All values come from tokens.css (contracts/design-tokens.md): this file may consume
+ * var(--md-sys-*)/var(--fx-*), never define a colour, radius, duration, or easing of its own.
  */
+@import './tokens.css';
 
 :root {
-  --bg: #101418;
-  --surface: #1a2027;
-  --surface-raised: #232b34;
-  --line: #39424d;
-  --text: #f2f5f8;
-  --text-dim: #a8b3bf;
-  --accent: #4b9fff;
-  --warn: #ffb02e;
-  --danger: #ff6b5a;
-
-  /* SC-001a: a gloved thumb. 44px is the documented floor; this is the field, so it is bigger. */
-  --touch: 56px;
-  --radius: 10px;
-
-  color-scheme: dark;
+  /*
+   * TRANSITIONAL ALIASES (deleted in T033): the legacy names, remapped onto tokens so every
+   * surface wears the new palette while its structure is still being rewritten story by story.
+   * Nothing new may consume these.
+   */
+  --bg: var(--md-sys-color-surface);
+  --surface: var(--md-sys-color-surface-container);
+  --surface-raised: var(--md-sys-color-surface-container-high);
+  --line: var(--md-sys-color-outline-variant);
+  --text: var(--md-sys-color-on-surface);
+  --text-dim: var(--md-sys-color-on-surface-variant);
+  --accent: var(--md-sys-color-primary);
+  --warn: var(--fx-color-warn);
+  --danger: var(--md-sys-color-error);
+  --touch: var(--fx-touch);
+  --radius: var(--md-sys-shape-corner-medium);
 }
 
 * {
@@ -31,9 +36,11 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font:
+    var(--md-sys-typescale-body-weight) var(--md-sys-typescale-body-size) /
+      var(--md-sys-typescale-body-line-height) var(--fx-font);
   /* No pull-to-refresh: a hunter dragging the map must not reload the app mid-report. */
   overscroll-behavior: none;
   /* The page itself never scrolls — only the panels inside it do. A map that can be dragged off
@@ -48,60 +55,136 @@ body {
   flex-direction: column;
 }
 
-/* ---- Typography ---- */
+/* ---- Typography: the M3 Expressive scale, on the system stack ---- */
 
 h1,
 h2 {
   margin: 0;
-  line-height: 1.2;
 }
+
 h1 {
-  font-size: 1.5rem;
+  font-size: var(--md-sys-typescale-headline-size);
+  font-weight: var(--md-sys-typescale-headline-weight);
+  line-height: var(--md-sys-typescale-headline-line-height);
 }
+
 h2 {
-  font-size: 1.1rem;
+  font-size: var(--md-sys-typescale-title-size);
+  font-weight: var(--md-sys-typescale-title-weight);
+  line-height: var(--md-sys-typescale-title-line-height);
+}
+
+.display {
+  font-size: var(--md-sys-typescale-display-size);
+  font-weight: var(--md-sys-typescale-display-weight);
+  line-height: var(--md-sys-typescale-display-line-height);
+  letter-spacing: var(--md-sys-typescale-display-tracking);
 }
 
 .dim {
-  color: var(--text-dim);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .small {
-  font-size: 0.85rem;
+  font-size: var(--md-sys-typescale-label-size);
+  line-height: var(--md-sys-typescale-label-line-height);
 }
 
-/* ---- Controls ---- */
+/* ---- Icons (src/ui/icons.ts) ---- */
+
+.icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  min-width: 0;
+}
+
+/* ---- Controls ----
+ *
+ * M3 anatomy on hand-rolled elements: a state layer (::after in currentColor) that answers the
+ * finger during the press, a scale dip so the answer survives direct sun, and shape from the
+ * token scale. The *button* is the 56px target; icons inside never carry that duty.
+ */
 
 button {
+  position: relative;
+  isolation: isolate;
   font: inherit;
-  color: var(--text);
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-height: var(--touch);
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: var(--md-sys-typescale-label-weight);
+  letter-spacing: var(--md-sys-typescale-label-tracking);
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  min-height: var(--fx-touch);
   padding: 0.75rem 1rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
   /* Nothing here is a double-tap target; kill the 300ms delay and the zoom. */
   touch-action: manipulation;
+  transition:
+    transform var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard),
+    background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+/* The state layer: present on every button, driven by interaction state. */
+button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+@media (hover: hover) {
+  button:hover:not(:disabled)::after {
+    opacity: var(--md-sys-state-hover-opacity);
+  }
+}
+
+/* The press answers *during* the press — opacity and a dip the sun cannot hide. */
+button:active:not(:disabled)::after {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 button:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--md-sys-color-primary);
   outline-offset: 2px;
 }
 
-button[aria-pressed='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #04121f;
-  font-weight: 600;
+/* Selected state: filled tonal, not a bare colour swap — outline, fill and weight all change. */
+button[aria-pressed='true'],
+button[aria-checked='true'] {
+  background: var(--md-sys-color-primary-container);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary-container);
+  font-weight: 700;
 }
 
+/* The one loud button per surface: filled primary. Send is unmistakable or it is mislaid. */
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #04121f;
-  font-weight: 600;
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-weight: 700;
 }
 
 button:disabled {
@@ -112,14 +195,28 @@ button:disabled {
 input {
   font: inherit;
   /* 16px minimum, or iOS zooms the viewport on focus and the hunter loses the map. */
-  font-size: 16px;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-height: var(--touch);
+  font-size: var(--fx-input-font);
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-small);
+  min-height: var(--fx-touch);
   padding: 0 0.75rem;
   width: 100%;
+  transition: border-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+input:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -1px;
+  border-color: var(--md-sys-color-primary);
+}
+
+label {
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: var(--md-sys-typescale-label-weight);
+  letter-spacing: var(--md-sys-typescale-label-tracking);
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 /* ---- Layout ---- */
@@ -243,7 +340,7 @@ input {
  * bar — which is the licence unmet, not a cosmetic fault. */
 .maplibregl-map .maplibregl-ctrl-bottom-right,
 .maplibregl-map .maplibregl-ctrl-bottom-left {
-  bottom: calc(var(--touch) + 1rem);
+  bottom: calc(var(--fx-touch) + 1rem);
 }
 
 /* ---- Sheet ---- */
@@ -297,7 +394,7 @@ input {
 .chip [data-testid='share-hunt'] {
   margin-left: 0;
   border: 0;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--fx-font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
 }
@@ -391,8 +488,16 @@ input {
   vertical-align: baseline;
 }
 
+/*
+ * The reduced-motion kill: last rule in the cascade on purpose (SC-006). Every state change
+ * still happens; nothing decorates the journey.
+ */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  /* Pseudo-elements named explicitly: `*` alone does not match them, and the button state
+     layer lives on ::after — the audit caught it animating under the preference. */
+  *,
+  *::before,
+  *::after {
     animation: none !important;
     transition: none !important;
   }
