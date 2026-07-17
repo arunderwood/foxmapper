@@ -5,6 +5,41 @@ after, because the point of the field gate is that it can still change the answe
 
 ---
 
+## Closed 2026-07-16 — built and verified, not proven outdoors
+
+US1 closes on the terms [constitution 1.1.0](../../.specify/memory/constitution.md) sets: its tests
+and its independent-test criteria. **106 tasks done, 7 deferred, 0 open.** Live at
+**https://foxmapper.com**, SSE delivering in ~130 ms against a 5 s budget.
+
+**It has never been outdoors.** SC-001a/b, SC-006, SC-007, SC-009 and SC-012 are **unmeasured, not
+passing**. The deferred phase in [tasks.md](tasks.md) keeps every field question verbatim, because
+"we never asked" and "we asked and it was fine" are different facts and only one of them is honest.
+
+**The bill that is still unpaid**, named once so it is not discovered later: the plan's
+strongest-worded Complexity Tracking violation — no offline basemap, reports drawn over blank space —
+was accepted *specifically* on the grounds that "the field gate will say so". It has not said. That
+decision now rests on nothing but the argument that produced it.
+
+**What the last three rounds actually taught**, in the order the lessons cost the most:
+
+1. **Green tests hid three CRITICAL defects.** Reports authored from a hardcoded coordinate and
+   labelled as hand-placed; a blank relay coordinate filing an observer at Null Island; a half-filled
+   relay silently filed as net control's own. Every one of them passed the whole suite. They were
+   found by reading the code against the spec — which is what the convergence rounds are for, and
+   what no amount of test-writing substitutes for.
+2. **A careful argument is not evidence.** T097 was a well-reasoned finding, sourced in real facts
+   about glyph hosting, and simply **false** — MapLibre shapes codepoints locally, so the callsigns
+   survive offline. A browser settled in ten seconds what review had got wrong. *Reason to find
+   candidates; run it to decide.*
+3. **A task that cannot name the decision its result would change is not a test.** T063 asked for a
+   field re-measurement of a number already sourced from NXP AN4246, where every possible outcome led
+   to no action. It survived three rounds of review by looking rigorous. What was actually worth doing
+   was hiding inside it: `heading.ts` was the last untested module in `src/`.
+4. **Fixes need their own audit.** Five of Phase 6's defects were introduced by Phase 5; one more
+   (T112) was created by a Phase 6 fix and caught by a stress run rather than by reading.
+
+---
+
 ## What is proven, and by what
 
 | Claim | Proven by | Where |
@@ -28,7 +63,8 @@ after, because the point of the field gate is that it can still change the answe
 | **SC-008 in full — 0 jargon on all 13 reachable screens** | A human reading every screen of the live app, which the scan cannot do | **T065, on `foxmapper.com`** |
 | **SC-003 — four devices, no report missing** | Four independent contexts from four locations; each asserted to hold all four | **`web/tests/e2e/four-devices.spec.ts`** |
 
-**Totals**: 153 web unit tests, 47 server tests, 23 E2E. All green.
+**Totals at close**: **191 web unit tests, 48 server tests, 98 E2E** (Chromium + mobile Safari). All
+green. Plus T069 and T065 run against the live deployment.
 
 The vocabulary check surfaced a pleasing structural fact: **"DFS" does not appear in the shipped
 bundle at all**, because nothing that renders imports `aprs/mapping.ts` and the module tree-shakes
