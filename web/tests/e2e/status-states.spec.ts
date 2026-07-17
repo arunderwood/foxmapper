@@ -10,7 +10,7 @@
  * glanceable colour roles, and wrap rather than truncate.
  */
 import { test, expect, type Locator } from '@playwright/test';
-import { createHunt, grantPosition, joinAs, reportHeardNothing } from './helpers.js';
+import { createHunt, grantPosition, joinAs, reportHeardNothing, tapOpenMap } from './helpers.js';
 
 interface ChipLook {
   iconPath: string;
@@ -121,7 +121,8 @@ test('GPS states carry the triple too', async ({ page, context }) => {
 
   // Hand-placement flips the chip to its placed identity — different icon, same calm tier.
   await page.getByTestId('place-position').click();
-  await page.getByTestId('map').click({ position: { x: 200, y: 200 } });
+  await page.getByTestId('placing-banner').waitFor();
+  await tapOpenMap(page);
   await expect(gps).toHaveAttribute('data-state', 'placed');
   const placed = await look(gps);
   await page.getByTestId('use-device-position').click();

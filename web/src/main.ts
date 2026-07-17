@@ -279,7 +279,7 @@ class App {
       el(
         'div',
         { class: 'screen', 'data-testid': 'start-screen' },
-        el('h1', {}, 'FoxMapper'),
+        el('h1', { class: 'display' }, 'FoxMapper'),
         el('p', { class: 'dim' }, 'A shared map of who heard what, and from where.'),
         el('label', {}, 'What are you hunting?'),
         label,

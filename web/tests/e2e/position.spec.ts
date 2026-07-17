@@ -16,6 +16,7 @@ import {
   joinAs,
   localReports,
   placePosition,
+  tapOpenMap,
   renderedFeatures,
   reportHeardNothing,
 } from './helpers.js';
@@ -63,7 +64,7 @@ test('point-at-map places the position, and the report is filed from there — F
   await page.getByTestId('placing-banner').waitFor();
 
   // The second entry method: tap where you are. Landing straight in the report you asked for.
-  await page.getByTestId('map').click({ position: { x: 180, y: 220 } });
+  await tapOpenMap(page);
   await page.getByTestId('sheet').waitFor();
   await page.getByTestId('send-null').click();
 

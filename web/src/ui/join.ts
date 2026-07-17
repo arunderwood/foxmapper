@@ -72,7 +72,9 @@ export function joinScreen(options: JoinOptions): HTMLElement {
   return el(
     'div',
     { class: 'screen', 'data-testid': 'join-screen' },
-    el('h1', {}, 'FoxMapper'),
+    // Display scale: the join screen is one of the sanctioned expressive moments (FR-005) —
+    // the first thing a handed-a-link hunter sees gets the biggest type in the app.
+    el('h1', { class: 'display' }, 'FoxMapper'),
     // The target is shown before any report arrives, so a joining hunter knows what they are
     // chasing. Offline it is simply the code — which does not block joining.
     //

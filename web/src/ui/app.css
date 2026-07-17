@@ -9,25 +9,6 @@
  */
 @import './tokens.css';
 
-:root {
-  /*
-   * TRANSITIONAL ALIASES (deleted in T033): the legacy names, remapped onto tokens so every
-   * surface wears the new palette while its structure is still being rewritten story by story.
-   * Nothing new may consume these.
-   */
-  --bg: var(--md-sys-color-surface);
-  --surface: var(--md-sys-color-surface-container);
-  --surface-raised: var(--md-sys-color-surface-container-high);
-  --line: var(--md-sys-color-outline-variant);
-  --text: var(--md-sys-color-on-surface);
-  --text-dim: var(--md-sys-color-on-surface-variant);
-  --accent: var(--md-sys-color-primary);
-  --warn: var(--fx-color-warn);
-  --danger: var(--md-sys-color-error);
-  --touch: var(--fx-touch);
-  --radius: var(--md-sys-shape-corner-medium);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -233,6 +214,17 @@ label {
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
   overflow-y: auto;
   flex: 1;
+  /* A sanctioned expressive moment (FR-005): the landing screens arrive with intent. Seen
+     once per hunt, in nobody's way — and flattened entirely under reduced motion. */
+  animation: screen-in var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 .stack {
@@ -673,40 +665,70 @@ label {
 
 /* ---- Report detail ---- */
 
-.popup p {
-  margin: 0 0 0.35rem;
-  font-size: 0.85rem;
+/* The popup wears the report's kind identity — same icon, same hue as the bar (US3 sc. 3). */
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Room for MapLibre's absolute close button, which is a full-size target. */
+  padding-right: 44px;
+  margin-bottom: 0.35rem;
 }
 
+.popup-header .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.popup-title {
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: 700;
+}
+
+.popup p {
+  margin: 0 0 0.35rem;
+  font-size: var(--md-sys-typescale-label-size);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Retraction: an outlined error action at the full touch floor — withdrawing a wrong report is
+   done with gloves on too. */
 .popup button {
   margin-top: 0.5rem;
-  min-height: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.8rem;
-  border-color: var(--danger);
-  color: var(--danger);
+  min-height: var(--fx-touch);
+  min-width: var(--fx-touch);
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
   background: transparent;
 }
 
 /* MapLibre's popup is white by default and would be unreadable against this palette. Scoped for
    specificity, for the same reason as the attribution above. */
 .maplibregl-popup .maplibregl-popup-content {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-large);
   padding: 0.75rem 0.9rem;
+  min-width: 232px;
 }
 
 .maplibregl-popup .maplibregl-popup-tip {
-  border-top-color: var(--surface);
-  border-bottom-color: var(--surface);
+  border-top-color: var(--md-sys-color-surface-container-high);
+  border-bottom-color: var(--md-sys-color-surface-container-high);
 }
 
+/* MapLibre's own close button, grown to the field floor (SC-002): a hunter dismisses a popup
+   with the same gloved thumb that opened it. */
 .maplibregl-popup .maplibregl-popup-close-button {
-  color: var(--text);
-  font-size: 1.1rem;
-  padding: 0 0.35rem;
+  color: var(--md-sys-color-on-surface);
+  font-size: 1.4rem;
+  width: var(--fx-touch);
+  height: var(--fx-touch);
+  padding: 0;
+  border-radius: var(--md-sys-shape-corner-full);
 }
 
 /* ---- Notices ---- */

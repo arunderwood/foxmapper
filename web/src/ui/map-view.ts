@@ -17,18 +17,26 @@ import { queueChip } from './storage.js';
 import { shareChip } from './share.js';
 import { targetChips, type Target } from './target.js';
 import { RETRACT_LABEL } from '../report/retract.js';
-import { formatTime, el, clear } from './dom.js';
+import { formatTime, el, clear, cssToken } from './dom.js';
 import { icon } from './icons.js';
+import { KIND_ICONS, type ReportKind } from './report-entry.js';
 import type { PositionState } from '../sensors/position.js';
 
 const WEDGE_SOURCE = 'reports-wedges';
 const MARKER_SOURCE = 'reports-markers';
 
-const LABEL_PAINT = {
-  'text-color': '#f2f5f8',
-  'text-halo-color': '#101418',
-  'text-halo-width': 1.5,
-} as const;
+/**
+ * Resolved when layers are added, not at import: the values come from the token set, and the
+ * stylesheet must be live to answer. Light ink with a dark halo reads on both grounds — the
+ * street style and the blank light fallback.
+ */
+function labelPaint(): { 'text-color': string; 'text-halo-color': string; 'text-halo-width': number } {
+  return {
+    'text-color': cssToken('--md-sys-color-on-surface', '#EFDFDB'),
+    'text-halo-color': cssToken('--md-sys-color-surface', '#191210'),
+    'text-halo-width': 1.5,
+  };
+}
 
 /**
  * Shared by the wedge and marker labels, so a bearing is attributed exactly as loudly as a marker.
@@ -183,7 +191,7 @@ export class MapView {
       type: 'symbol',
       source: WEDGE_SOURCE,
       layout: labelLayout(),
-      paint: LABEL_PAINT,
+      paint: labelPaint(),
     });
 
     // omni, null and fix: a circle at a position, and nothing that implies a direction. No arrow,
@@ -259,7 +267,7 @@ export class MapView {
       type: 'symbol',
       source: MARKER_SOURCE,
       layout: labelLayout(),
-      paint: LABEL_PAINT,
+      paint: labelPaint(),
     });
 
     this.#bindClick();
@@ -326,13 +334,26 @@ export class MapView {
   }
 
   #showDetail(lngLat: maplibregl.LngLat, properties: Record<string, unknown>): void {
-    const lines = [
-      `${String(properties['label'])} — ${describeKind(String(properties['kind']))}`,
-      formatTime(Number(properties['display_at'])),
-    ];
+    const kind = String(properties['kind']) as ReportKind;
+
+    const content = el('div', { class: 'popup', 'data-testid': 'report-detail' });
+
+    // The report's kind identity — same icon, same hue as the bar button that filed it (US3
+    // scenario 3): the popup visibly belongs to the vocabulary the hunter already knows.
+    const title = `${String(properties['label'])} — ${describeKind(kind)}`;
+    content.append(
+      el(
+        'div',
+        { class: `popup-header kind-${kind}` },
+        icon(KIND_ICONS[kind] ?? 'explore', { label: title }),
+        el('span', { class: 'popup-title' }, title),
+      ),
+      el('p', {}, formatTime(Number(properties['display_at']))),
+    );
 
     // Every caveat the report carries travels with it. The map must not read as more certain than
     // the report it is drawing.
+    const lines = [];
     if (properties['relayed']) {
       lines.push(`Relayed by ${String(properties['entered_by'])} over the air`);
     }
@@ -341,8 +362,6 @@ export class MapView {
       lines.push('That phone never checked its clock — time may be off');
     if (properties['clock_suspect'])
       lines.push('That phone’s clock was wrong — time is approximate');
-
-    const content = el('div', { class: 'popup', 'data-testid': 'report-detail' });
     for (const line of lines) content.append(el('p', {}, line));
 
     // FR-010, and only for a report this phone entered. There is no moderator and no appeal: a

@@ -43,11 +43,23 @@ export async function joinAs(page: Page, code: string, callsign: string): Promis
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
 }
 
+/**
+ * Taps the map on open ground — below the status chips, above the report bar. A fixed (200,200)
+ * used to work, but the redesigned chips are taller and on a phone viewport that point can land
+ * on a chip action, which rightly intercepts the tap.
+ */
+export async function tapOpenMap(page: Page): Promise<void> {
+  const map = page.getByTestId('map');
+  const box = await map.boundingBox();
+  if (!box) throw new Error('map has no box');
+  await map.click({ position: { x: box.width / 2, y: Math.round(box.height * 0.7) } });
+}
+
 /** Places the reporting position by hand: the point-at-map method (FR-008a). */
 export async function placePosition(page: Page): Promise<void> {
   await page.getByTestId('place-position').click();
   await page.getByTestId('placing-banner').waitFor();
-  await page.getByTestId('map').click({ position: { x: 200, y: 200 } });
+  await tapOpenMap(page);
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
 }
 

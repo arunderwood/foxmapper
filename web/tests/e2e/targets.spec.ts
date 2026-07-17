@@ -49,6 +49,7 @@ async function auditTargets(page: Page, surface: string): Promise<void> {
 }
 
 async function walk(page: Page, surface: string): Promise<void> {
+  await page.getByTestId('callsign-input').waitFor();
   await auditTargets(page, `${surface}/join`);
 
   await page.getByTestId('callsign-input').fill('KI7AUD');

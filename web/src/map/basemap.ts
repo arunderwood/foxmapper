@@ -13,6 +13,7 @@
  * no reports — which is what a hunt out of coverage looks like, i.e. the normal case.
  */
 import maplibregl, { type Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl';
+import { cssToken } from '../ui/dom.js';
 
 /** No API key, no registration, no cookies, and no open-core — self-hosting stays available. */
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -30,9 +31,7 @@ function blankStyle(): StyleSpecification {
   // absent. A LIGHT ground on purpose, and this is a decision the dark re-skin must not touch:
   // the per-callsign report colours are a wire-format guarantee tuned to sit on a street map
   // (docs/log-format.md), and they must stay legible when the streets never arrive.
-  const ground =
-    getComputedStyle(document.documentElement).getPropertyValue('--fx-color-map-ground').trim() ||
-    '#F6F0EA';
+  const ground = cssToken('--fx-color-map-ground', '#F6F0EA');
 
   return {
     version: 8,
