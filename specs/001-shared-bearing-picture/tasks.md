@@ -26,7 +26,19 @@ is not a defect in the task list; it is what "the smallest useful form" produced
 - **[Story]**: US1 (the only story)
 - Every task names its file path and the contract section that specifies it
 
-**Field-gate (constitution, Development Workflow)**: T070 closes the story. Green tests do not.
+**Field validation — a deferred milestone, not a gate** ([constitution 1.1.0](../../.specify/memory/constitution.md)).
+The amendment is exact about what closes a story: *"A story closes on its tests and its
+independent-test criteria, and the next story MAY begin without an intervening hunt."*
+
+US1's independent test is *"four people in different locations join one hunt, each submits one
+bearing, and each can see the other three."* Its **mechanism** is now proven — `four-devices.spec.ts`
+runs four independent contexts from four locations and asserts every device holds all four (SC-003).
+Four *people* on four *real phones* is T066, still owed.
+
+So **US1 closes: tests green, independent-test criteria met.** What it does not do is close as
+*proven outdoors* — SC-001a/b, SC-006, SC-007, SC-009 and SC-012 remain **unmeasured, not passing**
+(see the Deferred phase). The constitution says it plainly: the product is ultimately proven
+outdoors, and no amount of desk work converts a green suite into that.
 
 ## Path Conventions
 
@@ -151,10 +163,10 @@ each sees the other three on their own device within seconds.
 - [X] T060 [P] [US1] E2E relayed attribution in `web/tests/e2e/relay.spec.ts` — **0 relayed reports attributed to the operator who typed them** (SC-011); relay marking visible
 - [X] T061 [P] [US1] E2E offline in `web/tests/e2e/offline.spec.ts` — **real airplane mode, HTTP cache cleared**; three reports accepted and rendered locally; survives force-quit; 100% present after reconnect (SC-005); blank basemap is expected, a lost report is not
 - [X] T062 [US1] Manual SSE check per [quickstart.md](quickstart.md) Level 2 — `curl -N` shows events arriving one at a time; **a burst means a proxy is buffering and SC-002 is failing invisibly**
-- [ ] T063 [US1] Manual sensor checks per [quickstart.md](quickstart.md) Level 4 on real iOS and Android — declination applied (Bellingham ~15.2°); **stand next to a car and confirm the 10–30° swing**; clock set to 2030 does not crash
-- [ ] T064 [US1] Manual iOS storage checks per [quickstart.md](quickstart.md) Level 4 — the two things research could **not** verify from primary sources: does `persist()` beat the ITP 7-day rule, and does Add to Home Screen discard the tab's cache
-- [ ] T065 [US1] Jargon review of every reachable screen against [contracts/aprs-mapping.md § Vocabulary firewall](contracts/aprs-mapping.md) — **0 occurrences** of NRQ, DFS, PHG, Q, R, N, S or any raw digit (SC-008)
-- [ ] T066 [US1] Four-device test per [quickstart.md](quickstart.md) Level 5 — four phones, four locations, one hunt, no report missing (SC-003)
+- [~] **DEFERRED 2026-07-16 — and mostly retired rather than deferred** T063 [US1] Manual sensor checks per [quickstart.md](quickstart.md) Level 4 on real iOS and Android — declination applied (Bellingham ~15.2°); **stand next to a car and confirm the 10–30° swing**; clock set to 2030 does not crash. **Challenged and mostly upheld**: this task asked a maintainer to re-measure, with n=2 phones and one car, numbers the project had already sourced from primary references — `research.md § 5` establishes both platforms give magnetic *from WebKit source*, the 20–30° vehicle swing *from NXP AN4246*, and dataless GPS *from Chromium source*. **No decision hung on the result**: a smaller swing means the Q≤5 cap is conservative (Principle I satisfied harder, no action); a larger one is still inside the widest bucket's 64° (no action). And nothing there is codeable — compass error is physics and Android's missing accuracy is a platform fact we already degrade honestly for. **What was real, and was hiding inside it, is now done**: `heading.ts` was the last untested module in `src/`, and it is the one place a defect is both likely and fixable. `web/tests/unit/heading.test.ts` covers every branch with synthetic orientation events — verified to fail when alpha's sign is flipped (3 tests), when iOS's `-1` accuracy sentinel is accepted (1), and when the screen-rotation correction is dropped (2). **What a phone could still add**: proof the platform actually delivers an event to *our* handler. That is n=1 and five minutes — it is "open the app once on each platform", not a test protocol, and the first person to use the app finds out anyway
+- [~] **DEFERRED 2026-07-16** T064 [US1] Manual iOS storage checks per [quickstart.md](quickstart.md) Level 4 — the two things research could **not** verify from primary sources: does `persist()` beat the ITP 7-day rule, and does Add to Home Screen discard the tab's cache
+- [X] T065 [US1] Jargon review of every reachable screen against [contracts/aprs-mapping.md § Vocabulary firewall](contracts/aprs-mapping.md) — **0 occurrences** of NRQ, DFS, PHG, Q, R, N, S or any raw digit (SC-008) — **done 2026-07-16 against the live app at `foxmapper.com`. SC-008 passes: 0 occurrences across all 13 reachable screens** (start, join, status bar, report bar, the four sheets, relay fields, the incomplete-relay refusal, report detail, placing banner, share, offline status bar). The scan half was already a permanent test; this was the half it cannot do — judging *reachable*, and judging whether jargon-free prose is also the language a hunter speaks. **It found one**: the app said "Heading" where the constitution's own word list says **bearing** — the button says Bearing, then the sheet asked for a Heading. Jargon-free and still not their word, which is precisely what this task exists to catch. Fixed. Two findings recorded rather than fixed, in [findings.md](findings.md): relayed positions are typed as lat/lon, which is not how a position arrives over voice; and "Middling" is clear but archaic
+- [~] **PARTLY DONE 2026-07-16; the half needing people is deferred** T066 [US1] Four-device test per [quickstart.md](quickstart.md) Level 5 — four phones, four locations, one hunt, no report missing (SC-003). **Mechanism proven**: `web/tests/e2e/four-devices.spec.ts` joins four independent contexts from four locations, has each file one bearing, and asserts every device ends up holding all four — verified to fail when it expects three. That satisfies US1's independent-test criteria, which constitution 1.1.0 makes part of what closes a story. **Still owed**: four *real phones*, four *real places*, real cell. Four browser contexts are not four people and a loopback relay is not a trailhead
 
 ### Deploy (US1) — required before the field test
 
@@ -169,22 +181,25 @@ each sees the other three on their own device within seconds.
 > convincing. It costs a Saturday morning and no goodwill, and it is what makes the invitation in
 > T070 worth spending.
 
-- [ ] T069a [US1] Solo hunt per [quickstart.md](quickstart.md) Level 4a — hide a transmitter, hunt it yourself with two phones, invite nobody. Against the **deployed URL on real cell**, not localhost on wifi. Record: whether the blank basemap is usable **while walking**; whether a bearing takes under 10 s one-handed **holding a radio** (SC-001a/b); whether the wedge points at a transmitter **whose location you actually know** — the only rung where ground truth exists, because you hid it; the cold join on real cell (SC-001); whether the palette survives direct sunlight (T071). **This is not the gate**: SC-006, SC-007, SC-009 and SC-012 all need someone who is not you, and **you cannot fairly test the join flow you built**
+- [~] **DEFERRED 2026-07-16** T069a [US1] Solo hunt per [quickstart.md](quickstart.md) Level 4a — hide a transmitter, hunt it yourself with two phones, invite nobody. Against the **deployed URL on real cell**, not localhost on wifi. Record: whether the blank basemap is usable **while walking**; whether a bearing takes under 10 s one-handed **holding a radio** (SC-001a/b); whether the wedge points at a transmitter **whose location you actually know** — the only rung where ground truth exists, because you hid it; the cold join on real cell (SC-001); whether the palette survives direct sunlight (T071). **This is not the gate**: SC-006, SC-007, SC-009 and SC-012 all need someone who is not you, and **you cannot fairly test the join flow you built**
 
 ### Field Validation for User Story 1 (REQUIRED — this closes the story)
 
-- [ ] T070 [US1] Take it to a real hunt per [spec.md § Field Validation](spec.md) and [quickstart.md](quickstart.md) Level 6. Record: whether three untrained participants joined and reported **without being talked through it**; whether the stock-antenna hunter contributed rather than spectated (SC-009); whether **net control kept up with voice traffic** (SC-012 — the plan's explicit bet); whether anyone acted on someone else's report and could say whose they trusted and why (SC-006); whether anyone **fell back to voice because the interface was slower than talking** (SC-007 — the status quo winning); and whether the blank offline basemap was usable or useless
+- [~] **DEFERRED 2026-07-16** T070 [US1] Take it to a real hunt per [spec.md § Field Validation](spec.md) and [quickstart.md](quickstart.md) Level 6. Record: whether three untrained participants joined and reported **without being talked through it**; whether the stock-antenna hunter contributed rather than spectated (SC-009); whether **net control kept up with voice traffic** (SC-012 — the plan's explicit bet); whether anyone acted on someone else's report and could say whose they trusted and why (SC-006); whether anyone **fell back to voice because the interface was slower than talking** (SC-007 — the status quo winning); and whether the blank offline basemap was usable or useless
 
-**Checkpoint**: US1 is done when T070 is written up. Not when the tests are green.
+**Checkpoint**: US1 closes on its tests and its independent-test criteria, which is what constitution
+1.1.0 asks for. It is **not proven outdoors** — T070 was never run. The difference is not pedantry:
+five success criteria are unmeasured, and "we never asked" is a different fact from "we asked and it
+was fine".
 
 ---
 
 ## Phase 4: Polish & Cross-Cutting Concerns
 
-- [ ] T071 [P] Colour palette review in `web/src/log/colour.ts` — **CVD half done 2026-07-16; sunlight half open, and belongs to T069a.** The twelve were a rainbow and measured **ΔE 2.2** (CAM02-UCS, worst pair) under protanomaly — `#e5533d` red and `#9c6b45` brown were the same colour, and seven pairs collided under deuteranomaly. Because colour is a hash bucket, that collision is invisible to the person it affects. Replaced with **Paul Tol's "muted" (9)**, worst case **11.8** across all three CVD types. Nine is not a downgrade: colour already collided 95.4% of the time at eight hunters, and a deuteranope was already living with ~8 effective colours out of the twelve. `docs/log-format.md`, the spec contract, `data-model.md` and `plan.md` all updated; `colour.test.ts` now parses the published table and asserts it equals `PALETTE`, so the contract and the code cannot drift. **Remains open**: a dimmed screen in direct sunlight, and one real pair of CVD eyes — neither of which simulation can supply. The palette must not move after T069a. See [findings.md](findings.md)
+- [~] **DEFERRED 2026-07-16 (sunlight half only; CVD half done)** T071 [P] Colour palette review in `web/src/log/colour.ts` — **CVD half done 2026-07-16; sunlight half open, and belongs to T069a.** The twelve were a rainbow and measured **ΔE 2.2** (CAM02-UCS, worst pair) under protanomaly — `#e5533d` red and `#9c6b45` brown were the same colour, and seven pairs collided under deuteranomaly. Because colour is a hash bucket, that collision is invisible to the person it affects. Replaced with **Paul Tol's "muted" (9)**, worst case **11.8** across all three CVD types. Nine is not a downgrade: colour already collided 95.4% of the time at eight hunters, and a deuteranope was already living with ~8 effective colours out of the twelve. `docs/log-format.md`, the spec contract, `data-model.md` and `plan.md` all updated; `colour.test.ts` now parses the published table and asserts it equals `PALETTE`, so the contract and the code cannot drift. **Remains open**: a dimmed screen in direct sunlight, and one real pair of CVD eyes — neither of which simulation can supply. The palette must not move after T069a. See [findings.md](findings.md)
 - [X] T072 [P] Publish the log format at `docs/log-format.md` so a third party can reimplement it (FR-021) — the constitution's actual test
 - [X] T073 [P] Bundle size check against SC-001's 15-second cold join on real cell, not wifi
-- [ ] T074 Write up T070's findings against the spec; feed them into the next story
+- [~] **DEFERRED 2026-07-16** T074 Write up T070's findings against the spec; feed them into the next story
 
 ---
 
@@ -195,7 +210,7 @@ each sees the other three on their own device within seconds.
 - **Setup (Phase 1)**: no dependencies
 - **Foundational (Phase 2)**: depends on Setup. **Blocks US1 entirely**
 - **User Story 1 (Phase 3)**: depends on Foundational
-- **Polish (Phase 4)**: depends on T070
+- **Polish (Phase 4)**: depended on T070; T074 is deferred with it. The rest of Phase 4 is done.
 
 ### Within Phase 2
 
@@ -210,7 +225,7 @@ each sees the other three on their own device within seconds.
 - Fold + colour + wedge (T013, T015, T040) block layers (T042)
 - T043 blocks T047 (relay reuses bearing entry)
 - Deploy (T067, T068) blocks T069, which blocks T070
-- **Everything blocks T070**
+- **Everything blocked T070** — which is now deferred, so nothing does
 
 ### The order the field work actually runs in
 
@@ -278,7 +293,7 @@ kinds are what make it satisfy Principle II rather than being bearings-only.
 2. Phase 2: Foundational — **stop here and confirm the properties pass.** The constitution is either
    satisfied in this phase or it is not, and it is far cheaper to find out here than on a hilltop
 3. Phase 3: US1
-4. **T070: a real hunt.** This is the gate
+4. ~~**T070: a real hunt.** This is the gate~~ — **deferred 2026-07-16 (constitution 1.1.0)**. Still owed
 5. Phase 4: Polish, informed by what T070 found
 
 ### Order that matters
@@ -294,7 +309,7 @@ green pipeline stand in for it.
 - [P] = different files, no dependencies
 - Property tests must fail before their implementation exists
 - Commit after each task or logical group
-- A story closes on T070, not on green tests
+- A story owes T070. Since 1.1.0 it does not *wait* on it — but it closes as built, not as proven
 
 ---
 
@@ -346,7 +361,8 @@ field, and desk work that no code change closes.
 - [X] T093 Register the map click handler once per FR-012 (partial). `#addLayers` guards on `map.getSource(WEDGE_SOURCE)` (`web/src/ui/map-view.ts:76`), but a basemap style swap drops custom sources — as the comment at `:59-62` says — so the blank→streets upgrade re-enters and registers a **second** `map.on('click')` (`:142`), stacking two popups per tap
 - [X] T094 Keep one Q table per [contracts/aprs-mapping.md](contracts/aprs-mapping.md) (unrequested). `web/src/aprs/mapping.ts:191-223` (`Q_DEGREES`, `qDescription`, `wedgeHalfWidthDegrees`, `rangeMiles`) has no callers, while `web/src/map/wedge.ts:24` keeps its own duplicate `HALF_WIDTH_DEGREES`. The values agree today. Two normative copies of the table that caps what a wedge may claim is a divergence waiting to happen, and Principle I is what it would cost
 
-**Checkpoint**: Phase 5 does not close the story either. **T070 still does.** These are the things
+**Checkpoint**: Phase 5 does not close the story either. **T070 was what did — until it was
+deferred (2026-07-16, constitution 1.1.0).** These are the things
 that would have made the field gate measure the interface instead of its holes — a hunter cannot
 currently withdraw a wrong bearing (T077), place themselves when GPS fails (T075/T078), or tell whose
 wedge is whose without tapping it (T079). Fix these, then go outdoors.
@@ -407,7 +423,7 @@ no code change closes.
 
 - [X] T112 Stop the target fetch re-rendering the join screen under the participant, per FR-002 (contradicts). T100's first fix rendered the join screen immediately and then called `#renderJoin(target)` again when the fetch landed — which **destroyed the map if the hunter had already joined**, and wiped a half-typed callsign if they had not. It reproduced as a hang in about one run in twenty-four of `shared-picture.spec.ts` and would have been a rare, unexplainable "the app went blank as I joined" in the field. The target line is now updated in place (`web/src/ui/join.ts` `targetLine`), never re-rendered, and `onJoined` no longer closes over a stale target. **Introduced and caught inside this phase**, by the stress run rather than by review — the pattern the phase's own preamble names
 
-**Checkpoint**: still not the gate. **T070 is.** T095 and T096 are the two that would matter outdoors:
+**Checkpoint**: still not the gate. **T070 was — now deferred (2026-07-16, constitution 1.1.0).** T095 and T096 are the two that would matter outdoors:
 net control is the persona most likely to fumble a field while keeping up with voice traffic
 (SC-012), and both bugs turn that fumble into a report on the map that nobody can trace back to a
 mistake — one at Null Island, one wearing the wrong callsign.
@@ -416,3 +432,36 @@ mistake — one at Null Island, one wearing the wrong callsign.
 simply **false**, and only a test settled it. Two of the seventeen (T097, T101) dissolved on contact
 with a browser, and one new defect (T112) was created by a fix and caught by a stress run rather
 than by reading. Reason about the code to find candidates; run it to decide.
+
+---
+
+## Deferred — the field debt (2026-07-16)
+
+Marked `[~]`: **not done, and not dropped.**
+
+The field-gate was amended from a sequencing gate to an obligation
+([constitution 1.1.0](../../.specify/memory/constitution.md)). The reason is a missing tester base —
+there is nobody to recruit for repeated hunts — **not** a judgement that these questions stopped
+mattering. They are recorded with their text intact so that "we never asked" cannot quietly become
+"we asked and it was fine".
+
+| | still asks | why it was worth doing |
+|---|---|---|
+| T064 | does `persist()` beat iOS's 7-day eviction; does Add to Home Screen discard the tab cache | The two things research **could not** settle from primary sources. The exposed case is a report authored offline, on a phone that gets evicted — SC-005's "100% present" would be false, silently. |
+| T066 | four **real phones**, four **real places**, on real cell | SC-003's mechanism is **proven** — `four-devices.spec.ts` runs four contexts from four locations and asserts every device holds all four. Four browser contexts are not four people and a loopback relay is not a trailhead; that half is owed. |
+| T069a | is a blank basemap usable *while walking*; does a bearing take under 10 s one-handed holding a radio; does the wedge point at a fox whose location you actually know | The only rung where **ground truth exists**, because you hid it. Also the sunlight half of T071. |
+| T070 | three untrained people, one first impression | SC-006, SC-007, SC-009, SC-012 — none reachable any other way. **SC-007 is the one that matters most**: if anyone falls back to voice because the interface is slower than talking, that is the status quo winning, and no test suite outranks it. |
+| T071 | do the nine swatches survive a dimmed screen in direct sunlight | The CVD half is **done** (Paul Tol's "muted", worst case ΔE 11.8 vs the old rainbow's 2.2). Only sunlight is open. **The palette must not move after this is answered** — changing it repaints every hunt. |
+| T074 | write up what T070 found | Nothing to write up until T070 runs. |
+
+**What deferring actually costs**, stated once so nobody has to reconstruct it:
+
+- **US1 closes as built and verified, not as proven.** Six success criteria are unmeasured. That is
+  a different thing from passing, and the artifacts say so.
+- **The riskiest unknowns are the deferred ones.** The plan's own recorded Complexity Tracking
+  violation — no offline basemap, reports drawn over blank space — was accepted *specifically*
+  because "the field gate will say so". It has not said. That decision is now resting on nothing.
+- **T063 is not here.** It needs a phone and a car park, not people. The honesty cap (Q ≤ 5) rests on
+  the compass swinging 10–30° next to a car, and nobody has looked.
+
+**When a tester base exists**, the ladder is unchanged: T063/T064 → T069a → T066 → T070.

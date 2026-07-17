@@ -299,7 +299,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
     max: '359.9',
     step: '0.1',
     'data-testid': 'heading-input',
-    'aria-label': 'Heading in degrees',
+    'aria-label': 'Bearing in degrees',
   });
 
   // Typing overrides the compass permanently: the reporter has made a claim, and a sensor update
@@ -310,7 +310,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
     source = 'manual';
     accuracy = undefined;
     magnetic = readout.value.trim() === '' ? undefined : Number(readout.value);
-    status.textContent = 'Using the heading you typed';
+    status.textContent = 'Using the bearing you typed';
     refresh();
   });
 
@@ -329,7 +329,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
     // Must be inside a gesture handler on iOS or requestPermission rejects.
     void (async () => {
       if (needsPermission() && !(await requestPermission())) {
-        status.textContent = 'No compass access — type the heading instead';
+        status.textContent = 'No compass access — type the bearing instead';
         return;
       }
       source = 'compass';
@@ -417,7 +417,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
   return sheet(
     'Which way is the fox?',
     [
-      el('label', { for: 'heading' }, 'Heading (degrees)'),
+      el('label', { for: 'heading' }, 'Bearing (degrees)'),
       readout,
       useCompass,
       status,

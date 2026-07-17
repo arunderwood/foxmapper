@@ -4,7 +4,20 @@
 
 **Created**: 2026-07-14
 
-**Status**: Draft
+**Status**: **Closed 2026-07-16 — built and verified. Not proven outdoors.**
+
+Closed on the terms [constitution 1.1.0](../../.specify/memory/constitution.md) sets: *"A story closes
+on its tests and its independent-test criteria."* Both are met — 191 unit, 48 server and 98 E2E tests
+green, and the Independent Test below is proven mechanically by `web/tests/e2e/four-devices.spec.ts`
+(four contexts, four locations, every device holding all four).
+
+**What "closed" does not mean.** Nobody has taken this outdoors. The Field Validation section below
+was never run, and **SC-001a/b, SC-006, SC-007, SC-009 and SC-012 are unmeasured — not passing.**
+Field validation is a deferred milestone rather than a gate because there is no base of participants
+to recruit; the debt is still owed and the questions are preserved verbatim in
+[tasks.md](tasks.md)'s Deferred phase. See [findings.md](findings.md) for what is proven and by what.
+
+Live at **https://foxmapper.com**.
 
 **Input**: User description: "Shared bearing picture (Priority: P1) — A group of hunters is trying to find a hidden transmitter. One person creates a session and shares a code. Each hunter opens a link on their phone, joins with their callsign, and — from wherever they are standing — records which direction the signal is coming from. Within seconds, every other hunter sees that observation appear on a shared map, drawn from the reporter's position and shaded to reflect how much they trust it."
 
