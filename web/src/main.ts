@@ -39,6 +39,7 @@ import { joinScreen, targetLine } from './ui/join.js';
 import { MapView } from './ui/map-view.js';
 import {
   bearingSheet,
+  dismissSheet,
   omniSheet,
   reportBar,
   simpleSheet,
@@ -334,8 +335,17 @@ class App {
 
     // The bar goes inside the map view, not into a second wrapper: nesting .map-view in itself
     // leaves the inner one with no height to fill.
-    this.#view.root.append(reportBar((kind) => this.#openEntry(kind)));
+    const bar = reportBar((kind) => this.#openEntry(kind));
+    this.#view.root.append(bar);
     this.#root.append(this.#view.root);
+
+    // The attribution offsets itself from the bar's *measured* height (FR-014: the licence
+    // stays clear of the controls). The bar's height is content-driven — labels wrap on narrow
+    // phones — so a constant here is a regression waiting for a small screen.
+    const viewRoot = this.#view.root;
+    new ResizeObserver(() => {
+      viewRoot.style.setProperty('--fx-report-bar-height', `${bar.offsetHeight}px`);
+    }).observe(bar);
 
     const offer = addToHomeScreenOffer(() => {});
     if (offer) this.#root.append(offer);
@@ -404,7 +414,7 @@ class App {
       context: () => this.#authorContext(),
       onSubmit: (report: Report) => void this.#submit(report),
     };
-    const close = (): void => sheetNode.remove();
+    const close = (): void => dismissSheet(sheetNode);
     const sheetNode =
       kind === 'bearing'
         ? bearingSheet(options, close)

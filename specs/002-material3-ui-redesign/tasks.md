@@ -70,14 +70,14 @@ screen and chips still carry old styling.
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Report bar markup in web/src/ui/report-entry.ts: render each KIND_BUTTONS entry as kind icon above short label using icons.ts and the report-kind identities from data-model.md §2 (bearing/explore, omni/cell_tower, null/signal_disconnected, fix/flag)
-- [ ] T011 [US1] Report bar styling in web/src/ui/app.css: 4-equal-column grid preserved, kind icons in their `--fx-kind-*` hues, labels at 7:1, state layers + press scale, `--fx-touch` floor, attribution clearance rule retained
-- [ ] T012 [US1] Sheet structure in web/src/ui/report-entry.ts: header carries the kind's icon + colour + title (same triple as the bar), explicit close affordance (icon-only `close` is permitted), motion hook classes for enter/exit
-- [ ] T013 [US1] Sheet styling in web/src/ui/app.css: extra-large top corners, enter via emphasized-decelerate 300 ms translate-up + backdrop fade, exit via emphasized-accelerate 200 ms, Send as filled primary button visually dominant over tonal secondaries, sheet text ≥ 7:1 on surface-container-high
-- [ ] T014 [US1] Single-choice button rows (`.choices` radiogroups) in web/src/ui/report-entry.ts and app.css: selected state as filled tonal (not just colour swap — outline + fill + weight change), unselected quiet, three-across gloved-thumb layout preserved
-- [ ] T015 [US1] Microcopy pass over the four sheets in web/src/ui/report-entry.ts: shorten any label where the icon + short label carries the same meaning; hunter language only; input labels stay explicit (relay fields keep their plain questions)
-- [ ] T016 [US1] Report flow e2e in web/tests/e2e/report-redesign.spec.ts: assert all four kind buttons expose icon + visible label at equal size, `:active` press state applies a visible state layer, sheet opens/dismisses, one report of each kind submits; run T006–T008 audits against the restyled flow
-- [ ] T017 [US1] US1 checkpoint: full unit + e2e suites green including the pre-existing report-entry tests (both relay-toggle directions); grep the touched files for legacy variables — none introduced back
+- [x] T010 [US1] Report bar markup in web/src/ui/report-entry.ts: render each KIND_BUTTONS entry as kind icon above short label using icons.ts and the report-kind identities from data-model.md §2 (bearing/explore, omni/cell_tower, null/signal_disconnected, fix/flag)
+- [x] T011 [US1] Report bar styling in web/src/ui/app.css: 4-equal-column grid preserved, kind icons in their `--fx-kind-*` hues, labels at 7:1, state layers + press scale, `--fx-touch` floor, attribution clearance rule retained
+- [x] T012 [US1] Sheet structure in web/src/ui/report-entry.ts: header carries the kind's icon + colour + title (same triple as the bar), explicit close affordance (icon-only `close` is permitted), motion hook classes for enter/exit
+- [x] T013 [US1] Sheet styling in web/src/ui/app.css: extra-large top corners, enter via emphasized-decelerate 300 ms translate-up + backdrop fade, exit via emphasized-accelerate 200 ms, Send as filled primary button visually dominant over tonal secondaries, sheet text ≥ 7:1 on surface-container-high
+- [x] T014 [US1] Single-choice button rows (`.choices` radiogroups) in web/src/ui/report-entry.ts and app.css: selected state as filled tonal (not just colour swap — outline + fill + weight change), unselected quiet, three-across gloved-thumb layout preserved
+- [x] T015 [US1] Microcopy pass over the four sheets in web/src/ui/report-entry.ts: shorten any label where the icon + short label carries the same meaning; hunter language only; input labels stay explicit (relay fields keep their plain questions)
+- [x] T016 [US1] Report flow e2e in web/tests/e2e/report-redesign.spec.ts: assert all four kind buttons expose icon + visible label at equal size, `:active` press state applies a visible state layer, sheet opens/dismisses, one report of each kind submits; run T006–T008 audits against the restyled flow
+- [x] T017 [US1] US1 checkpoint: full unit + e2e suites green including the pre-existing report-entry tests (both relay-toggle directions); grep the touched files for legacy variables — none introduced back
 
 ### Field Validation for User Story 1 (deferred milestone — does not gate User Story 2)
 

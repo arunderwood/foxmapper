@@ -156,13 +156,17 @@ button::after {
   }
 }
 
-/* The press answers *during* the press — opacity and a dip the sun cannot hide. */
+/* The press answers *during* the press — instantly, with opacity and a dip the sun cannot
+   hide. `transition-duration: 0ms` on the way in: an eased-in press state is feedback that
+   arrives after the thumb has moved on. The release still eases out. */
 button:active:not(:disabled)::after {
   opacity: var(--md-sys-state-pressed-opacity);
+  transition-duration: 0ms;
 }
 
 button:active:not(:disabled) {
   transform: scale(0.97);
+  transition-duration: 0ms;
 }
 
 button:focus-visible {
@@ -271,7 +275,11 @@ label {
   gap: 0.4rem;
   padding: 0.5rem;
   padding-top: max(0.5rem, env(safe-area-inset-top));
-  background: linear-gradient(to bottom, rgba(16, 20, 24, 0.94), rgba(16, 20, 24, 0));
+  background: linear-gradient(
+    to bottom,
+    var(--fx-color-scrim),
+    var(--fx-color-scrim-transparent)
+  );
   pointer-events: none;
 }
 
@@ -315,24 +323,56 @@ label {
   gap: 0.4rem;
   padding: 0.5rem;
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-  background: rgba(16, 20, 24, 0.94);
-  border-top: 1px solid var(--line);
+  background: var(--fx-color-scrim);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
 /*
  * All four kinds sit side by side at the same size. FR-005d: none is presented as lesser — a
  * hunter with a stock antenna is not filing a second-class report, and the layout must not say
- * otherwise.
+ * otherwise. Icon above label, each kind in its own CVD-safe hue, meaning carried by shape and
+ * words — at 320px the labels wrap before the targets or icons give an inch.
  */
-.report-bar button {
+.report-bar .kind-button {
   flex-direction: column;
-  font-size: 0.8rem;
+  gap: 0.25rem;
   padding: 0.5rem 0.25rem;
-  min-height: var(--touch);
+  min-height: var(--fx-touch);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+
+.kind-button .icon {
+  width: 26px;
+  height: 26px;
+}
+
+.kind-button .kind-label {
+  font-size: var(--md-sys-typescale-label-size);
+  line-height: var(--md-sys-typescale-label-line-height);
+  text-align: center;
+}
+
+/* The kind's hue, on the glyph only: labels keep the 7:1 on-surface ink. */
+.kind-bearing > .icon {
+  color: var(--fx-kind-bearing);
+}
+
+.kind-omni > .icon {
+  color: var(--fx-kind-signal);
+}
+
+.kind-null > .icon {
+  color: var(--fx-kind-null);
+}
+
+.kind-fix > .icon {
+  color: var(--fx-kind-fix);
 }
 
 /* The licence requires the attribution be present, so it is lifted clear of the report bar
-   rather than sitting under it.
+   rather than sitting under it. The offset tracks the bar's *measured* height (set by a
+   ResizeObserver in main.ts): the redesigned bar is taller than the touch floor and grows when
+   labels wrap on a narrow phone, and the licence must clear all of it.
  *
  * Scoped under `.maplibregl-map` to outrank MapLibre's own `bottom: 0` on specificity rather than
  * on load order: index.html links this file in <head> while MapLibre's stylesheet arrives with the
@@ -340,32 +380,104 @@ label {
  * bar — which is the licence unmet, not a cosmetic fault. */
 .maplibregl-map .maplibregl-ctrl-bottom-right,
 .maplibregl-map .maplibregl-ctrl-bottom-left {
-  bottom: calc(var(--fx-touch) + 1rem);
+  bottom: calc(var(--fx-report-bar-height, calc(var(--fx-touch) + 1rem)) + 0.5rem);
 }
 
-/* ---- Sheet ---- */
+/* ---- Sheet ----
+ *
+ * Enters from the bottom edge because that is where it lives: emphasized-decelerate up, and it
+ * leaves the way it came (emphasized-accelerate, faster — M3's exit idiom). Motion clarifies
+ * the state change and never gates input; the reduced-motion kill flattens all of it.
+ */
 
 .sheet-backdrop {
   position: fixed;
   inset: 0;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--fx-color-backdrop);
   display: flex;
   align-items: flex-end;
+  animation: backdrop-in var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard)
+    both;
 }
 
 .sheet {
   width: 100%;
   max-height: 92%;
   overflow-y: auto;
-  background: var(--surface);
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0;
   padding: 1.25rem;
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  animation: sheet-in var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+.sheet-backdrop.closing {
+  animation: backdrop-out var(--md-sys-motion-duration-exit) var(--md-sys-motion-easing-standard)
+    both;
+}
+
+.sheet-backdrop.closing .sheet {
+  animation: sheet-out var(--md-sys-motion-duration-exit)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The sheet belongs to the tap that opened it: same icon, same hue, same words as the button. */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sheet-header > .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.sheet-header h2 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Icon-only buttons: sanctioned for close/share/locate only (contracts/iconography.md §1).
+   Quiet chrome, full-size target — the glyph is small, the button is not. */
+.icon-button {
+  min-width: var(--fx-touch);
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.danger {
+  color: var(--md-sys-color-error);
 }
 
 .sheet-actions {

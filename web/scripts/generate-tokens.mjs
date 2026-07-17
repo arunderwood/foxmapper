@@ -102,6 +102,10 @@ function existingTunedBlock() {
     '  --fx-kind-null: #DDCC77;',
     '  --fx-kind-fix: #44AA99;',
     '  --fx-color-map-ground: #F6F0EA;',
+    '  /* Scrims: the only sanctioned translucency (surface-tinted; avoids color-mix for iOS 16). */',
+    '  --fx-color-scrim: rgba(25, 18, 16, 0.94);',
+    '  --fx-color-scrim-transparent: rgba(25, 18, 16, 0);',
+    '  --fx-color-backdrop: rgba(0, 0, 0, 0.6);',
     TUNED_END,
   ].join('\n');
 }

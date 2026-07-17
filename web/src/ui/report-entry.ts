@@ -18,8 +18,21 @@ import { relayContext, type RelayDetails } from '../report/relay.js';
 import type { ConfidenceQ, MaxRangeR, Report, StrengthS } from '../log/types.js';
 import { watchHeading, needsPermission, requestPermission } from '../sensors/heading.js';
 import { el } from './dom.js';
+import { icon, type IconName } from './icons.js';
 
 export type ReportKind = 'bearing' | 'omni' | 'null' | 'fix';
+
+/**
+ * The report-kind identity (data-model.md §2): the icon that names each kind, used identically
+ * in the bar, the sheet header, and the map popup. Shape distinguishes; the `--fx-kind-*` hue
+ * reinforces — never colour alone (FR-015).
+ */
+export const KIND_ICONS: Record<ReportKind, IconName> = {
+  bearing: 'explore',
+  omni: 'cell_tower',
+  null: 'signal_disconnected',
+  fix: 'flag',
+};
 
 export interface EntryOptions {
   /**
@@ -225,7 +238,14 @@ export const KIND_BUTTONS: readonly { kind: ReportKind; label: string }[] = [
 export function reportBar(open: (kind: ReportKind) => void): HTMLElement {
   const bar = el('div', { class: 'report-bar', 'data-testid': 'report-bar' });
   for (const { kind, label } of KIND_BUTTONS) {
-    const button = el('button', { type: 'button', 'data-testid': `report-${kind}` }, label);
+    // Icon above label, never icon alone: the glyph is recognition, the words are the meaning
+    // (FR-007). The label names the icon, so the glyph hides from the accessibility tree.
+    const button = el(
+      'button',
+      { type: 'button', class: `kind-button kind-${kind}`, 'data-testid': `report-${kind}` },
+      icon(KIND_ICONS[kind], { label }),
+      el('span', { class: 'kind-label' }, label),
+    );
     button.addEventListener('click', () => open(kind));
     bar.append(button);
   }
@@ -265,10 +285,52 @@ function choiceRow<T>(
   return { node: row, value: () => picked };
 }
 
-function sheet(title: string, body: HTMLElement[], onClose: () => void): HTMLElement {
+/**
+ * Dismisses a sheet the way it arrived: back down, on the emphasized-accelerate exit curve.
+ * Under reduced motion the removal is immediate — the state change happens, undecorated.
+ * Exported for main.ts, whose close callback owns the actual removal.
+ */
+export function dismissSheet(backdrop: HTMLElement): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    backdrop.remove();
+    return;
+  }
+  backdrop.classList.add('closing');
+  backdrop.addEventListener('animationend', () => backdrop.remove(), { once: true });
+  // Belt to the animationend braces: if the animation never runs (display quirk, interrupted
+  // style), the sheet must still leave — a stuck backdrop is a blocked report bar.
+  setTimeout(() => backdrop.remove(), 350);
+}
+
+function sheet(
+  kind: ReportKind,
+  title: string,
+  body: HTMLElement[],
+  onClose: () => void,
+): HTMLElement {
   const backdrop = el('div', { class: 'sheet-backdrop', 'data-testid': 'sheet' });
   const panel = el('div', { class: 'sheet', role: 'dialog', 'aria-label': title });
-  panel.append(el('h2', {}, title), ...body);
+
+  // The header carries the same icon + colour + words as the button that opened it: the sheet
+  // visibly belongs to the tap. Close is one of the three sanctioned icon-only affordances
+  // (contracts/iconography.md §1) — and still a 56px target.
+  const close = el(
+    'button',
+    { type: 'button', class: 'icon-button', 'data-testid': 'close-sheet' },
+    icon('close'),
+  );
+  close.addEventListener('click', onClose);
+  panel.append(
+    el(
+      'header',
+      { class: `sheet-header kind-${kind}` },
+      icon(KIND_ICONS[kind], { label: title }),
+      el('h2', {}, title),
+      close,
+    ),
+    ...body,
+  );
+
   backdrop.append(panel);
   backdrop.addEventListener('click', (event) => {
     if (event.target === backdrop) onClose();
@@ -415,9 +477,10 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
   });
 
   return sheet(
+    'bearing',
     'Which way is the fox?',
     [
-      el('label', { for: 'heading' }, 'Bearing (degrees)'),
+      el('label', { for: 'heading' }, 'Degrees'),
       readout,
       useCompass,
       status,
@@ -479,6 +542,7 @@ export function omniSheet(options: EntryOptions, onClose: () => void): HTMLEleme
   cancel.addEventListener('click', onClose);
 
   return sheet(
+    'omni',
     'How strong is the signal here?',
     [strength.node, relay.node, problem.node, cancel],
     onClose,
@@ -530,6 +594,7 @@ export function simpleSheet(
   cancel.addEventListener('click', onClose);
 
   return sheet(
+    kind,
     title,
     [
       el('p', { class: 'small dim' }, explain),
