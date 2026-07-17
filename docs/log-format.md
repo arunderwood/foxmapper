@@ -209,22 +209,45 @@ colour     = PALETTE[index]
 
 **PALETTE is normative and ordered.** Changing it, or its order, repaints every hunt.
 
+It is Paul Tol's "muted" qualitative scheme, chosen because it survives colour-vision deficiency —
+see [Colour and CVD](#colour-and-cvd) below.
+
 | # | Colour | | # | Colour |
 |---|---|---|---|---|
-| 0 | `#e5533d` | | 6 | `#5b8ff9` |
-| 1 | `#f2a03d` | | 7 | `#7f6bd6` |
-| 2 | `#d9c02b` | | 8 | `#c264c2` |
-| 3 | `#6bbf3f` | | 9 | `#e0629b` |
-| 4 | `#2fae7e` | | 10 | `#9c6b45` |
-| 5 | `#2eb0c4` | | 11 | `#8a8f99` |
+| 0 | `#cc6677` | | 5 | `#882255` |
+| 1 | `#332288` | | 6 | `#44aa99` |
+| 2 | `#ddcc77` | | 7 | `#999933` |
+| 3 | `#117733` | | 8 | `#aa4499` |
+| 4 | `#88ccee` | | | |
 
 **Guaranteed**: one callsign is one colour, on every device, forever, offline, whether the report
 was entered by that operator or relayed by someone else.
 
-**Not guaranteed**: that two *different* callsigns get different colours. With twelve swatches and
-a hash, a hunt of eight will usually contain a collision — that is birthday maths, not a bug.
+**Not guaranteed**: that two *different* callsigns get different colours. With nine swatches and a
+hash, a hunt of eight will almost always contain a collision — that is birthday maths, not a bug.
 **Colour is an aid, never an identifier.** The callsign is on every report; identity never rests
 on colour alone.
+
+### Colour and CVD
+
+The palette is chosen, not decorative, and a reimplementation should not "improve" it into a
+rainbow. Measured as CAM02-UCS ΔE between every pair, under simulated vision (Machado 2009):
+
+| Vision | Worst pair |
+|---|---|
+| normal | 17.3 |
+| deuteranomaly (~6% of men) | 12.3 |
+| protanomaly (~2% of men) | 15.0 |
+| tritanomaly (rare) | 11.8 |
+
+The rainbow this replaced scored **2.2** under protanomaly: its red and brown rendered as the same
+colour, and seven pairs collided under deuteranomaly. Because the palette is a hash bucket, a
+collision there is invisible to the person it affects — they simply see two hunters as one, and
+have no way to know.
+
+Nine swatches rather than twelve is deliberate. Colour already collided (see above), so the count
+buys less than it appears to; a CVD-safe nine that everyone sees alike is worth more than twelve
+that only some do.
 
 ### Duplicate callsigns
 

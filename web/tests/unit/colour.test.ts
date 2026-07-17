@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   PALETTE,
   ambiguousCallsigns,
@@ -49,6 +50,25 @@ describe('colour is a pure function of the callsign', () => {
     // Pins the byte-level spec: be_u32(SHA-256(utf8(upper(trim(cs))))[0..4]) mod len(PALETTE).
     // A third-party reimplementation must land on the same swatch or the contract has failed.
     expect(colourFor('KI7XYZ')).toBe(PALETTE[expectedIndex('KI7XYZ')]);
+  });
+
+  /**
+   * The published contract and the code must not drift.
+   *
+   * The vector above pins the *algorithm* but takes the palette from this very module, so it would
+   * pass happily while `docs/log-format.md` listed different swatches — and a third party
+   * reimplementing from the doc, which is the whole of FR-021, would then paint every hunter a
+   * different colour. Nothing caught that until the palette actually changed and four files had to
+   * be hand-synced.
+   */
+  it('the published contract lists exactly this palette, in this order (FR-021)', () => {
+    const doc = readFileSync('../docs/log-format.md', 'utf8');
+    const rows = [...doc.matchAll(/\|\s*(\d+)\s*\|\s*`(#[0-9a-f]{6})`\s*\|/g)];
+
+    const fromDoc: string[] = [];
+    for (const [, index, colour] of rows) fromDoc[Number(index)] = colour!;
+
+    expect(fromDoc).toEqual([...PALETTE]);
   });
 });
 
@@ -158,7 +178,10 @@ describe('duplicate callsign detection', () => {
     fc.assert(
       fc.property(bearingReportArb, uuidArb, (report, retractionId) => {
         fc.pre(retractionId !== report.id);
-        const self = { ...report, entered_by: { ...report.entered_by, callsign: report.observer.callsign } };
+        const self = {
+          ...report,
+          entered_by: { ...report.entered_by, callsign: report.observer.callsign },
+        };
         const retraction: Report = {
           ...self,
           id: retractionId,

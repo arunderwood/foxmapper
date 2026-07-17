@@ -13,22 +13,34 @@ import { isRelayed, type ObservationReport } from './types.js';
  * Normative and ordered. Changing this list, or its order, repaints every hunt — it is versioned
  * with the format, not tuned casually.
  *
- * These twelve swatches are provisional: no colour-vision-deficiency check and no direct-sunlight
- * check has been done (see tasks T071). The algorithm is settled; the swatches are not.
+ * **Paul Tol's "muted" qualitative scheme**, chosen because it survives colour-vision deficiency.
+ * The twelve swatches this replaces were a rainbow, and a rainbow is precisely what CVD flattens:
+ * measured worst-case separation of **ΔE 2.2** (CAM02-UCS) under protanomaly, where `#e5533d` red
+ * and `#9c6b45` brown both render as roughly `#7b6f3e` — the same colour. Seven pairs collided for
+ * deuteranomaly, five for protanomaly. That is ~8% of men, and this is amateur radio.
+ *
+ * This scheme's worst case is **ΔE 11.8**, across normal, deuteranomalous, protanomalous and
+ * tritanomalous vision.
+ *
+ * **Nine is not a downgrade from twelve.** Colour has always collided: with twelve swatches a hunt
+ * of eight already collided 95.4% of the time (birthday maths), and nine makes that 99.2% — which
+ * is why FR-002b says colour is an aid and the callsign is the identifier. Meanwhile a deuteranope
+ * was already living with ~8 effective colours out of the twelve, unpredictably, and differently
+ * from the hunter beside them. Nine that everyone sees alike beats twelve that only some do.
+ *
+ * **Still open (T071): the direct-sunlight check.** Simulation is not a person squinting at a
+ * dimmed phone on a hilltop, and that half is answered outdoors (T069a), not here.
  */
 export const PALETTE = [
-  '#e5533d',
-  '#f2a03d',
-  '#d9c02b',
-  '#6bbf3f',
-  '#2fae7e',
-  '#2eb0c4',
-  '#5b8ff9',
-  '#7f6bd6',
-  '#c264c2',
-  '#e0629b',
-  '#9c6b45',
-  '#8a8f99',
+  '#cc6677',
+  '#332288',
+  '#ddcc77',
+  '#117733',
+  '#88ccee',
+  '#882255',
+  '#44aa99',
+  '#999933',
+  '#aa4499',
 ] as const;
 
 export type Swatch = (typeof PALETTE)[number];

@@ -182,7 +182,9 @@ Run it against the **deployed** URL, on real cell, from a trailhead — not loca
   a transmitter whose location you actually know? This is the only test in the whole ladder where
   ground truth is available — you hid it.
 - **Cold join on real cell** at the trailhead (SC-001's 15 s), not a 302 KB transfer estimate.
-- **Sunlight.** Whether the twelve swatches survive a dimmed screen outdoors (T071's input).
+- **Sunlight.** Whether the nine swatches survive a dimmed screen outdoors — **the open half of
+  T071**. The colour-vision half is settled (Paul Tol's "muted"); this is the half no simulation can
+  answer, and changing the palette after this point repaints every hunt.
 - Whether the picture **helps at all**, or is just something to look at.
 
 **What this cannot tell you, and must not be mistaken for:**
