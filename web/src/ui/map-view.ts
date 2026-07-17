@@ -18,7 +18,8 @@ import { shareChip } from './share.js';
 import { targetChips, type Target } from './target.js';
 import { RETRACT_LABEL } from '../report/retract.js';
 import { formatTime, el, clear, cssToken } from './dom.js';
-import { icon } from './icons.js';
+import { icon, iconPath } from './icons.js';
+import { PALETTE } from '../log/colour.js';
 import { KIND_ICONS, type ReportKind } from './report-entry.js';
 import type { PositionState } from '../sensors/position.js';
 
@@ -135,6 +136,8 @@ export class MapView {
   #pending: RenderedLog | undefined;
   /** Map-level listeners survive a style swap; the layers do not. */
   #clickBound = false;
+  /** The browser event a placement tap consumed — the detail listener must ignore that click. */
+  #placementClick: MouseEvent | TouchEvent | undefined;
   readonly root: HTMLElement;
 
   constructor(options: MapViewOptions) {
@@ -209,23 +212,21 @@ export class MapView {
       paint: labelPaint(),
     });
 
-    // omni, null and fix: a circle at a position, and nothing that implies a direction. No arrow,
+    // omni and null: a circle at a position, and nothing that implies a direction. No arrow,
     // no cone, no radius — interpreting how much ground a null report kills is fusion.
     map.addLayer({
       id: 'marker-circle',
       type: 'circle',
       source: MARKER_SOURCE,
+      filter: ['!=', ['get', 'kind'], 'fix'],
       paint: {
         // Each kind reads as the claim it is. `omni` is sized by the strength reported — the one
-        // scalar it carries — so two signal reports are not one indistinguishable dot; `fix` is
-        // the biggest and boldest mark on the map. Size never implies a direction.
+        // scalar it carries — so two signal reports are not one indistinguishable dot.
         // Only an omni carries a strength, so the interpolate reads through `to-number` with a
-        // fallback: the `case` above should keep a null from ever reaching it, and this makes the
+        // fallback: the filter should keep a null from ever reaching it, and this makes the
         // radius defined rather than resting on that.
         'circle-radius': [
           'case',
-          ['==', ['get', 'kind'], 'fix'],
-          14,
           ['==', ['get', 'kind'], 'omni'],
           ['interpolate', ['linear'], ['to-number', ['get', 'strength'], 5], 2, 6, 8, 12],
           8,
@@ -238,15 +239,27 @@ export class MapView {
           ['get', 'colour'],
         ],
         'circle-stroke-color': ['get', 'colour'],
-        'circle-stroke-width': [
-          'case',
-          ['==', ['get', 'kind'], 'null'],
-          3,
-          ['==', ['get', 'kind'], 'fix'],
-          5,
-          2,
-        ],
+        'circle-stroke-width': ['case', ['==', ['get', 'kind'], 'null'], 3, 2],
         'circle-opacity': 0.85,
+      },
+    });
+
+    // "Found it" is the report a hunt exists to produce, and it stopped looking like a bigger
+    // signal dot (feedback round 3): it plants the same flag the report bar and popup wear, in
+    // the observer's colour, taller than any circle on the map. One image per palette swatch,
+    // rasterized from the shared glyph so every surface agrees on what "Found it" looks like.
+    this.#addFlagImages(map);
+    map.addLayer({
+      id: 'fix-flag',
+      type: 'symbol',
+      source: MARKER_SOURCE,
+      filter: ['==', ['get', 'kind'], 'fix'],
+      layout: {
+        'icon-image': ['concat', 'fix-flag-', ['get', 'colour']],
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        // The pole plants at the reported position; the flag flies above it.
+        'icon-anchor': 'bottom',
       },
     });
 
@@ -289,6 +302,41 @@ export class MapView {
   }
 
   /**
+   * The flag marker images: the shared `flag` glyph rasterized once per palette swatch. The
+   * halo is the LIGHT map ground, not the dark label halo — half the Tol swatches are dark,
+   * and a dark halo turned those flags into blobs; a light halo cuts every colour out of the
+   * busy street detail the way a classic map marker does. Re-added after every style swap —
+   * `setStyle(diff: false)` drops images along with the sources.
+   */
+  #addFlagImages(map: MapLibreMap): void {
+    const halo = cssToken('--fx-color-map-ground', '#F6F0EA');
+    const size = 64; // device pixels; pixelRatio 2 → 32 CSS px, taller than any marker circle
+
+    for (const colour of PALETTE) {
+      if (map.hasImage(`fix-flag-${colour}`)) continue;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // The glyph lives in Material Symbols' 0/-960/960/960 box; map it onto the canvas.
+      const path = new Path2D(iconPath('flag'));
+      const scale = size / 960;
+      ctx.setTransform(scale, 0, 0, scale, 0, size);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 110;
+      ctx.strokeStyle = halo;
+      ctx.stroke(path);
+      ctx.fillStyle = colour;
+      ctx.fill(path);
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      map.addImage(`fix-flag-${colour}`, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
+    }
+  }
+
+  /**
    * Registered once, on the map rather than the style.
    *
    * A style swap drops the custom sources — which is why `#addLayers` re-runs — but it does not
@@ -306,11 +354,15 @@ export class MapView {
       const place = this.#placing;
       if (!place) return;
       this.#endPlacing();
+      // Remember the browser event this tap consumed: the layer-filtered listener below fires
+      // for the SAME click, and by then #placing is already cleared — so its guard alone let a
+      // placement tap inside a wedge also open that wedge's popup.
+      this.#placementClick = event.originalEvent;
       place({ lat: event.lngLat.lat, lon: event.lngLat.lng });
     });
 
-    map.on('click', ['wedge-fill', 'marker-circle'], (event) => {
-      if (this.#placing) return;
+    map.on('click', ['wedge-fill', 'marker-circle', 'fix-flag'], (event) => {
+      if (this.#placing || event.originalEvent === this.#placementClick) return;
       const feature = event.features?.[0];
       if (feature) this.#showDetail(event.lngLat, feature.properties as Record<string, unknown>);
     });

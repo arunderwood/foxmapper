@@ -66,7 +66,7 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
       'p',
       { class: 'small dim' },
       'Relay mode is for net control: it adds a way to file reports for hunters calling theirs ' +
-        'in over the radio. This switch is for this phone only.',
+        'in over the radio.',
     ),
   );
 

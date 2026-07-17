@@ -124,3 +124,24 @@ spec 002's re-skin boundary):
   lifecycle, and cancel). `tapOpenMap` now finds open ground by `elementFromPoint`
   hit-testing after three generations of guessed coordinates each eventually landed on
   grown chrome (the last one: the expanded attribution control).
+
+## Feedback round 3 (2026-07-17, maintainer)
+
+1. **Placement tap inside a wedge also opened the wedge's popup** — real event-ordering bug:
+   the placement listener consumed the tap and cleared the placing flag before the
+   layer-filtered listener saw the *same* click, so its guard passed. Fixed by remembering
+   which browser event the placement consumed; the detail listener ignores that click.
+   Regression test added (position.spec: tap deliberately inside a south-pointing wedge).
+2. **"set by hand" dropped from map labels** — with hand-placement a normal entry method,
+   the caveat on every such report was clutter. Maintainer call, consciously loosening spec
+   001's "distinguished on the map, not on a tap": `placed` still travels on the feature and
+   the detail popup still says "Position set by hand". The voice-hop line ("via W7NET")
+   stays in the primary view — that one is FR-012b's by name.
+3. **"Take that back" → "Delete"** — the interface says what the button does from where the
+   hunter stands; the wire still appends a retraction (Principle IV), and the V-split
+   (interface wins, mapping absorbs) is documented at RETRACT_LABEL.
+4. **"Found it" markers are now flags** — the same `flag` glyph as the report bar and popup,
+   rasterized per palette swatch with a light map-ground halo (a dark halo turned the dark
+   Tol swatches into blobs), planted at the position via a symbol layer, taller than any
+   circle. A found fox finally looks like a found fox.
+5. **Settings note trimmed** — "This switch is for this phone only." removed.

@@ -82,6 +82,15 @@ export function icon(name: IconName, options: IconOptions = {}): SVGSVGElement {
 }
 
 /** Icon beside its visible label, as one inline-flex unit. Chips and buttons compose this. */
+/**
+ * Raw path data, for the code that paints outside the DOM — the map rasterizes the flag into
+ * its marker images. Same glyph everywhere: the bar button, the popup header, and the mark on
+ * the ground all agree on what "Found it" looks like.
+ */
+export function iconPath(name: IconName): string {
+  return PATHS[name];
+}
+
 export function iconLabel(name: IconName, label: string): HTMLElement {
   return el('span', { class: 'icon-label' }, icon(name, { label }), el('span', {}, label));
 }
