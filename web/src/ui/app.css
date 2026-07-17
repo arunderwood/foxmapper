@@ -283,12 +283,27 @@ label {
   pointer-events: none;
 }
 
+/*
+ * Chips: the status vocabulary (data-model.md §3). Every state is an icon + colour + SHAPE
+ * triple — calm states are pills, states that want peripheral attention square off to the
+ * medium corner and take a tonal container. Never colour alone (FR-010, FR-015).
+ *
+ * No transitions here on purpose: the bar is cleared and rebuilt on every refresh (~1/s on a
+ * live fix), so a CSS transition or entrance animation would replay on every rebuild — a pulse
+ * where a state change should be. The delta itself is the signal.
+ */
 .chip {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
   padding: 0.3rem 0.7rem;
-  font-size: 0.8rem;
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: var(--md-sys-typescale-label-weight);
+  letter-spacing: var(--md-sys-typescale-label-tracking);
+  color: var(--md-sys-color-on-surface);
   white-space: nowrap;
   /* A warning that runs off the edge of the screen has not been given to anyone. Long ones wrap
      rather than truncate — the constitution puts these in the primary view to be read. */
@@ -296,20 +311,93 @@ label {
   overflow-wrap: anywhere;
 }
 
+.chip .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.chip .chip-label {
+  min-width: 0;
+}
+
+.chip.dim {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.chip.ok {
+  color: var(--fx-color-ok);
+}
+
+.chip .mono,
+.chip-action .mono {
+  font-family: var(--fx-font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* The loud tier: tonal container, squarer shape, full wrap. Shape shift is deliberate — it is
+   the channel a colour-blind hunter still gets in peripheral vision. */
 .chip.warn,
 .chip.danger {
   white-space: normal;
-  border-radius: var(--radius);
+  border-radius: var(--md-sys-shape-corner-medium);
 }
 
 .chip.warn {
-  border-color: var(--warn);
-  color: var(--warn);
+  background: var(--fx-color-warn-container);
+  border-color: var(--fx-color-warn);
+  color: var(--fx-color-on-warn-container);
+}
+
+.chip.warn .icon {
+  color: var(--fx-color-warn);
 }
 
 .chip.danger {
-  border-color: var(--danger);
-  color: var(--danger);
+  background: var(--md-sys-color-error-container);
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.chip.danger .icon {
+  color: var(--md-sys-color-error);
+}
+
+/* Queued: warn family, pill shape — it sits beside the squared-off offline chip, and its count
+   is the identity. */
+.chip.queued {
+  background: var(--fx-color-warn-container);
+  border-color: var(--fx-color-warn);
+  color: var(--fx-color-on-warn-container);
+}
+
+.chip.queued .icon {
+  color: var(--fx-color-warn);
+}
+
+/* Draining: primary-toned pill with a determinate hairline filling under the count. Progress,
+   not a spinner — the app visibly working through what it held (FR-011). */
+.chip.progress {
+  position: relative;
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  overflow: hidden;
+}
+
+.chip-track {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--md-sys-color-outline-variant);
+}
+
+.chip-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--md-sys-color-primary);
 }
 
 .report-bar {
@@ -486,29 +574,68 @@ label {
   gap: 0.5rem;
 }
 
-/* ---- Chips that do something ---- */
-
-/* The status bar lets taps through to the map, so anything inside it that is actually a control
-   has to take them back. Without this the share button and the hand-placement button are painted
-   on and dead. */
-.chip button {
+/* ---- Chips that do something ----
+ *
+ * Actions in the status bar are real buttons at the real floor: a gloved thumb gets 56px, not
+ * a decorative nested pill (SC-002). The status bar lets taps through to the map, so controls
+ * take them back. A chip that hosts an action drops its own padding and lets the button be
+ * the surface.
+ */
+.chip-action {
   pointer-events: auto;
-  min-height: 0;
-  margin-left: 0.5rem;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.75rem;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid currentColor;
-  color: inherit;
+  min-height: var(--fx-touch);
+  padding: 0.5rem 0.9rem;
+  font-size: var(--md-sys-typescale-label-size);
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface);
 }
 
-.chip [data-testid='share-hunt'] {
-  margin-left: 0;
-  border: 0;
-  font-family: var(--fx-font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
+.chip-action .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.chip.chip-with-action {
+  padding: 0;
+  background: transparent;
+  border: none;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* The status part of an action-bearing chip keeps its own quiet pill so the text still sits on
+   a readable ground. */
+.chip.chip-with-action > .icon:first-child,
+.chip.chip-with-action > .chip-label {
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.chip.chip-with-action > .icon:first-child {
+  box-sizing: content-box;
+  border-right: none;
+  border-radius: var(--md-sys-shape-corner-full) 0 0 var(--md-sys-shape-corner-full);
+  padding: 0.55rem 0 0.55rem 0.7rem;
+  /* Fused to its label half — the flex gap belongs between chip and actions, not mid-pill. */
+  margin-right: calc(-0.4rem);
+}
+
+.chip.chip-with-action > .chip-label {
+  border-left: none;
+  border-radius: 0 var(--md-sys-shape-corner-full) var(--md-sys-shape-corner-full) 0;
+  padding: 0.55rem 0.7rem 0.55rem 0.4rem;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The danger variant keeps its loud container across the split pieces. */
+.chip.danger.chip-with-action > .icon:first-child,
+.chip.danger.chip-with-action > .chip-label {
+  background: var(--md-sys-color-error-container);
+  border-color: var(--md-sys-color-error);
 }
 
 /* ---- Placing a position by hand ---- */
@@ -521,19 +648,22 @@ label {
   top: 50%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  font-size: 0.9rem;
+  padding: 0.6rem 0.75rem 0.6rem 1rem;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  border: 1px solid var(--md-sys-color-outline);
 }
 
-.banner button {
-  min-height: 0;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
+.banner > .icon {
+  color: var(--md-sys-color-primary);
+}
+
+.banner .banner-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: var(--md-sys-typescale-label-weight);
 }
 
 /* A crosshair says "this tap is an answer", which a grab hand does not. */
@@ -582,13 +712,14 @@ label {
 /* ---- Notices ---- */
 
 .notice {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--warn);
-  border-radius: var(--radius);
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-left: 3px solid var(--fx-color-warn);
+  border-radius: var(--md-sys-shape-corner-medium);
   padding: 0.75rem 1rem;
-  font-size: 0.85rem;
-  color: var(--text-dim);
+  font-size: var(--md-sys-typescale-label-size);
+  line-height: 1.45;
+  color: var(--md-sys-color-on-surface-variant);
 }
 
 .swatch {

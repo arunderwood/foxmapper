@@ -149,9 +149,12 @@ test('the map says whether it is showing everyone or only this phone', async ({ 
   await expect(a.page.getByTestId('sync-state')).toContainText(/everyone/i);
 
   await a.context.setOffline(true);
-  await expect(a.page.getByTestId('sync-state')).toContainText(/only what this phone/i, {
+  // The redesign shortened the wording ("No signal — this phone only"); what FR-018 requires
+  // is the distinction itself, so assert the state and the phrase's load-bearing halves.
+  await expect(a.page.getByTestId('sync-state')).toHaveAttribute('data-state', 'offline', {
     timeout: 10_000,
   });
+  await expect(a.page.getByTestId('sync-state')).toContainText(/this phone only/i);
 
   await a.context.close();
 });

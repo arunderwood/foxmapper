@@ -15,25 +15,37 @@ import { createHunt, grantPosition, reportHeardNothing, tapReport } from './help
 
 const FLOOR = 56;
 
-/** Asserts every visible interactive element in scope meets the floor. */
+/**
+ * Asserts every visible interactive element in scope meets the floor.
+ *
+ * One atomic page.evaluate on purpose: the status bar rebuilds about once a second, so a
+ * locator walked element-by-element can check the exemption on one element and measure a
+ * different one. Layout boxes (offset*), not boundingBox — a press-scale transform mid-release
+ * or sub-pixel rounding must not fail the audit; the *laid-out* target is what the floor
+ * governs.
+ */
 async function auditTargets(page: Page, surface: string): Promise<void> {
-  const elements = page.locator(
-    'button:visible, a:visible, input:visible, [role="button"]:visible, [role="radio"]:visible',
-  );
-  const count = await elements.count();
-  expect(count, `${surface}: no interactive elements found — selector drift?`).toBeGreaterThan(0);
-
-  for (let i = 0; i < count; i++) {
-    const element = elements.nth(i);
-    if (await element.evaluate((node) => Boolean(node.closest('.maplibregl-ctrl')))) continue;
-    const box = await element.boundingBox();
-    const name = await element.evaluate(
-      (node) => node.getAttribute('data-testid') ?? node.textContent?.slice(0, 30) ?? node.tagName,
+  const result = await page.evaluate((floor) => {
+    const candidates = document.querySelectorAll<HTMLElement>(
+      'button, a, input, [role="button"], [role="radio"]',
     );
-    expect(box, `${surface}: "${name}" has no box`).toBeTruthy();
-    expect(box!.height, `${surface}: "${name}" height ${box!.height}`).toBeGreaterThanOrEqual(FLOOR);
-    expect(box!.width, `${surface}: "${name}" width ${box!.width}`).toBeGreaterThanOrEqual(FLOOR);
-  }
+    const violations: string[] = [];
+    let audited = 0;
+    for (const node of candidates) {
+      // Visible, and not MapLibre's licence furniture (the one exemption, documented above).
+      if (node.closest('[class*="maplibregl-ctrl"]')) continue;
+      if (node.offsetParent === null && getComputedStyle(node).position !== 'fixed') continue;
+      audited++;
+      const name = node.getAttribute('data-testid') ?? node.textContent?.slice(0, 30) ?? node.tagName;
+      if (node.offsetHeight < floor - 0.5 || node.offsetWidth < floor - 0.5) {
+        violations.push(`"${name}" ${node.offsetWidth}×${node.offsetHeight}`);
+      }
+    }
+    return { audited, violations };
+  }, FLOOR);
+
+  expect(result.audited, `${surface}: no interactive elements found — selector drift?`).toBeGreaterThan(0);
+  expect(result.violations, `${surface}: targets under ${FLOOR}px`).toEqual([]);
 }
 
 async function walk(page: Page, surface: string): Promise<void> {
@@ -69,8 +81,15 @@ async function walk(page: Page, surface: string): Promise<void> {
   await auditTargets(page, `${surface}/placing-banner`);
   await page.getByTestId('cancel-placing').click();
 
-  // A report popup.
+  // A report popup. Wait for the report to reach the map's sources before projecting a tap —
+  // filing is durable-first and the render follows a beat later.
   await reportHeardNothing(page);
+  await page.waitForFunction(() => {
+    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+    const source = map?.getSource('reports-markers') as maplibregl.GeoJSONSource | undefined;
+    const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
+    return (data?.features?.length ?? 0) > 0;
+  });
   await tapReport(page);
   await auditTargets(page, `${surface}/popup`);
 }

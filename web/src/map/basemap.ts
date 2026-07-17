@@ -22,27 +22,36 @@ export const ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap'
 
 /**
  * Blank ground. Not an error state — this is what a hunt looks like where cell coverage does not
- * reach, and every report still draws on top of it.
+ * reach, and every report still draws on top of it. A designed empty state, coloured from the
+ * token set (`--fx-color-map-ground`) rather than a hex of its own.
  */
-const BLANK_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {},
-  // The label font, from the tile host — which is fine, and is *not* what the callsigns depend on.
-  // When a glyph range cannot be fetched MapLibre shapes the codepoints locally instead, so a
-  // report keeps its callsign with this host unreachable. Verified rather than assumed, on both
-  // engines, in tests/e2e/basemap.spec.ts — FR-002b ("no interface may rely on colour alone")
-  // rests on it, and it is a behaviour of a dependency rather than of our code.
-  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-  layers: [
-    {
-      id: 'blank-ground',
-      type: 'background',
-      // A light ground rather than black: the report colours are chosen to sit on a street map,
-      // and they must stay legible when the streets never arrive.
-      paint: { 'background-color': '#f5f2ef' },
-    },
-  ],
-};
+function blankStyle(): StyleSpecification {
+  // Read at map creation; the committed token value stands in if the stylesheet is somehow
+  // absent. A LIGHT ground on purpose, and this is a decision the dark re-skin must not touch:
+  // the per-callsign report colours are a wire-format guarantee tuned to sit on a street map
+  // (docs/log-format.md), and they must stay legible when the streets never arrive.
+  const ground =
+    getComputedStyle(document.documentElement).getPropertyValue('--fx-color-map-ground').trim() ||
+    '#F6F0EA';
+
+  return {
+    version: 8,
+    sources: {},
+    // The label font, from the tile host — which is fine, and is *not* what the callsigns depend
+    // on. When a glyph range cannot be fetched MapLibre shapes the codepoints locally instead, so
+    // a report keeps its callsign with this host unreachable. Verified rather than assumed, on
+    // both engines, in tests/e2e/basemap.spec.ts — FR-002b ("no interface may rely on colour
+    // alone") rests on it, and it is a behaviour of a dependency rather than of our code.
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    layers: [
+      {
+        id: 'blank-ground',
+        type: 'background',
+        paint: { 'background-color': ground },
+      },
+    ],
+  };
+}
 
 export interface BasemapOptions {
   container: HTMLElement;
@@ -55,7 +64,7 @@ export interface BasemapOptions {
 export function createBasemap(options: BasemapOptions): MapLibreMap {
   const map = new maplibregl.Map({
     container: options.container,
-    style: BLANK_STYLE,
+    style: blankStyle(),
     center: options.center,
     zoom: options.zoom ?? 12,
     attributionControl: false,

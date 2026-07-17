@@ -18,6 +18,7 @@ import { shareChip } from './share.js';
 import { targetChips, type Target } from './target.js';
 import { RETRACT_LABEL } from '../report/retract.js';
 import { formatTime, el, clear } from './dom.js';
+import { icon } from './icons.js';
 import type { PositionState } from '../sensors/position.js';
 
 const WEDGE_SOURCE = 'reports-wedges';
@@ -98,6 +99,15 @@ export class MapView {
    * out loud, were both wiped within a second of appearing.
    */
   #shareChip: HTMLElement | undefined;
+  /**
+   * The deepest the queue got this offline stretch — the denominator of the drain progress.
+   * Reset when the queue empties, so the next dead zone starts its own drain from zero.
+   */
+  #queuePeak = 0;
+  /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
+  #syncedUntil = 0;
+  #syncedTimer: ReturnType<typeof setTimeout> | undefined;
+  #lastState: MapViewState | undefined;
   /** The most recent fold, kept so it can be re-applied once the style is ready. */
   #pending: RenderedLog | undefined;
   /** Map-level listeners survive a style swap; the layers do not. */
@@ -301,7 +311,8 @@ export class MapView {
     this.#banner = el(
       'div',
       { class: 'banner', 'data-testid': 'placing-banner' },
-      el('span', {}, prompt),
+      icon('edit_location', { label: prompt }),
+      el('span', { class: 'banner-text' }, prompt),
       cancel,
     );
     this.root.append(this.#banner);
@@ -357,6 +368,22 @@ export class MapView {
   update(state: MapViewState): void {
     this.#pending = render(state.fold);
     this.#flush();
+
+    // Drain accounting (FR-011): the peak is the denominator, and reaching zero from a real
+    // drain earns a brief "all shared" confirmation before the bar goes quiet again.
+    if (state.queueDepth > this.#queuePeak) this.#queuePeak = state.queueDepth;
+    if (this.#queuePeak > 0 && state.queueDepth === 0) {
+      this.#queuePeak = 0;
+      this.#syncedUntil = Date.now() + 2000;
+      clearTimeout(this.#syncedTimer);
+      // The bar rebuilds on every position tick anyway; this only guarantees the flash also
+      // *ends* on time when the phone is sitting still.
+      this.#syncedTimer = setTimeout(() => {
+        if (this.#lastState) this.#updateStatus(this.#lastState);
+      }, 2100);
+    }
+
+    this.#lastState = state;
     this.#updateStatus(state);
   }
 
@@ -377,6 +404,24 @@ export class MapView {
 
   #updateStatus(state: MapViewState): void {
     clear(this.#statusBar);
+
+    // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
+    // reports" and "only mine" look identical otherwise, and the difference is the whole point.
+    // Each state is an icon + colour + shape triple (data-model.md §3) — never colour alone.
+    const syncChip = state.live
+      ? el(
+          'span',
+          { class: 'chip ok', 'data-testid': 'sync-state', 'data-state': 'live' },
+          icon('cloud_done', { label: 'Everyone’s reports' }),
+          el('span', { class: 'chip-label' }, 'Everyone’s reports'),
+        )
+      : el(
+          'span',
+          { class: 'chip warn', 'data-testid': 'sync-state', 'data-state': 'offline' },
+          icon('cloud_off', { label: 'No signal' }),
+          el('span', { class: 'chip-label' }, 'No signal — this phone only'),
+        );
+
     const chips: (HTMLElement | undefined)[] = [
       ...targetChips(state.target, state.fold.found),
 
@@ -384,17 +429,20 @@ export class MapView {
       // A creator whose only copy of it is the address bar has not been given anything.
       (this.#shareChip ??= shareChip(state.huntCode)),
 
-      // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
-      // reports" and "only mine" look identical otherwise, and the difference is the whole point.
-      state.live
-        ? el('span', { class: 'chip', 'data-testid': 'sync-state' }, 'Showing everyone’s reports')
-        : el(
-            'span',
-            { class: 'chip warn', 'data-testid': 'sync-state' },
-            'No signal — showing only what this phone has',
-          ),
+      syncChip,
 
-      queueChip(state.queueDepth),
+      queueChip(state.queueDepth, state.live, this.#drainedFraction(state.queueDepth)),
+
+      // The drain just finished: say so, briefly, then get out of the way (FR-011).
+      Date.now() < this.#syncedUntil
+        ? el(
+            'span',
+            { class: 'chip ok', 'data-testid': 'sync-flash' },
+            icon('cloud_done', { label: 'All shared' }),
+            el('span', { class: 'chip-label' }, 'All shared'),
+          )
+        : undefined,
+
       clockWarning(state.clockOffset),
 
       // Where the hunter is reporting from, and how that was established. A report needs one of
@@ -406,8 +454,9 @@ export class MapView {
       state.tilesUnavailable
         ? el(
             'span',
-            { class: 'chip', 'data-testid': 'tiles-state' },
-            'Map background unavailable out here — reports still show',
+            { class: 'chip dim', 'data-testid': 'tiles-state' },
+            icon('layers_clear', { label: 'No map out here' }),
+            el('span', { class: 'chip-label' }, 'No map out here — reports still show'),
           )
         : undefined,
     ];
@@ -415,12 +464,19 @@ export class MapView {
     this.#statusBar.append(...chips.filter((c): c is HTMLElement => c !== undefined));
   }
 
+  /** How much of this drain is already through: the determinate part of the draining chip. */
+  #drainedFraction(depth: number): number {
+    if (this.#queuePeak === 0) return 0;
+    return (this.#queuePeak - depth) / this.#queuePeak;
+  }
+
   /** Always offered, never only on failure: a measured fix can be wrong, and FR-008 says so. */
   #placeButton(onPlace: () => void): HTMLElement {
     const button = el(
       'button',
-      { type: 'button', 'data-testid': 'place-position' },
-      'Set where you are',
+      { type: 'button', class: 'chip-action', 'data-testid': 'place-position' },
+      icon('edit_location', { label: 'Set where you are' }),
+      el('span', { class: 'chip-label' }, 'Set where you are'),
     );
     button.addEventListener('click', onPlace);
     return button;
@@ -452,8 +508,14 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 
     return el(
       'span',
-      { class: 'chip', 'data-testid': 'gps-state', 'data-ready': 'true' },
-      el('span', {}, 'Reporting from where you set yourself'),
+      {
+        class: 'chip chip-with-action',
+        'data-testid': 'gps-state',
+        'data-ready': 'true',
+        'data-state': 'placed',
+      },
+      icon('edit_location', { label: 'From the spot you set' }),
+      el('span', { class: 'chip-label' }, 'From the spot you set'),
       place,
       ...(back ? [back] : []),
     );
@@ -461,8 +523,14 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
   if (state.position.status === 'ready') {
     return el(
       'span',
-      { class: 'chip', 'data-testid': 'gps-state', 'data-ready': 'true' },
-      el('span', {}, 'Reporting from your phone’s position'),
+      {
+        class: 'chip chip-with-action',
+        'data-testid': 'gps-state',
+        'data-ready': 'true',
+        'data-state': 'gps-ok',
+      },
+      icon('my_location', { label: 'From your phone’s fix' }),
+      el('span', { class: 'chip-label' }, 'From your phone’s fix'),
       place,
     );
   }
@@ -479,8 +547,14 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 
   return el(
     'span',
-    { class: 'chip danger', 'data-testid': 'gps-state', 'data-ready': 'false' },
-    el('span', {}, message),
+    {
+      class: 'chip danger chip-with-action',
+      'data-testid': 'gps-state',
+      'data-ready': 'false',
+      'data-state': 'gps-lost',
+    },
+    icon('location_disabled', { label: message }),
+    el('span', { class: 'chip-label' }, message),
     place,
   );
 }
@@ -489,8 +563,9 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 function useDeviceButton(onUseDevice: () => void): HTMLElement {
   const button = el(
     'button',
-    { type: 'button', 'data-testid': 'use-device-position' },
-    'Use my phone’s position',
+    { type: 'button', class: 'chip-action', 'data-testid': 'use-device-position' },
+    icon('my_location', { label: 'Use my phone’s fix' }),
+    el('span', { class: 'chip-label' }, 'Use my phone’s fix'),
   );
   button.addEventListener('click', onUseDevice);
   return button;
