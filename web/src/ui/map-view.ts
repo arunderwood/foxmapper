@@ -30,7 +30,11 @@ const MARKER_SOURCE = 'reports-markers';
  * stylesheet must be live to answer. Light ink with a dark halo reads on both grounds — the
  * street style and the blank light fallback.
  */
-function labelPaint(): { 'text-color': string; 'text-halo-color': string; 'text-halo-width': number } {
+function labelPaint(): {
+  'text-color': string;
+  'text-halo-color': string;
+  'text-halo-width': number;
+} {
   return {
     'text-color': cssToken('--md-sys-color-on-surface', '#EFDFDB'),
     'text-halo-color': cssToken('--md-sys-color-surface', '#191210'),

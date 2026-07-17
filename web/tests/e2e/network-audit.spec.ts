@@ -36,9 +36,9 @@ test('a full session fetches nothing but the bundle and tiles', async ({ page, c
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
 
   // FR-014: no pull-to-refresh, ever — a hunter dragging the map must not reload the app.
-  expect(
-    await page.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY),
-  ).toBe('none');
+  expect(await page.evaluate(() => getComputedStyle(document.body).overscrollBehaviorY)).toBe(
+    'none',
+  );
 
   // FR-014: attribution stays clear of the report bar.
   const attribution = await page.locator('.maplibregl-ctrl-bottom-right').boundingBox();

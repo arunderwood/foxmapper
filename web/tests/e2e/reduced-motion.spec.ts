@@ -42,7 +42,10 @@ test('reduced motion: state changes complete with no animation over 50ms', async
   for (const kind of ['bearing', 'omni', 'null', 'fix']) {
     await page.getByTestId(`report-${kind}`).click();
     await page.getByTestId('sheet').waitFor();
-    expect(await longestMotion(page), `sheet-${kind} animated under reduced motion`).toBeLessThanOrEqual(50);
+    expect(
+      await longestMotion(page),
+      `sheet-${kind} animated under reduced motion`,
+    ).toBeLessThanOrEqual(50);
     await page.getByTestId('sheet').click({ position: { x: 8, y: 8 } });
     await expect(page.getByTestId('sheet')).toHaveCount(0);
   }

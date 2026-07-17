@@ -102,7 +102,10 @@ test('the draining chip is progress, not a spinner', async ({ page, context }) =
       .locator('[data-testid="queue-depth"][data-state="draining"] .chip-track-fill')
       .waitFor({ timeout: 30_000 })
       .then(() => 'draining'),
-    page.getByTestId('sync-flash').waitFor({ timeout: 30_000 }).then(() => 'flash'),
+    page
+      .getByTestId('sync-flash')
+      .waitFor({ timeout: 30_000 })
+      .then(() => 'flash'),
   ]);
   expect(['draining', 'flash']).toContain(seen);
 

@@ -14,21 +14,21 @@
 
 :root {
   /* ---- Reference tier (generated tonal palettes) ---- */
-  --md-ref-palette-primary-20: #5F1600;
+  --md-ref-palette-primary-20: #5f1600;
   --md-ref-palette-primary-30: #862300;
-  --md-ref-palette-primary-80: #FFB59F;
-  --md-ref-palette-primary-90: #FFDBD1;
+  --md-ref-palette-primary-80: #ffb59f;
+  --md-ref-palette-primary-90: #ffdbd1;
   --md-ref-palette-neutral-6: #191210;
-  --md-ref-palette-neutral-12: #261E1C;
+  --md-ref-palette-neutral-12: #261e1c;
   --md-ref-palette-neutral-17: #312826;
-  --md-ref-palette-neutral-90: #EFDFDB;
-  --md-ref-palette-neutral-95: #FDEDE9;
-  --md-ref-palette-neutral-variant-30: #55423D;
-  --md-ref-palette-neutral-variant-60: #A38B85;
-  --md-ref-palette-neutral-variant-80: #DCC1B9;
-  --md-ref-palette-error-30: #93000A;
-  --md-ref-palette-error-80: #FFB4AB;
-  --md-ref-palette-error-90: #FFDAD6;
+  --md-ref-palette-neutral-90: #efdfdb;
+  --md-ref-palette-neutral-95: #fdede9;
+  --md-ref-palette-neutral-variant-30: #55423d;
+  --md-ref-palette-neutral-variant-60: #a38b85;
+  --md-ref-palette-neutral-variant-80: #dcc1b9;
+  --md-ref-palette-error-30: #93000a;
+  --md-ref-palette-error-80: #ffb4ab;
+  --md-ref-palette-error-90: #ffdad6;
 
   /* ---- System tier: colour ---- */
   --md-sys-color-surface: var(--md-ref-palette-neutral-6);
@@ -52,15 +52,15 @@
      report-kind hues (Tol-family, see contracts/iconography.md), and the blank-basemap
      ground — light on purpose: the per-callsign wire palette is tuned for a street map
      and must stay legible when the streets never arrive (docs/log-format.md). */
-  --fx-color-warn: #FFCB69;
-  --fx-color-warn-container: #4A3200;
-  --fx-color-on-warn-container: #FFE0A6;
-  --fx-color-ok: #8CD5B0;
-  --fx-kind-bearing: #FFB598;
-  --fx-kind-signal: #88CCEE;
-  --fx-kind-null: #DDCC77;
-  --fx-kind-fix: #44AA99;
-  --fx-color-map-ground: #F6F0EA;
+  --fx-color-warn: #ffcb69;
+  --fx-color-warn-container: #4a3200;
+  --fx-color-on-warn-container: #ffe0a6;
+  --fx-color-ok: #8cd5b0;
+  --fx-kind-bearing: #ffb598;
+  --fx-kind-signal: #88ccee;
+  --fx-kind-null: #ddcc77;
+  --fx-kind-fix: #44aa99;
+  --fx-color-map-ground: #f6f0ea;
   /* Scrims: the only sanctioned translucency (surface-tinted; avoids color-mix for iOS 16). */
   --fx-color-scrim: rgba(25, 18, 16, 0.94);
   --fx-color-scrim-transparent: rgba(25, 18, 16, 0);

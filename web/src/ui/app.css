@@ -19,9 +19,8 @@ body {
   height: 100%;
   background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-  font:
-    var(--md-sys-typescale-body-weight) var(--md-sys-typescale-body-size) /
-      var(--md-sys-typescale-body-line-height) var(--fx-font);
+  font: var(--md-sys-typescale-body-weight) var(--md-sys-typescale-body-size) /
+    var(--md-sys-typescale-body-line-height) var(--fx-font);
   /* No pull-to-refresh: a hunter dragging the map must not reload the app mid-report. */
   overscroll-behavior: none;
   /* The page itself never scrolls — only the panels inside it do. A map that can be dragged off
@@ -267,11 +266,7 @@ label {
   gap: 0.4rem;
   padding: 0.5rem;
   padding-top: max(0.5rem, env(safe-area-inset-top));
-  background: linear-gradient(
-    to bottom,
-    var(--fx-color-scrim),
-    var(--fx-color-scrim-transparent)
-  );
+  background: linear-gradient(to bottom, var(--fx-color-scrim), var(--fx-color-scrim-transparent));
   pointer-events: none;
 }
 

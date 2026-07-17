@@ -222,7 +222,9 @@ describe('provenance is in the primary view, not a tooltip', () => {
     };
 
     expect(renderOf([mine]).markers.features[0]!.properties.label).toBe('KI7XYZ');
-    const labels = renderOf([mine, theirs]).markers.features.map((f) => f.properties.label).sort();
+    const labels = renderOf([mine, theirs])
+      .markers.features.map((f) => f.properties.label)
+      .sort();
     expect(labels).toEqual(['KI7XYZ ·11', 'KI7XYZ ·22']);
   });
 });

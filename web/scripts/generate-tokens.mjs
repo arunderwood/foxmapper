@@ -74,7 +74,8 @@ const SYSTEM = {
 };
 
 /** The HAND-TUNED block survives regeneration verbatim. */
-const TUNED_BEGIN = '  /* ---- HAND-TUNED (survives regeneration; contrast test is the arbiter) ---- */';
+const TUNED_BEGIN =
+  '  /* ---- HAND-TUNED (survives regeneration; contrast test is the arbiter) ---- */';
 const TUNED_END = '  /* ---- end HAND-TUNED ---- */';
 
 function existingTunedBlock() {
@@ -117,7 +118,9 @@ lines.push(` * Seed ${SEED} (fox rust — the identity mark's wedge colour). Dar
 lines.push(' *');
 lines.push(' * THE CONTRACT (specs/002-material3-ui-redesign/contracts/design-tokens.md):');
 lines.push(' * this file is the only place a colour, radius, easing, duration, opacity step,');
-lines.push(' * or type-scale value may be defined. Components consume var(--md-sys-*)/var(--fx-*).');
+lines.push(
+  ' * or type-scale value may be defined. Components consume var(--md-sys-*)/var(--fx-*).',
+);
 lines.push(' * Contrast floors are enforced by tests/unit/contrast.test.ts: 7:1 glanceable,');
 lines.push(' * 4.5:1 body, 3:1 non-text. The per-callsign palette in src/log/colour.ts is wire');
 lines.push(' * format (docs/log-format.md), not a token, and is never defined or overridden here.');
@@ -140,7 +143,9 @@ for (const [role, [palette, t]] of Object.entries(SYSTEM)) {
 lines.push('');
 lines.push(existingTunedBlock());
 lines.push('');
-lines.push('  /* ---- System tier: type scale (system stack; expressive scale, zero webfont bytes) ---- */');
+lines.push(
+  '  /* ---- System tier: type scale (system stack; expressive scale, zero webfont bytes) ---- */',
+);
 lines.push("  --fx-font: system-ui, -apple-system, 'Segoe UI', sans-serif;");
 lines.push('  --fx-font-mono: ui-monospace, monospace;');
 lines.push('  --md-sys-typescale-display-size: 2.25rem;');
@@ -169,7 +174,9 @@ lines.push('  --md-sys-shape-corner-large: 16px;');
 lines.push('  --md-sys-shape-corner-extra-large: 28px;');
 lines.push('  --md-sys-shape-corner-full: 999px;');
 lines.push('');
-lines.push('  /* ---- System tier: motion (calm instrument, expressive moments — spec FR-005) ---- */');
+lines.push(
+  '  /* ---- System tier: motion (calm instrument, expressive moments — spec FR-005) ---- */',
+);
 lines.push('  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);');
 lines.push('  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);');
 lines.push('  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);');
@@ -177,12 +184,16 @@ lines.push('  --md-sys-motion-duration-short: 150ms;');
 lines.push('  --md-sys-motion-duration-medium: 300ms;');
 lines.push('  --md-sys-motion-duration-exit: 200ms;');
 lines.push('');
-lines.push('  /* ---- System tier: state layers (pressed boosted — a sunlit screen hides 12%) ---- */');
+lines.push(
+  '  /* ---- System tier: state layers (pressed boosted — a sunlit screen hides 12%) ---- */',
+);
 lines.push('  --md-sys-state-hover-opacity: 0.08;');
 lines.push('  --md-sys-state-focus-opacity: 0.1;');
 lines.push('  --md-sys-state-pressed-opacity: 0.16;');
 lines.push('');
-lines.push('  /* ---- Field constants: minimums, never targets (contracts/design-tokens.md §5) ---- */');
+lines.push(
+  '  /* ---- Field constants: minimums, never targets (contracts/design-tokens.md §5) ---- */',
+);
 lines.push('  --fx-touch: 56px; /* gloved thumb; consumed only as min-height/min-width */');
 lines.push('  --fx-input-font: 16px; /* below this iOS zooms the viewport on focus */');
 lines.push('');

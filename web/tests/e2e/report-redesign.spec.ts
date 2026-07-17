@@ -38,9 +38,7 @@ test('the press answers during the press: state layer visible on :active', async
   const box = (await button.boundingBox())!;
 
   // Resting: no layer. (Read before the pointer arrives — hover is itself a state layer.)
-  const restingOpacity = await button.evaluate(
-    (node) => getComputedStyle(node, '::after').opacity,
-  );
+  const restingOpacity = await button.evaluate((node) => getComputedStyle(node, '::after').opacity);
   expect(Number(restingOpacity)).toBe(0);
 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

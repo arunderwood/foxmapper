@@ -16,7 +16,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const css = readFileSync(fileURLToPath(new URL('../../src/ui/tokens.css', import.meta.url)), 'utf8');
+const css = readFileSync(
+  fileURLToPath(new URL('../../src/ui/tokens.css', import.meta.url)),
+  'utf8',
+);
 
 /** Every `--name: value;` declaration in the file, var() references unresolved. */
 const declarations = new Map<string, string>();

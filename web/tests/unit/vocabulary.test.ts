@@ -91,7 +91,10 @@ describe('the vocabulary firewall', () => {
   it('speaks the language hunters actually use', () => {
     // The other half of Principle V, which a "no jargon" check alone would not catch: the absence
     // of NRQ is not the presence of plain language.
-    const spoken = surfaces.map((f) => readFileSync(f, 'utf8')).join('\n').toLowerCase();
+    const spoken = surfaces
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n')
+      .toLowerCase();
     for (const phrase of ['bearing', 'signal', 'hear nothing here', 'how sure are you']) {
       expect(spoken).toContain(phrase);
     }

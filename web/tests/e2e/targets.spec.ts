@@ -36,7 +36,8 @@ async function auditTargets(page: Page, surface: string): Promise<void> {
       if (node.closest('[class*="maplibregl-ctrl"]')) continue;
       if (node.offsetParent === null && getComputedStyle(node).position !== 'fixed') continue;
       audited++;
-      const name = node.getAttribute('data-testid') ?? node.textContent?.slice(0, 30) ?? node.tagName;
+      const name =
+        node.getAttribute('data-testid') ?? node.textContent?.slice(0, 30) ?? node.tagName;
       if (node.offsetHeight < floor - 0.5 || node.offsetWidth < floor - 0.5) {
         violations.push(`"${name}" ${node.offsetWidth}×${node.offsetHeight}`);
       }
@@ -44,7 +45,10 @@ async function auditTargets(page: Page, surface: string): Promise<void> {
     return { audited, violations };
   }, FLOOR);
 
-  expect(result.audited, `${surface}: no interactive elements found — selector drift?`).toBeGreaterThan(0);
+  expect(
+    result.audited,
+    `${surface}: no interactive elements found — selector drift?`,
+  ).toBeGreaterThan(0);
   expect(result.violations, `${surface}: targets under ${FLOOR}px`).toEqual([]);
 }
 
@@ -66,7 +70,10 @@ async function walk(page: Page, surface: string): Promise<void> {
     kindBoxes.push(box!);
   }
   const widths = kindBoxes.map((b) => Math.round(b.width));
-  expect(Math.max(...widths) - Math.min(...widths), `${surface}: kind buttons unequal`).toBeLessThanOrEqual(1);
+  expect(
+    Math.max(...widths) - Math.min(...widths),
+    `${surface}: kind buttons unequal`,
+  ).toBeLessThanOrEqual(1);
 
   for (const kind of ['bearing', 'omni', 'null', 'fix']) {
     await page.getByTestId(`report-${kind}`).click();

@@ -149,11 +149,11 @@ and no surface reads as pre-redesign.
 
 **Purpose**: The measured gates that close the feature, and the record they leave behind.
 
-- [ ] T037 Bundle budget audit: `npm run build`, gzip-measure dist assets; assert total ≤ 330 KB and redesign delta ≤ 20 KB vs the 304 KB baseline (research.md R4); record numbers in specs/002-material3-ui-redesign/findings.md
-- [ ] T038 Slow-3G load measurement per quickstart.md: preview build under Slow 3G + 4× CPU vs the same measurement on main; assert ≤ 10 s to interactive join screen and ≤ 120% of baseline (SC-003); record in findings.md
+- [x] T037 Bundle budget audit: `npm run build`, gzip-measure dist assets; assert total ≤ 330 KB and redesign delta ≤ 20 KB vs the 304 KB baseline (research.md R4); record numbers in specs/002-material3-ui-redesign/findings.md
+- [x] T038 Slow-3G load measurement per quickstart.md: preview build under Slow 3G + 4× CPU vs the same measurement on main; assert ≤ 10 s to interactive join screen and ≤ 120% of baseline (SC-003); record in findings.md
 - [ ] T039 Full quickstart.md validation pass end-to-end (all SC sections) on real hardware: one iOS Safari and one Android Chrome device
 - [ ] T040 First-time tester sessions (convenience testers, not field validation): run SC-004 (report unaided ≤ 60 s) and SC-005 (name all four kinds from icon+label) with 5 testers; record pass/fail per tester in specs/002-material3-ui-redesign/findings.md
-- [ ] T041 [P] Document the design system: header comment in web/src/ui/tokens.css covering regeneration, the hand-tuned block, and the frozen callsign palette; note in docs/ pointing UI contributors at contracts/design-tokens.md
+- [x] T041 [P] Document the design system: header comment in web/src/ui/tokens.css covering regeneration, the hand-tuned block, and the frozen callsign palette; note in docs/ pointing UI contributors at contracts/design-tokens.md
 
 ---
 
