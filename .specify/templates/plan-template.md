@@ -63,7 +63,7 @@ cannot be removed go in Complexity Tracking below with the simpler alternative n
       tracking beyond per-report is opt-in and revocable; no search-and-rescue or certification
       claim; joining still needs no account, install, or payment.
 - [ ] **Fusion discipline**: If this plan touches location-estimate mathematics, name the user story
-      and the field observation that motivate it.
+      that motivates it, and cite a field observation if one exists.
 
 ## Project Structure
 

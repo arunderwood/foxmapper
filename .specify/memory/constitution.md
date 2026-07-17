@@ -1,30 +1,45 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (unfilled template) → 1.0.0
-Bump rationale: Initial ratification. Template placeholders replaced with concrete
-governance; no prior version to compare against.
+Version change: 1.0.0 → 1.1.0
+Bump rationale: The Development Workflow's field-gate is redefined from a hard sequencing
+gate into a deferred milestone, and Fusion discipline no longer requires a field observation
+as a precondition for fusion work. The five Core Principles and the Operating Constraints are
+untouched. The versioning policy reserves MAJOR for changes to principles; this is a material
+change to a section's guidance, hence MINOR.
 
-Modified principles:
-  - [PRINCIPLE_1_NAME] → I. Honest Uncertainty (NON-NEGOTIABLE)
-  - [PRINCIPLE_2_NAME] → II. Every Radio Contributes
-  - [PRINCIPLE_3_NAME] → III. Offline Is the Normal Case
-  - [PRINCIPLE_4_NAME] → IV. Append-Only Log, Derived State
-  - [PRINCIPLE_5_NAME] → V. Interop Over Invention, Plain Language Over Jargon
+Migration note (required — this amendment loosens a MUST):
+  - No story to date has closed through the field-gate, so no completed work loses the basis
+    on which it was accepted.
+  - Existing specs keep their Field Validation entries and tasks (e.g.
+    specs/001-shared-bearing-picture, T070) as deferred milestone work: still tracked and
+    still worth doing, but no longer blocking story completion or the start of later stories.
+    Completed specs are not rewritten.
+  - Story sequencing reverts to plain priority order with no field checkpoint between
+    stories. When a real hunt does happen, its findings re-enter planning as prized input
+    rather than as a gate artifact.
 
-Added sections:
-  - Operating Constraints (was [SECTION_2_NAME])
-  - Development Workflow (was [SECTION_3_NAME])
-  - Governance (rules filled)
+Modified principles: none
+
+Modified sections:
+  - Development Workflow: "Field-gate" → "Field validation (deferred milestone)" — outdoor
+    validation is now an aspiration and a recorded milestone, not a precondition for
+    starting or finishing work
+  - Development Workflow: "Fusion discipline" — fusion work now requires a named user story;
+    a field observation is the preferred motivation when one exists, not a precondition
+
+Added sections: none
 
 Removed sections: none
 
 Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md — Constitution Check gates added
-  - ✅ .specify/templates/spec-template.md — field-gate + uncertainty/offline prompts added
-  - ✅ .specify/templates/tasks-template.md — field-gate checkpoint note added
-  - ✅ .claude/skills/speckit-*/SKILL.md — reviewed, no agent-specific or outdated
-       references requiring change
+  - ✅ .specify/templates/spec-template.md — Field Validation entries reframed as deferred
+       milestones; gating language removed
+  - ✅ .specify/templates/tasks-template.md — field validation tasks no longer close stories
+       or gate the next story; sequencing/parallelism notes updated
+  - ✅ .specify/templates/plan-template.md — Fusion discipline check no longer demands a
+       field observation
+  - ✅ .claude/skills/speckit-*/SKILL.md — reviewed, no field-gate references
 
 Follow-up TODOs: none
 -->
@@ -117,13 +132,21 @@ than in terms of service.
 
 ## Development Workflow
 
-**Field-gate**: Each user story ships to a real hunt with real participants before the next story is
-started. A story is not done when its tests pass; it is done when someone used it outdoors and the
-interaction survived contact.
+**Field validation (deferred milestone)**: The product is ultimately proven outdoors. The
+strongest evidence a story works is that someone used it on a real hunt and the interaction
+survived contact — but the project does not yet have a base of participants to recruit for
+repeated real-world hunts, so field validation is a milestone the project works toward, not a
+precondition for starting or finishing work. A story closes on its tests and its independent-test
+criteria, and the next story MAY begin without an intervening hunt. Each story SHOULD still state
+what its field validation would look like, and that entry remains open as tracked milestone work.
+When field feedback exists it is prized: capture it verbatim, and let it reprioritize the backlog
+ahead of new construction. Reinstating field validation as a gate is expected as a future
+amendment once a tester base exists.
 
 **Fusion discipline**: The location-estimate mathematics is the most interesting part of this
 project and therefore the most likely to be built beyond what any user asked for. Fusion work
-requires a named user story and a field observation motivating it.
+requires a named user story motivating it. When field observations exist, they are the preferred
+motivation and SHOULD be cited.
 
 **Simplicity**: The server has no opinion about direction finding. Any proposal to move estimation,
 interpretation, or DF-specific logic server-side requires explicit justification against Principles
@@ -151,4 +174,4 @@ stricter rule.
 - MINOR: a principle or section is added, or its guidance is materially expanded.
 - PATCH: clarification, wording, or typo fixes that change no outcome.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-14 | **Last Amended**: 2026-07-14
+**Version**: 1.1.0 | **Ratified**: 2026-07-14 | **Last Amended**: 2026-07-16
