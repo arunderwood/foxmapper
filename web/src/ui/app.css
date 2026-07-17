@@ -589,6 +589,9 @@ label {
 .chip-action .icon {
   width: 20px;
   height: 20px;
+  /* Actions read as tappable: the primary hue marks "this does something", where status pills
+     keep their state colour. */
+  color: var(--md-sys-color-primary);
 }
 
 .chip.chip-with-action {
@@ -599,37 +602,28 @@ label {
   flex-wrap: wrap;
 }
 
-/* The status part of an action-bearing chip keeps its own quiet pill so the text still sits on
-   a readable ground. */
-.chip.chip-with-action > .icon:first-child,
-.chip.chip-with-action > .chip-label {
-  background: var(--md-sys-color-surface-container);
-  border: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.chip.chip-with-action > .icon:first-child {
-  box-sizing: content-box;
-  border-right: none;
-  border-radius: var(--md-sys-shape-corner-full) 0 0 var(--md-sys-shape-corner-full);
-  padding: 0.55rem 0 0.55rem 0.7rem;
-  /* Fused to its label half — the flex gap belongs between chip and actions, not mid-pill. */
-  margin-right: calc(-0.4rem);
-}
-
-.chip.chip-with-action > .chip-label {
-  border-left: none;
-  border-radius: 0 var(--md-sys-shape-corner-full) var(--md-sys-shape-corner-full) 0;
-  padding: 0.55rem 0.7rem 0.55rem 0.4rem;
-  align-self: stretch;
+/* The status half of an action-bearing chip: one pill, one element (built by chipStatus in
+   map-view.ts) — the old two-segment construction rendered with a seam. */
+.chip-status {
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  padding: 0.55rem 0.8rem;
 }
 
-/* The danger variant keeps its loud container across the split pieces. */
-.chip.danger.chip-with-action > .icon:first-child,
-.chip.danger.chip-with-action > .chip-label {
+.chip-status .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* The danger variant keeps its loud container on the status pill. */
+.chip.danger.chip-with-action .chip-status {
   background: var(--md-sys-color-error-container);
   border-color: var(--md-sys-color-error);
+  border-radius: var(--md-sys-shape-corner-medium);
 }
 
 /* ---- Placing a position by hand ---- */
@@ -663,6 +657,35 @@ label {
 /* A crosshair says "this tap is an answer", which a grab hand does not. */
 #map.placing canvas {
   cursor: crosshair;
+}
+
+/* The pin at a hand-placed position: the tap's receipt, in the action colour. The wedge-halo
+   keeps it legible on the light basemap. */
+.placed-pin {
+  color: var(--md-sys-color-primary-container);
+}
+
+.placed-pin .icon {
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* ---- The relay toggle ----
+ *
+ * A mode, not an answer: it sits below choice rows that all look like answers, so it must not
+ * look like one of them. Quiet, auto-width, and dashed on purpose — relayed reports draw
+ * dashed on the map, and the toggle wears the mark it creates. */
+.relay-toggle {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  background: transparent;
+  border: 1px dashed var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.relay-toggle[aria-pressed='true'] {
+  border-style: solid;
 }
 
 /* ---- Report detail ---- */

@@ -73,3 +73,26 @@ join screen's callsign input accepting a click. Three runs.
 - **T040** — SC-004/SC-005 first-time tester sessions (5 people): report unaided ≤ 60 s;
   name all four kinds from icon + label. Record per-tester pass/fail here.
 - **T018 / T027 / T036** — the deferred field-validation milestones, unchanged.
+
+## Feedback round 1 (2026-07-17, maintainer, desktop viewport)
+
+Six items; all addressed the same day:
+
+1. **"From the spot you set" chip rendered with a seam** — the split-pill construction (icon
+   and label as siblings fused by negative margin) was replaced with a single `.chip-status`
+   wrapper element. Structural fix, not more CSS glue.
+2. **Position chip purpose unclear** — the trimmed labels had dropped the load-bearing verb.
+   Now "Reporting from the spot you set" / "Reporting from your phone's fix". Lesson recorded:
+   glanceable microcopy still needs its verb when the chip answers "what is happening?".
+3. **"Everyone's reports" unclear** — same fix: "Showing everyone's reports" restored.
+4. **No feedback after placing a position** — a pin (`edit_location` glyph, primary-container,
+   drop-shadowed) now drops at the tapped spot the moment placement lands, and leaves when the
+   hunter returns to the device fix. Asserted in status-states e2e.
+5. **Relay fields visible by default** — not a redesign bug: this branch forked one commit
+   before PR #35 (`[hidden]` vs `.stack` specificity). Merged `origin/main` in; the fix and
+   its both-directions tests now ride along.
+6. **Relay toggle read as a fourth answer in the choice rows** — restyled as a mode: quiet,
+   auto-width, left-aligned, dashed outline (deliberately the same dashed vocabulary relayed
+   reports wear on the map), with a new `record_voice_over` icon (subset is now 17).
+   Action buttons in the status bar also gained primary-hued icons so "tappable" and "status"
+   stop looking identical.

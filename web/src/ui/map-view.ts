@@ -116,6 +116,8 @@ export class MapView {
    * Reset when the queue empties, so the next dead zone starts its own drain from zero.
    */
   #queuePeak = 0;
+  /** Marks the hand-placed position on the map itself — the answer to "where did my tap land?" */
+  #placedPin: maplibregl.Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
   #syncedUntil = 0;
   #syncedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -407,7 +409,38 @@ export class MapView {
     }
 
     this.#lastState = state;
+    this.#syncPlacedPin(state.placed);
     this.#updateStatus(state);
+  }
+
+  /**
+   * A pin at the hand-placed position, the moment it exists (FR-008a feedback). Placing without
+   * a mark left the hunter guessing whether — and where — the tap landed; the chip alone says
+   * "the spot you set" without showing the spot. Decorative on the accessibility tree: the
+   * position chip carries the words.
+   */
+  #syncPlacedPin(placed: { lat: number; lon: number } | undefined): void {
+    if (!placed) {
+      this.#placedPin?.remove();
+      this.#placedPin = undefined;
+      return;
+    }
+    const map = this.#map;
+    // Not created yet: the next refresh (~1/s) lands the pin once the map exists.
+    if (!map) return;
+
+    if (!this.#placedPin) {
+      const pin = el(
+        'div',
+        { class: 'placed-pin', 'data-testid': 'placed-pin', 'aria-hidden': 'true' },
+        icon('edit_location', { label: 'the spot you set' }),
+      );
+      this.#placedPin = new maplibregl.Marker({ element: pin, anchor: 'bottom' })
+        .setLngLat([placed.lon, placed.lat])
+        .addTo(map);
+    } else {
+      this.#placedPin.setLngLat([placed.lon, placed.lat]);
+    }
   }
 
   /** Pushes the latest fold to the map, if the style is ready to receive it. */
@@ -431,18 +464,20 @@ export class MapView {
     // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
     // reports" and "only mine" look identical otherwise, and the difference is the whole point.
     // Each state is an icon + colour + shape triple (data-model.md §3) — never colour alone.
+    // The verb is load-bearing: "Everyone's reports" alone reads as a mystery button, and this
+    // chip exists to answer "am I looking at the whole picture?" — so it says what it is doing.
     const syncChip = state.live
       ? el(
           'span',
           { class: 'chip ok', 'data-testid': 'sync-state', 'data-state': 'live' },
-          icon('cloud_done', { label: 'Everyone’s reports' }),
-          el('span', { class: 'chip-label' }, 'Everyone’s reports'),
+          icon('cloud_done', { label: 'Showing everyone’s reports' }),
+          el('span', { class: 'chip-label' }, 'Showing everyone’s reports'),
         )
       : el(
           'span',
           { class: 'chip warn', 'data-testid': 'sync-state', 'data-state': 'offline' },
           icon('cloud_off', { label: 'No signal' }),
-          el('span', { class: 'chip-label' }, 'No signal — this phone only'),
+          el('span', { class: 'chip-label' }, 'No signal — showing this phone only'),
         );
 
     const chips: (HTMLElement | undefined)[] = [
@@ -510,6 +545,7 @@ export class MapView {
   }
 
   destroy(): void {
+    this.#placedPin?.remove();
     this.#map?.remove();
   }
 }
@@ -537,8 +573,7 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
         'data-ready': 'true',
         'data-state': 'placed',
       },
-      icon('edit_location', { label: 'From the spot you set' }),
-      el('span', { class: 'chip-label' }, 'From the spot you set'),
+      chipStatus('edit_location', 'Reporting from the spot you set'),
       place,
       ...(back ? [back] : []),
     );
@@ -552,8 +587,7 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
         'data-ready': 'true',
         'data-state': 'gps-ok',
       },
-      icon('my_location', { label: 'From your phone’s fix' }),
-      el('span', { class: 'chip-label' }, 'From your phone’s fix'),
+      chipStatus('my_location', 'Reporting from your phone’s fix'),
       place,
     );
   }
@@ -576,9 +610,22 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
       'data-ready': 'false',
       'data-state': 'gps-lost',
     },
-    icon('location_disabled', { label: message }),
-    el('span', { class: 'chip-label' }, message),
+    chipStatus('location_disabled', message),
     place,
+  );
+}
+
+/**
+ * The status half of a chip that also hosts actions: one pill, one element. It used to be an
+ * icon and a label as loose siblings fused by negative-margin CSS, which rendered with a seam —
+ * a wrapper is the honest structure.
+ */
+function chipStatus(name: Parameters<typeof icon>[0], label: string): HTMLElement {
+  return el(
+    'span',
+    { class: 'chip-status' },
+    icon(name, { label }),
+    el('span', { class: 'chip-label' }, label),
   );
 }
 

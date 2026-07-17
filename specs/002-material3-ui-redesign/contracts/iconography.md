@@ -24,7 +24,8 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 | `close` | dismiss sheet/popup | **Icon-only allowed** (universal) |
 | `warning` | uncertainty / generic warnings | Labeled (the warning text) |
 | `send` | submit report | Labeled ("Send") — primary action never icon-only |
-| `edit_location` | set-position-by-hand | Labeled |
+| `edit_location` | set-position-by-hand; the placed-position pin | Labeled (pin decorative — the chip carries the words) |
+| `record_voice_over` | relay toggle — someone else's report, heard over voice | Labeled |
 
 ## Rules
 

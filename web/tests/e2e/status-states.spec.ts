@@ -122,14 +122,17 @@ test('GPS states carry the triple too', async ({ page, context }) => {
   const gps = page.getByTestId('gps-state');
   await expect(gps).toHaveAttribute('data-state', 'gps-ok');
 
-  // Hand-placement flips the chip to its placed identity — different icon, same calm tier.
+  // Hand-placement flips the chip to its placed identity — different icon, same calm tier —
+  // and drops a pin at the tap: the placement's receipt, on the map itself.
   await page.getByTestId('place-position').click();
   await page.getByTestId('placing-banner').waitFor();
   await tapOpenMap(page);
   await expect(gps).toHaveAttribute('data-state', 'placed');
+  await expect(page.getByTestId('placed-pin')).toBeVisible();
   const placed = await look(gps);
   await page.getByTestId('use-device-position').click();
   await expect(gps).toHaveAttribute('data-state', 'gps-ok');
+  await expect(page.getByTestId('placed-pin')).toHaveCount(0);
   const ready = await look(gps);
   expect(placed.iconPath).not.toBe(ready.iconPath);
 });

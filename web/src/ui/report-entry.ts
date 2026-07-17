@@ -139,10 +139,20 @@ function relayFields(): {
     minutesAgo,
   );
 
+  // Quiet and visually apart from the answer rows above it: this is a mode, not a choice, and
+  // most reports are the reporter's own. The dashed outline is deliberate vocabulary — relayed
+  // reports draw dashed on the map, so the toggle wears the mark it creates. Voice icon for
+  // the voice hop.
   const toggle = el(
     'button',
-    { type: 'button', 'aria-pressed': 'false', 'data-testid': 'relay-toggle' },
-    'This is someone else’s report',
+    {
+      type: 'button',
+      class: 'relay-toggle',
+      'aria-pressed': 'false',
+      'data-testid': 'relay-toggle',
+    },
+    icon('record_voice_over', { label: 'This is someone else’s report' }),
+    el('span', {}, 'This is someone else’s report'),
   );
   toggle.addEventListener('click', () => {
     const on = toggle.getAttribute('aria-pressed') === 'true';
