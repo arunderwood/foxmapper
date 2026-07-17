@@ -145,14 +145,43 @@ is preserved for whoever picks it up rather than as a plan for this week. When a
 it still runs deploy → T069 → T063/T064 → T069a → T066 → T070, in ascending order of what a mistake
 costs. T064 remains the long pole: a seven-day clock and no dependants.
 
-### T063 — sensors, on real iOS and Android
-- Does the compass swing 10–30° next to a car? The entire honesty cap (Q ≤ 5) rests on that number.
-- Does declination land at ~15.2° in Bellingham? (The library computes 15.18° for 2026 — checked in
-  a unit test, but not against a real compass.)
-- Does a device clock set to 2030 degrade to a stale magnetic model rather than crashing? The code
-  catches the WMM's hard expiry; nobody has watched it happen on a phone.
-- **Android reports no compass accuracy at all.** A bearing from an Android phone carries less
-  provenance than one from an iPhone, and no code can fix that.
+### T063 — sensors. **Mostly retired 2026-07-16, not deferred — it could not decide anything.**
+
+Challenged on the grounds that n=2 phones and one car would not meaningfully change what we know,
+that the platform facts are published, and that no deficiency it found could be coded around. All
+three hold, and the file above is the evidence: `research.md § 5` had already sourced both platforms
+giving magnetic **from WebKit source**, the 20–30° vehicle swing **from NXP AN4246**, and dataless
+GPS **from Chromium source**. T063 was asking for a field re-measurement of cited engineering
+numbers.
+
+**The decisive question was "what would we do with the answer?"** Nothing:
+
+| measured swing | action |
+|---|---|
+| < 10° | none — the Q≤5 cap is merely conservative, which satisfies Principle I harder |
+| 10–30° | none — matches NXP, cap unchanged |
+| > 30° | none — the widest bucket is already 64° |
+
+No branch. And nothing there is codeable: compass error is physics, Android's missing accuracy is a
+platform gap we already degrade honestly for (`accuracyDegrees` is simply absent), and declination is
+arithmetic that `declination.test.ts` already pins — including the 2029 hard-throw and Bellingham's
+15.18°, neither of which a phone tells us more about.
+
+**What was real was hiding inside it, and is now done.** `heading.ts` was the **last untested module
+in `src/`** — and the one where a silent defect costs most, because every bearing in the product goes
+through `360 - alpha - screenAngle()`. A phone cannot prove that sign is right; synthetic orientation
+events can, on every branch, in 3 ms, forever. `web/tests/unit/heading.test.ts` is verified to fail
+when alpha's sign flips (3 tests), when iOS's `-1` "needs calibration" sentinel is accepted as a real
+error bar (1), and when the screen-rotation correction is dropped (2). The window is faked rather
+than pulling in jsdom: `watchHeading` touches `addEventListener` and `screen.orientation.angle` and
+nothing else.
+
+**What a phone could still add**, and all it could add: proof the platform delivers an event to *our*
+handler at all. That is n=1, five minutes, and it is "open the app once on each platform" — not a
+protocol, and the first person to use the app discovers it regardless.
+
+**The lesson worth keeping**: a task that cannot name the decision its result would change is not a
+test, it is a ritual. T063 survived three rounds of review by looking rigorous.
 
 ### T064 — iOS storage, the two things research could not verify
 - Does `navigator.storage.persist()` actually beat the 7-day ITP eviction rule?
