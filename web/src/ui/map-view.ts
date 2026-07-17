@@ -79,6 +79,13 @@ export interface MapViewState {
   onPlace: () => void;
   /** Drops the hand-placed position and goes back to the device's own (FR-008a). */
   onUseDevice: () => void;
+  /** Per-device setting (settings.ts): when false, no relay affordance exists anywhere. */
+  relayMode: boolean;
+  /** Armed relay target: the next report files as this observer's. One report per arming. */
+  relayTarget: { callsign: string; position: { lat: number; lon: number } } | undefined;
+  onOpenSettings: () => void;
+  onBeginRelay: () => void;
+  onCancelRelay: () => void;
 }
 
 /** What the map may do to a report it is drawing. Retraction is the only one. */
@@ -118,6 +125,8 @@ export class MapView {
   #queuePeak = 0;
   /** Marks the hand-placed position on the map itself — the answer to "where did my tap land?" */
   #placedPin: maplibregl.Marker | undefined;
+  /** Marks the armed relay target's position while a relayed report is being filed. */
+  #relayPin: maplibregl.Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
   #syncedUntil = 0;
   #syncedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -410,7 +419,36 @@ export class MapView {
 
     this.#lastState = state;
     this.#syncPlacedPin(state.placed);
+    this.#syncRelayPin(state.relayTarget);
     this.#updateStatus(state);
+  }
+
+  /**
+   * The armed relay target's pin: where the OBSERVER stood, dashed like every relayed mark on
+   * this map. It exists exactly as long as the arming does — dropped on "Report for them",
+   * gone when the report files or the arming is cancelled.
+   */
+  #syncRelayPin(target: MapViewState['relayTarget']): void {
+    if (!target) {
+      this.#relayPin?.remove();
+      this.#relayPin = undefined;
+      return;
+    }
+    const map = this.#map;
+    if (!map) return;
+
+    if (!this.#relayPin) {
+      const pin = el(
+        'div',
+        { class: 'relay-pin', 'data-testid': 'relay-pin', 'aria-hidden': 'true' },
+        icon('record_voice_over', { label: target.callsign }),
+      );
+      this.#relayPin = new maplibregl.Marker({ element: pin, anchor: 'center' })
+        .setLngLat([target.position.lon, target.position.lat])
+        .addTo(map);
+    } else {
+      this.#relayPin.setLngLat([target.position.lon, target.position.lat]);
+    }
   }
 
   /**
@@ -517,6 +555,12 @@ export class MapView {
             el('span', { class: 'chip-label' }, 'No map out here — reports still show'),
           )
         : undefined,
+
+      // Relay: an affordance only when this device opted in (settings), a status only while
+      // armed. Everyone else's status bar never mentions it.
+      ...this.#relayChips(state),
+
+      this.#settingsButton(state.onOpenSettings),
     ];
 
     this.#statusBar.append(...chips.filter((c): c is HTMLElement => c !== undefined));
@@ -526,6 +570,58 @@ export class MapView {
   #drainedFraction(depth: number): number {
     if (this.#queuePeak === 0) return 0;
     return (this.#queuePeak - depth) / this.#queuePeak;
+  }
+
+  /**
+   * Relay affordances (feedback round 2): a "report for someone else" action while unarmed,
+   * a "relaying for X" status with its cancel while armed. Absent entirely when relay mode is
+   * off — the fringe feature costs the common case nothing.
+   */
+  #relayChips(state: MapViewState): HTMLElement[] {
+    if (!state.relayMode) return [];
+
+    if (state.relayTarget) {
+      const cancel = el(
+        'button',
+        { type: 'button', class: 'chip-action', 'data-testid': 'cancel-relay' },
+        icon('close', { label: 'Cancel' }),
+        el('span', { class: 'chip-label' }, 'Cancel'),
+      );
+      cancel.addEventListener('click', state.onCancelRelay);
+      return [
+        el(
+          'span',
+          { class: 'chip chip-with-action', 'data-testid': 'relay-armed' },
+          chipStatus('record_voice_over', `Next report files as ${state.relayTarget.callsign}’s`),
+          cancel,
+        ),
+      ];
+    }
+
+    const begin = el(
+      'button',
+      { type: 'button', class: 'chip-action', 'data-testid': 'begin-relay' },
+      icon('record_voice_over', { label: 'Report for someone else' }),
+      el('span', { class: 'chip-label' }, 'Report for someone else'),
+    );
+    begin.addEventListener('click', state.onBeginRelay);
+    return [el('span', { class: 'chip chip-with-action' }, begin)];
+  }
+
+  /** The settings gear: icon-only (universal), and the only door to the per-device switches. */
+  #settingsButton(onOpenSettings: () => void): HTMLElement {
+    const button = el(
+      'button',
+      {
+        type: 'button',
+        class: 'chip-action icon-only',
+        'data-testid': 'open-settings',
+        'aria-label': 'Settings',
+      },
+      icon('settings'),
+    );
+    button.addEventListener('click', onOpenSettings);
+    return el('span', { class: 'chip chip-with-action' }, button);
   }
 
   /** Always offered, never only on failure: a measured fix can be wrong, and FR-008 says so. */
@@ -546,6 +642,7 @@ export class MapView {
 
   destroy(): void {
     this.#placedPin?.remove();
+    this.#relayPin?.remove();
     this.#map?.remove();
   }
 }

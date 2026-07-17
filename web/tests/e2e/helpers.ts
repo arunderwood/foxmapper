@@ -44,15 +44,30 @@ export async function joinAs(page: Page, code: string, callsign: string): Promis
 }
 
 /**
- * Taps the map on open ground — below the status chips, above the report bar. A fixed (200,200)
- * used to work, but the redesigned chips are taller and on a phone viewport that point can land
- * on a chip action, which rightly intercepts the tap.
+ * Taps the map on genuinely open ground, found by hit-testing rather than arithmetic. Every
+ * guessed point has eventually landed on chrome as the UI evolved — (200,200) on grown chips,
+ * a 0.7-height fraction on the settings gear, a measured chip/bar midpoint on the expanded
+ * attribution control. `elementFromPoint` answers the only question that matters: would this
+ * tap reach the canvas?
  */
 export async function tapOpenMap(page: Page): Promise<void> {
   const map = page.getByTestId('map');
-  const box = await map.boundingBox();
-  if (!box) throw new Error('map has no box');
-  await map.click({ position: { x: box.width / 2, y: Math.round(box.height * 0.7) } });
+  const mapBox = await map.boundingBox();
+  if (!mapBox) throw new Error('map has no box');
+
+  const x = mapBox.x + mapBox.width / 2;
+  const y = await page.evaluate(
+    ({ x, top, height }) => {
+      for (let fraction = 0.35; fraction < 0.95; fraction += 0.05) {
+        const cy = top + height * fraction;
+        if (document.elementFromPoint(x, cy) instanceof HTMLCanvasElement) return cy;
+      }
+      return null;
+    },
+    { x, top: mapBox.y, height: mapBox.height },
+  );
+  if (y === null) throw new Error('no open map ground to tap');
+  await map.click({ position: { x: mapBox.width / 2, y: Math.round(y - mapBox.y) } });
 }
 
 /** Places the reporting position by hand: the point-at-map method (FR-008a). */

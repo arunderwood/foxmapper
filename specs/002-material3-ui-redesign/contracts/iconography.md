@@ -25,13 +25,14 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 | `warning` | uncertainty / generic warnings | Labeled (the warning text) |
 | `send` | submit report | Labeled ("Send") — primary action never icon-only |
 | `edit_location` | set-position-by-hand; the placed-position pin | Labeled (pin decorative — the chip carries the words) |
-| `record_voice_over` | relay toggle — someone else's report, heard over voice | Labeled |
+| `record_voice_over` | relay: mode toggle, arming flow, armed chip, observer pin | Labeled (pin decorative — the armed chip carries the words) |
+| `settings` | the per-device settings pane | **Icon-only allowed** (universal) |
 
 ## Rules
 
 1. **Label policy is the constitution's plain-language principle operationalized**
-   (FR-007): only `close`, `share`, and `my_location` may ever appear without a visible
-   text label. Everything else pairs icon + short hunter-language label. A new icon enters
+   (FR-007): only `close`, `share`, `my_location`, and `settings` may ever appear without a
+   visible text label. Everything else pairs icon + short hunter-language label. A new icon enters
    the icon-only list only by demonstrating universality (a first-time hunter names its
    meaning unprompted — same 4-of-5 bar as SC-005).
 2. **Shape before colour** (FR-015): the four report-kind icons must be distinguishable as

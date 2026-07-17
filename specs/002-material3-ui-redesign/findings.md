@@ -96,3 +96,31 @@ Six items; all addressed the same day:
    reports wear on the map), with a new `record_voice_over` icon (subset is now 17).
    Action buttons in the status bar also gained primary-hued icons so "tappable" and "status"
    stop looking identical.
+
+## Feedback round 2 (2026-07-17, maintainer): relay becomes a mode with a placement-style flow
+
+Direction: the lat/long entry did not belong inside the Bearing/Signal sheets, and relay is
+fringe enough that no affordance should exist until a device opts in.
+
+What changed (an interaction restructure — a deliberate, maintainer-directed extension past
+spec 002's re-skin boundary):
+
+- **Settings pane** (new surface, `settings.ts`): a gear in the status bar (icon-only —
+  added to the sanctioned universal list) opens the per-DEVICE switches. One resident:
+  "Relay mode". Persisted in the device-scoped meta store, deliberately not keyed by hunt.
+- **Relay off by default**: with the mode off, the report sheets carry zero relay markup and
+  the status bar never mentions relay. The sheets lost ~90 lines of embedded relay state.
+- **Arming flow** (`relay-entry.ts`), shaped like hand-placement: "Report for someone else"
+  → their callsign + where they were + how stale the call is → "Report for them" (disabled
+  until complete and sane — the dead button IS the validation) → a dashed voice-icon pin
+  drops at their position, the map centres on it, and a "Next report files as KI7XYZ's"
+  chip shows with Cancel. The next report files as theirs, then the target disarms and the
+  pin lifts: one relayed report per arming, each a deliberate act.
+- **SC-011 got structurally stronger**: the old half-filled-toggle middle state is now
+  unrepresentable — a relay target either exists with complete, validated details or does
+  not exist at all. relayContext() and the wire format are untouched.
+- Tests: relay.spec.ts rewritten around the real flow (13 tests — same attribution,
+  position, and timing invariants, plus mode-gating, persistence-across-reload, pin
+  lifecycle, and cancel). `tapOpenMap` now finds open ground by `elementFromPoint`
+  hit-testing after three generations of guessed coordinates each eventually landed on
+  grown chrome (the last one: the expanded attribution control).

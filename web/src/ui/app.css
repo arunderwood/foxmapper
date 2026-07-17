@@ -671,21 +671,32 @@ label {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
-/* ---- The relay toggle ----
+/* ---- Relay (feedback round 2: its own flow, off unless this device opted in) ----
  *
- * A mode, not an answer: it sits below choice rows that all look like answers, so it must not
- * look like one of them. Quiet, auto-width, and dashed on purpose — relayed reports draw
- * dashed on the map, and the toggle wears the mark it creates. */
-.relay-toggle {
-  align-self: flex-start;
-  margin-top: 0.25rem;
-  background: transparent;
-  border: 1px dashed var(--md-sys-color-outline);
-  color: var(--md-sys-color-on-surface-variant);
+ * Dashed is the relay vocabulary everywhere: relayed reports draw dashed on the map, so the
+ * pin that marks an armed observer's position wears the same mark. */
+.relay-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  border: 2px dashed var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
-.relay-toggle[aria-pressed='true'] {
-  border-style: solid;
+.relay-pin .icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Icon-only actions (settings gear): a square 56px target, glyph centred. */
+.chip-action.icon-only {
+  min-width: var(--fx-touch);
+  padding: 0.5rem;
 }
 
 /* ---- Report detail ---- */
