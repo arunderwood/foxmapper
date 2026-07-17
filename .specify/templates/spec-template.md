@@ -22,9 +22,11 @@
   - Deployed independently
   - Demonstrated to users independently
 
-  FIELD-GATE (constitution, Development Workflow): each story also carries a Field Validation
-  entry. A story is not done when its tests pass; it is done when someone used it outdoors on a
-  real hunt and the interaction survived contact. The next story does not start until then.
+  FIELD VALIDATION (constitution, Development Workflow): each story also carries a Field
+  Validation entry describing what outdoor use on a real hunt would prove. It is a deferred
+  milestone, not a gate: a story closes on its tests and its Independent Test, and the next
+  story may start without an intervening hunt. When field feedback exists, capture it and let
+  it reprioritize the backlog.
 -->
 
 ### User Story 1 - [Brief Title] (Priority: P1)
@@ -35,7 +37,7 @@
 
 **Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
 
-**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
+**Field Validation** *(deferred milestone — not a gate)*: [What a real participant would do with this on a real hunt, and what observation would prove it survived contact]
 
 **Acceptance Scenarios**:
 
@@ -52,7 +54,7 @@
 
 **Independent Test**: [Describe how this can be tested independently]
 
-**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
+**Field Validation** *(deferred milestone — not a gate)*: [What a real participant would do with this on a real hunt, and what observation would prove it survived contact]
 
 **Acceptance Scenarios**:
 
@@ -68,7 +70,7 @@
 
 **Independent Test**: [Describe how this can be tested independently]
 
-**Field Validation**: [What a real participant does with this on a real hunt, and what observation proves it survived contact]
+**Field Validation** *(deferred milestone — not a gate)*: [What a real participant would do with this on a real hunt, and what observation would prove it survived contact]
 
 **Acceptance Scenarios**:
 
