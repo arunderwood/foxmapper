@@ -181,7 +181,7 @@ each sees the other three on their own device within seconds.
 
 ## Phase 4: Polish & Cross-Cutting Concerns
 
-- [ ] T071 [P] Colour palette review in `web/src/log/colour.ts` — the twelve swatches are provisional and have had **no colour-vision-deficiency check and no direct-sunlight check**. Changing the list repaints every hunt, so settle it before real use
+- [ ] T071 [P] Colour palette review in `web/src/log/colour.ts` — **CVD half done 2026-07-16; sunlight half open, and belongs to T069a.** The twelve were a rainbow and measured **ΔE 2.2** (CAM02-UCS, worst pair) under protanomaly — `#e5533d` red and `#9c6b45` brown were the same colour, and seven pairs collided under deuteranomaly. Because colour is a hash bucket, that collision is invisible to the person it affects. Replaced with **Paul Tol's "muted" (9)**, worst case **11.8** across all three CVD types. Nine is not a downgrade: colour already collided 95.4% of the time at eight hunters, and a deuteranope was already living with ~8 effective colours out of the twelve. `docs/log-format.md`, the spec contract, `data-model.md` and `plan.md` all updated; `colour.test.ts` now parses the published table and asserts it equals `PALETTE`, so the contract and the code cannot drift. **Remains open**: a dimmed screen in direct sunlight, and one real pair of CVD eyes — neither of which simulation can supply. The palette must not move after T069a. See [findings.md](findings.md)
 - [X] T072 [P] Publish the log format at `docs/log-format.md` so a third party can reimplement it (FR-021) — the constitution's actual test
 - [X] T073 [P] Bundle size check against SC-001's 15-second cold join on real cell, not wifi
 - [ ] T074 Write up T070's findings against the spec; feed them into the next story

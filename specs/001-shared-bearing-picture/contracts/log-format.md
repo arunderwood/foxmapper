@@ -188,19 +188,25 @@ that guarantee failing visibly.
 **PALETTE is normative and ordered.** Changing it, or its order, repaints every hunt — so it is
 versioned with the format, not tuned casually.
 
+Paul Tol's "muted" qualitative scheme.
+
 | # | Colour | | # | Colour |
 |---|---|---|---|---|
-| 0 | `#e5533d` | | 6 | `#5b8ff9` |
-| 1 | `#f2a03d` | | 7 | `#7f6bd6` |
-| 2 | `#d9c02b` | | 8 | `#c264c2` |
-| 3 | `#6bbf3f` | | 9 | `#e0629b` |
-| 4 | `#2fae7e` | | 10 | `#9c6b45` |
-| 5 | `#2eb0c4` | | 11 | `#8a8f99` |
+| 0 | `#cc6677` | | 5 | `#882255` |
+| 1 | `#332288` | | 6 | `#44aa99` |
+| 2 | `#ddcc77` | | 7 | `#999933` |
+| 3 | `#117733` | | 8 | `#aa4499` |
+| 4 | `#88ccee` | | | |
 
-> **This list needs a designer's eye before first release.** It must survive direct sunlight, a
-> dimmed screen, and common colour-vision deficiencies — none of which has been checked. Twelve
-> entries is a starting point, not a verified answer. The *algorithm* is settled; the swatches are a
-> Stage 6 task.
+> **The CVD half is now checked (T071); the sunlight half is not.** The original twelve were a
+> rainbow and measured **ΔE 2.2** (CAM02-UCS, worst pair) under protanomaly — red and brown became
+> one colour, with seven pairs colliding under deuteranomaly. This scheme's worst case is **11.8**
+> across normal, deuteranomalous, protanomalous and tritanomalous vision. Nine rather than twelve
+> is deliberate: colour already collided at eight hunters 95.4% of the time, so the count buys less
+> than it looks like, and a CVD-safe nine everyone sees alike beats twelve only some do.
+>
+> **What remains is a dimmed screen in direct sunlight**, which simulation cannot answer and T069a
+> can. The *algorithm* was always settled; the swatches are now half-settled.
 
 ### What this does and does not guarantee
 
@@ -210,8 +216,8 @@ the reason colour is derived from the callsign rather than from `participant_id`
 key would give KI7XYZ one colour for their own reports and a different one for reports net control
 relayed on their behalf, which is the same person appearing as two stations.
 
-**Not guaranteed**: that two *different* callsigns get different colours. With twelve swatches and a
-hash, a hunt of eight will usually contain a collision — that is birthday maths, not a bug to fix.
+**Not guaranteed**: that two *different* callsigns get different colours. With nine swatches and a
+hash, a hunt of eight will almost always contain a collision — that is birthday maths, not a bug to fix.
 **Colour is an aid, never an identifier.** FR-012 requires the callsign on every report, so identity
 never rests on colour alone. Any implementation that uses colour as the primary way to tell stations
 apart has misread this contract.

@@ -318,6 +318,10 @@ Unresolved items a task-writer will hit. Recorded rather than guessed.
   suffix shown only on collision. **The only residual is the palette itself** (Stage 6.1) — the
   algorithm is settled, the twelve swatches are provisional and have had no colour-vision or
   direct-sunlight check.
+  **Palette half-resolved 2026-07-16 (T071).** The twelve were a rainbow and measured ΔE 2.2
+  (CAM02-UCS) under protanomaly — red and brown were one colour. Replaced with Paul Tol's "muted"
+  nine, worst case 11.8 across all three CVD types. The sunlight half is still open and belongs to
+  T069a: simulation cannot answer what a dimmed screen does outdoors.
 - **UI/interaction is unspecified by choice.** No screens, states, or flows are documented. The
   consequence is accepted and worth naming: SC-001a/b (ten seconds, gloved) and SC-008 (zero jargon)
   are unverifiable until something exists, so the field gate is where a wrong flow gets found. Stage 6

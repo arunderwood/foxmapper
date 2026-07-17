@@ -223,7 +223,47 @@ on `commit` — deploying every push to main whether CI passed or not, for a ser
 purpose is to be running while nobody is watching a dashboard. Fixed to `checksPass` (PR #29),
 matching what the maintainer's other service already does.
 
-### T071 — the palette
-The twelve swatches are provisional and have had **no colour-vision-deficiency check and no
-direct-sunlight check**. The algorithm is settled and pinned by tests; the colours are a designer's
-call. Changing the list repaints every hunt, so it should be settled before first real use.
+### T071 — the palette. CVD half **done 2026-07-16**; sunlight half still open.
+
+**The twelve were a rainbow, and a rainbow is what CVD flattens.** Measured as CAM02-UCS ΔE between
+every pair under simulated vision (Machado 2009, severity 100):
+
+| | outline — carries identity | fill @ 22% |
+|---|---|---|
+| old rainbow (12) | 14.8 / **4.2** / **2.2** | 4.0 / **0.4** / **0.7** |
+| Tol muted (9) | 17.3 / **12.3** / **15.0** | 3.9 / 3.1 / 3.0 |
+
+*(normal / deuteranomaly / protanomaly)*
+
+`#e5533d` red and `#9c6b45` brown both rendered as roughly `#7b6f3e` for a protanope — **ΔE 2.2**.
+Seven pairs collided under deuteranomaly. That is ~8% of men, in a hobby that is overwhelmingly
+men, and because colour is a hash bucket the collision is *invisible to the person it affects*: they
+simply see two hunters as one and have no way to know.
+
+Replaced with **Paul Tol's "muted"** — a human-designed CVD-safe scheme, not something generated.
+Worst case **11.8** across all three CVD types.
+
+**Nine is not a downgrade from twelve.** Colour already collided: at eight hunters, twelve swatches
+collided 95.4% of the time and nine collide 99.2% — birthday maths, and exactly why FR-002b says
+colour is an aid and the callsign is the identifier. A deuteranope was *already* living with ~8
+effective colours out of the twelve, unpredictably, and differently from the hunter beside them.
+
+**Three things worth knowing:**
+
+1. **The fill was never the identity carrier and cannot be.** At `fill-opacity: 0.22` every palette
+   merges — the old one to **ΔE 0.4**, below a just-noticeable difference, i.e. provably one colour.
+   Identity lives in the full-strength outline and the label. Raising the opacity would fix nothing
+   worth the cost: even 50% only reaches 8.6 for normal vision, and it would obscure the overlapping
+   wedges that are the entire product. The fill is a locator; the outline is the name.
+2. **Twelve CVD-safe swatches is achievable** — an annealer found a set at ΔE 20.5. It was also
+   unshippable sludge (near-blacks, pure neons). "Twelve is too many" was never the reason; the
+   reason is that the twelve chosen were a rainbow.
+3. **`docs/log-format.md` and `PALETTE` could drift silently.** The fixed-vector test claimed to
+   protect a third-party reimplementation but derived its expectation from `PALETTE` itself, so it
+   would pass while the published contract listed different swatches. Four files had to be hand-synced
+   for this change and nothing would have caught a typo. Now `colour.test.ts` parses the contract's
+   table and asserts it equals `PALETTE` — verified to fail on a one-character drift.
+
+**Still open: the direct-sunlight check.** Simulation is not a person squinting at a dimmed phone on
+a hilltop, and it is not a person with actual CVD either — one real pair of eyes is worth having.
+That half belongs to T069a, and the palette should not move again after it.

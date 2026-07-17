@@ -166,8 +166,8 @@ export class MapView {
     });
 
     // FR-012: a bearing is attributed on the map, not on a tap. Without this the headline report
-    // kind is told apart by colour alone, which FR-002b forbids by name — and with twelve swatches
-    // a hunt of eight will usually contain a collision.
+    // kind is told apart by colour alone, which FR-002b forbids by name — and with nine swatches
+    // a hunt of eight will almost always contain a collision.
     map.addLayer({
       id: 'wedge-label',
       type: 'symbol',
