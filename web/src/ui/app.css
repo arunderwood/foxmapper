@@ -659,18 +659,6 @@ label {
   cursor: crosshair;
 }
 
-/* The pin at a hand-placed position: the tap's receipt, in the action colour. The wedge-halo
-   keeps it legible on the light basemap. */
-.placed-pin {
-  color: var(--md-sys-color-primary-container);
-}
-
-.placed-pin .icon {
-  width: 34px;
-  height: 34px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-}
-
 /* ---- Relay (feedback round 2: its own flow, off unless this device opted in) ----
  *
  * Dashed is the relay vocabulary everywhere: relayed reports draw dashed on the map, so the

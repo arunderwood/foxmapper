@@ -25,6 +25,8 @@ import type { PositionState } from '../sensors/position.js';
 
 const WEDGE_SOURCE = 'reports-wedges';
 const MARKER_SOURCE = 'reports-markers';
+/** The hand-placed position, as map data rather than a DOM marker — see #addLayers. */
+const PLACED_SOURCE = 'placed-position';
 
 /**
  * Resolved when layers are added, not at import: the values come from the token set, and the
@@ -124,8 +126,8 @@ export class MapView {
    * Reset when the queue empties, so the next dead zone starts its own drain from zero.
    */
   #queuePeak = 0;
-  /** Marks the hand-placed position on the map itself — the answer to "where did my tap land?" */
-  #placedPin: maplibregl.Marker | undefined;
+  /** The hand-placed position, held for re-application when a style swap recreates sources. */
+  #placedPosition: { lat: number; lon: number } | undefined;
   /** Marks the armed relay target's position while a relayed report is being filed. */
   #relayPin: maplibregl.Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
@@ -179,6 +181,26 @@ export class MapView {
     const empty = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
     map.addSource(WEDGE_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(MARKER_SOURCE, { type: 'geojson', data: empty() });
+    map.addSource(PLACED_SOURCE, { type: 'geojson', data: empty() });
+
+    // The hand-placed position pin, FIRST: it lives in the canvas (not a DOM marker, which
+    // would float above everything the map draws) precisely so every report renders over it.
+    // The pin is position furniture; a planted "Found it" flag on the same spot must win.
+    this.#glyphImage(map, 'placed-pin-img', 'edit_location', {
+      fill: cssToken('--md-sys-color-primary-container', '#862300'),
+      size: 64,
+    });
+    map.addLayer({
+      id: 'placed-pin',
+      type: 'symbol',
+      source: PLACED_SOURCE,
+      layout: {
+        'icon-image': 'placed-pin-img',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-anchor': 'bottom',
+      },
+    });
 
     // A bearing is a bounded sector: width is the reporter's stated confidence, length their
     // stated range. Both come from the report; neither is a default wearing their name.
@@ -246,9 +268,12 @@ export class MapView {
 
     // "Found it" is the report a hunt exists to produce, and it stopped looking like a bigger
     // signal dot (feedback round 3): it plants the same flag the report bar and popup wear, in
-    // the observer's colour, taller than any circle on the map. One image per palette swatch,
-    // rasterized from the shared glyph so every surface agrees on what "Found it" looks like.
-    this.#addFlagImages(map);
+    // the observer's colour, twice the height of any circle — and, added after the placed-pin
+    // layer, it draws over the pin when the fox is found at the spot the hunter set. One image
+    // per palette swatch, from the shared glyph, so every surface agrees on what it looks like.
+    for (const colour of PALETTE) {
+      this.#glyphImage(map, `fix-flag-${colour}`, 'flag', { fill: colour, size: 88 });
+    }
     map.addLayer({
       id: 'fix-flag',
       type: 'symbol',
@@ -299,41 +324,44 @@ export class MapView {
     });
 
     this.#bindClick();
+    // The swap that recreated these sources also emptied them; the pin state survives here.
+    this.#applyPlacedPin();
   }
 
   /**
-   * The flag marker images: the shared `flag` glyph rasterized once per palette swatch. The
-   * halo is the LIGHT map ground, not the dark label halo — half the Tol swatches are dark,
-   * and a dark halo turned those flags into blobs; a light halo cuts every colour out of the
-   * busy street detail the way a classic map marker does. Re-added after every style swap —
-   * `setStyle(diff: false)` drops images along with the sources.
+   * A shared glyph rasterized into a map image (the flag markers, the placed pin). The halo is
+   * the LIGHT map ground, not the dark label halo — half the Tol swatches are dark, and a dark
+   * halo turned those glyphs into blobs; a light halo cuts every colour out of the busy street
+   * detail the way a classic map marker does. `size` is device pixels at pixelRatio 2, so the
+   * on-map height is half of it. Re-added after every style swap — `setStyle(diff: false)`
+   * drops images along with the sources.
    */
-  #addFlagImages(map: MapLibreMap): void {
-    const halo = cssToken('--fx-color-map-ground', '#F6F0EA');
-    const size = 64; // device pixels; pixelRatio 2 → 32 CSS px, taller than any marker circle
+  #glyphImage(
+    map: MapLibreMap,
+    id: string,
+    name: Parameters<typeof iconPath>[0],
+    options: { fill: string; size: number },
+  ): void {
+    if (map.hasImage(id)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = options.size;
+    canvas.height = options.size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    for (const colour of PALETTE) {
-      if (map.hasImage(`fix-flag-${colour}`)) continue;
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    // The glyph lives in Material Symbols' 0/-960/960/960 box; map it onto the canvas.
+    const path = new Path2D(iconPath(name));
+    const scale = options.size / 960;
+    ctx.setTransform(scale, 0, 0, scale, 0, options.size);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 110;
+    ctx.strokeStyle = cssToken('--fx-color-map-ground', '#F6F0EA');
+    ctx.stroke(path);
+    ctx.fillStyle = options.fill;
+    ctx.fill(path);
 
-      // The glyph lives in Material Symbols' 0/-960/960/960 box; map it onto the canvas.
-      const path = new Path2D(iconPath('flag'));
-      const scale = size / 960;
-      ctx.setTransform(scale, 0, 0, scale, 0, size);
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 110;
-      ctx.strokeStyle = halo;
-      ctx.stroke(path);
-      ctx.fillStyle = colour;
-      ctx.fill(path);
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      map.addImage(`fix-flag-${colour}`, ctx.getImageData(0, 0, size, size), { pixelRatio: 2 });
-    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    map.addImage(id, ctx.getImageData(0, 0, options.size, options.size), { pixelRatio: 2 });
   }
 
   /**
@@ -506,31 +534,35 @@ export class MapView {
   /**
    * A pin at the hand-placed position, the moment it exists (FR-008a feedback). Placing without
    * a mark left the hunter guessing whether — and where — the tap landed; the chip alone says
-   * "the spot you set" without showing the spot. Decorative on the accessibility tree: the
-   * position chip carries the words.
+   * "the spot you set" without showing the spot. Map data, not a DOM marker: DOM markers float
+   * above the whole canvas, and the pin must sit UNDER the reports — a flag planted at the spot
+   * the hunter set has to win. Invisible to the accessibility tree either way; the position
+   * chip carries the words.
    */
   #syncPlacedPin(placed: { lat: number; lon: number } | undefined): void {
-    if (!placed) {
-      this.#placedPin?.remove();
-      this.#placedPin = undefined;
-      return;
-    }
-    const map = this.#map;
-    // Not created yet: the next refresh (~1/s) lands the pin once the map exists.
-    if (!map) return;
+    this.#placedPosition = placed;
+    this.#applyPlacedPin();
+  }
 
-    if (!this.#placedPin) {
-      const pin = el(
-        'div',
-        { class: 'placed-pin', 'data-testid': 'placed-pin', 'aria-hidden': 'true' },
-        icon('edit_location', { label: 'the spot you set' }),
-      );
-      this.#placedPin = new maplibregl.Marker({ element: pin, anchor: 'bottom' })
-        .setLngLat([placed.lon, placed.lat])
-        .addTo(map);
-    } else {
-      this.#placedPin.setLngLat([placed.lon, placed.lat]);
-    }
+  /** Writes the placed position into its source — re-run after style swaps recreate it. */
+  #applyPlacedPin(): void {
+    const source = this.#map?.getSource(PLACED_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    // Not yet: #addLayers re-applies once the source exists again.
+    if (!source) return;
+
+    const placed = this.#placedPosition;
+    source.setData({
+      type: 'FeatureCollection',
+      features: placed
+        ? [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [placed.lon, placed.lat] },
+              properties: {},
+            },
+          ]
+        : [],
+    });
   }
 
   /** Pushes the latest fold to the map, if the style is ready to receive it. */
@@ -693,7 +725,6 @@ export class MapView {
   }
 
   destroy(): void {
-    this.#placedPin?.remove();
     this.#relayPin?.remove();
     this.#map?.remove();
   }

@@ -145,3 +145,11 @@ spec 002's re-skin boundary):
    Tol swatches into blobs), planted at the position via a symbol layer, taller than any
    circle. A found fox finally looks like a found fox.
 5. **Settings note trimmed** — "This switch is for this phone only." removed.
+
+### Round 3 addendum: flag over pin
+
+The placed-position pin was a DOM marker, and DOM markers float above the entire canvas — so
+a fox found at the spot the hunter set drew the pin OVER the flag. The pin is now map data
+(`placed-position` source + symbol layer added before the report layers), which puts every
+report above it by construction, and the flag grew to 44 px. Two test helpers stopped
+guessing coordinates and now hit-test with `elementFromPoint`.

@@ -123,16 +123,26 @@ test('GPS states carry the triple too', async ({ page, context }) => {
   await expect(gps).toHaveAttribute('data-state', 'gps-ok');
 
   // Hand-placement flips the chip to its placed identity — different icon, same calm tier —
-  // and drops a pin at the tap: the placement's receipt, on the map itself.
+  // and drops a pin at the tap: the placement's receipt, on the map itself. The pin is map
+  // data (a canvas layer under the reports, so a planted flag wins), so the assertion reads
+  // the source rather than the DOM.
+  const placedPinCount = (): Promise<number> =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+      const source = map?.getSource('placed-position') as maplibregl.GeoJSONSource | undefined;
+      const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
+      return data?.features?.length ?? 0;
+    });
+
   await page.getByTestId('place-position').click();
   await page.getByTestId('placing-banner').waitFor();
   await tapOpenMap(page);
   await expect(gps).toHaveAttribute('data-state', 'placed');
-  await expect(page.getByTestId('placed-pin')).toBeVisible();
+  await expect.poll(placedPinCount).toBe(1);
   const placed = await look(gps);
   await page.getByTestId('use-device-position').click();
   await expect(gps).toHaveAttribute('data-state', 'gps-ok');
-  await expect(page.getByTestId('placed-pin')).toHaveCount(0);
+  await expect.poll(placedPinCount).toBe(0);
   const ready = await look(gps);
   expect(placed.iconPath).not.toBe(ready.iconPath);
 });

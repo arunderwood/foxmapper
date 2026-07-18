@@ -97,13 +97,20 @@ test('a placement tap inside a wedge places — it does not open the wedge popup
   await page.getByTestId('place-position').click();
   await page.getByTestId('placing-banner').waitFor();
 
-  // Tap deliberately INSIDE the wedge: a point just south of the observer's position.
+  // Tap deliberately INSIDE the wedge: south of the observer's position, at the first depth
+  // where the tap would actually reach the canvas — a fixed offset lands on status chips or
+  // the attribution on a phone viewport, which is this helper-shaped trap all over again.
   const point = await page.evaluate(() => {
     const map = (window as unknown as { __map?: maplibregl.Map }).__map!;
     const projected = map.project([-122.4787, 48.7519]);
-    return { x: projected.x, y: projected.y + 120 };
+    for (let dy = 40; dy <= 260; dy += 20) {
+      const candidate = document.elementFromPoint(projected.x, projected.y + dy);
+      if (candidate instanceof HTMLCanvasElement) return { x: projected.x, y: projected.y + dy };
+    }
+    return null;
   });
-  await page.getByTestId('map').click({ position: point });
+  expect(point, 'no open canvas south of the observer to tap').toBeTruthy();
+  await page.getByTestId('map').click({ position: point! });
 
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
   await expect(page.getByTestId('gps-state')).toHaveAttribute('data-state', 'placed');
