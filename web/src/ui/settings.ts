@@ -8,6 +8,14 @@
  */
 import type { FoxmapperDb } from '../log/store.js';
 import { getMeta, setMeta } from '../log/store.js';
+import {
+  analyticsConfigured,
+  analyticsEnabled,
+  analyticsForcedOff,
+  feedbackAvailable,
+  openFeedback,
+  setAnalyticsEnabled,
+} from '../analytics/posthog.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { dismissSheet } from './report-entry.js';
@@ -85,6 +93,62 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
     ),
     replayTour,
   );
+
+  // The analytics section exists only in a build that was given a PostHog key — a keyless dev or CI
+  // build has no analytics to control, so it shows nothing rather than a dead switch. Within a keyed
+  // build, `forcedOff` means exactly one thing: the browser sent Do Not Track / GPC.
+  if (analyticsConfigured()) {
+    const forcedOff = analyticsForcedOff();
+
+    // Feedback rides the same vendor as analytics, so it is only offered while analytics is live.
+    const feedback = el(
+      'button',
+      {
+        type: 'button',
+        'data-testid': 'send-feedback',
+        ...(feedbackAvailable() ? {} : { hidden: 'true' }),
+      },
+      icon('send', { label: 'Send feedback' }),
+      el('span', {}, 'Send feedback'),
+    );
+    feedback.addEventListener('click', () => {
+      onClose();
+      openFeedback();
+    });
+
+    // Anonymous, opt-out usage and error analytics. Shown disabled under Do Not Track / GPC so the
+    // control never lies about what it can do. Nothing here carries a callsign, position, hunt code,
+    // or frequency — see docs/analytics.md.
+    const analyticsToggle = el('button', {
+      type: 'button',
+      'aria-pressed': String(analyticsEnabled()),
+      'data-testid': 'analytics-toggle',
+      ...(forcedOff ? { disabled: 'true' } : {}),
+    });
+    analyticsToggle.append(
+      icon('cell_tower', { label: 'Anonymous analytics' }),
+      el('span', {}, 'Anonymous analytics'),
+    );
+    analyticsToggle.addEventListener('click', () => {
+      if (forcedOff) return;
+      const on = analyticsToggle.getAttribute('aria-pressed') !== 'true';
+      analyticsToggle.setAttribute('aria-pressed', String(on));
+      setAnalyticsEnabled(on);
+      // When analytics goes off, feedback goes with it.
+      feedback.toggleAttribute('hidden', !feedbackAvailable());
+    });
+
+    const analyticsNote = el(
+      'p',
+      { class: 'small dim' },
+      forcedOff
+        ? 'Your browser has asked apps not to track it, so this stays off.'
+        : 'Anonymous counts of what gets used and what breaks. No callsign, position, hunt code, ' +
+            'or frequency is ever sent. Off honours Do Not Track automatically.',
+    );
+
+    panel.append(analyticsToggle, analyticsNote, feedback);
+  }
 
   backdrop.append(panel);
   backdrop.addEventListener('click', (event) => {

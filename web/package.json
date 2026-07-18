@@ -18,7 +18,8 @@
     "@turf/sector": "^7.1.0",
     "geomagnetism": "^0.2.0",
     "idb": "^8.0.0",
-    "maplibre-gl": "^5.0.0"
+    "maplibre-gl": "^5.0.0",
+    "posthog-js": "^1.404.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

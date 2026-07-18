@@ -10,6 +10,13 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# Vite bakes env at build time, so the PostHog key must be present here, not at runtime. Render
+# passes matching service env vars into the build as args (declared below). Absent — as in a plain
+# `docker build` or CI — analytics stays off, which is the correct default for anything but prod.
+ARG VITE_PUBLIC_POSTHOG_KEY=""
+ARG VITE_PUBLIC_POSTHOG_HOST=""
+ENV VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY
+ENV VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
 RUN npm run build
 
 FROM rust:1.97-slim AS server
