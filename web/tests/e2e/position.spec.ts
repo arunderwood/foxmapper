@@ -16,7 +16,9 @@ import {
   joinAs,
   localReports,
   placePosition,
+  tapOpenMap,
   renderedFeatures,
+  reportBearing,
   reportHeardNothing,
 } from './helpers.js';
 
@@ -63,7 +65,7 @@ test('point-at-map places the position, and the report is filed from there — F
   await page.getByTestId('placing-banner').waitFor();
 
   // The second entry method: tap where you are. Landing straight in the report you asked for.
-  await page.getByTestId('map').click({ position: { x: 180, y: 220 } });
+  await tapOpenMap(page);
   await page.getByTestId('sheet').waitFor();
   await page.getByTestId('send-null').click();
 
@@ -74,6 +76,48 @@ test('point-at-map places the position, and the report is filed from there — F
   // map's "Position set by hand" to be worth reading.
   await expect.poll(async () => (await renderedFeatures(page)).length).toBe(1);
   expect((await renderedFeatures(page))[0]!.placed).toBe(true);
+});
+
+test('a placement tap inside a wedge places — it does not open the wedge popup', async ({
+  browser,
+}) => {
+  // The placement listener consumed the tap and cleared #placing BEFORE the layer-filtered
+  // listener saw the same click — so a tap that landed inside a prior bearing's cone both
+  // placed the position AND opened that report's popup, retract button and all.
+  const context = await browser.newContext();
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 48.7519, longitude: -122.4787 });
+  const page = await context.newPage();
+
+  const code = await createHunt();
+  await joinAs(page, code, 'W7ABC');
+  // A wedge pointing south from the hunter's own position: it covers the ground below centre.
+  await reportBearing(page, 180);
+
+  await page.getByTestId('place-position').click();
+  await page.getByTestId('placing-banner').waitFor();
+
+  // Tap deliberately INSIDE the wedge: south of the observer's position, at the first depth
+  // where the tap would actually reach the canvas — a fixed offset lands on status chips or
+  // the attribution on a phone viewport, which is this helper-shaped trap all over again.
+  const point = await page.evaluate(() => {
+    const map = (window as unknown as { __map?: maplibregl.Map }).__map!;
+    const projected = map.project([-122.4787, 48.7519]);
+    for (let dy = 40; dy <= 260; dy += 20) {
+      const candidate = document.elementFromPoint(projected.x, projected.y + dy);
+      if (candidate instanceof HTMLCanvasElement) return { x: projected.x, y: projected.y + dy };
+    }
+    return null;
+  });
+  expect(point, 'no open canvas south of the observer to tap').toBeTruthy();
+  await page.getByTestId('map').click({ position: point! });
+
+  await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
+  await expect(page.getByTestId('gps-state')).toHaveAttribute('data-state', 'placed');
+  // The whole of the fix: the same tap must NOT have opened the wedge's detail popup.
+  await expect(page.getByTestId('report-detail')).toHaveCount(0);
+
+  await context.close();
 });
 
 test('a placed position is not the map’s default centre', async ({ page }) => {

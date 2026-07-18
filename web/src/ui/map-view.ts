@@ -17,17 +17,33 @@ import { queueChip } from './storage.js';
 import { shareChip } from './share.js';
 import { targetChips, type Target } from './target.js';
 import { RETRACT_LABEL } from '../report/retract.js';
-import { formatTime, el, clear } from './dom.js';
+import { formatTime, el, clear, cssToken } from './dom.js';
+import { icon, iconPath } from './icons.js';
+import { PALETTE } from '../log/colour.js';
+import { KIND_ICONS, type ReportKind } from './report-entry.js';
 import type { PositionState } from '../sensors/position.js';
 
 const WEDGE_SOURCE = 'reports-wedges';
 const MARKER_SOURCE = 'reports-markers';
+/** The hand-placed position, as map data rather than a DOM marker — see #addLayers. */
+const PLACED_SOURCE = 'placed-position';
 
-const LABEL_PAINT = {
-  'text-color': '#f2f5f8',
-  'text-halo-color': '#101418',
-  'text-halo-width': 1.5,
-} as const;
+/**
+ * Resolved when layers are added, not at import: the values come from the token set, and the
+ * stylesheet must be live to answer. Light ink with a dark halo reads on both grounds — the
+ * street style and the blank light fallback.
+ */
+function labelPaint(): {
+  'text-color': string;
+  'text-halo-color': string;
+  'text-halo-width': number;
+} {
+  return {
+    'text-color': cssToken('--md-sys-color-on-surface', '#EFDFDB'),
+    'text-halo-color': cssToken('--md-sys-color-surface', '#191210'),
+    'text-halo-width': 1.5,
+  };
+}
 
 /**
  * Shared by the wedge and marker labels, so a bearing is attributed exactly as loudly as a marker.
@@ -66,6 +82,13 @@ export interface MapViewState {
   onPlace: () => void;
   /** Drops the hand-placed position and goes back to the device's own (FR-008a). */
   onUseDevice: () => void;
+  /** Per-device setting (settings.ts): when false, no relay affordance exists anywhere. */
+  relayMode: boolean;
+  /** Armed relay target: the next report files as this observer's. One report per arming. */
+  relayTarget: { callsign: string; position: { lat: number; lon: number } } | undefined;
+  onOpenSettings: () => void;
+  onBeginRelay: () => void;
+  onCancelRelay: () => void;
 }
 
 /** What the map may do to a report it is drawing. Retraction is the only one. */
@@ -98,10 +121,25 @@ export class MapView {
    * out loud, were both wiped within a second of appearing.
    */
   #shareChip: HTMLElement | undefined;
+  /**
+   * The deepest the queue got this offline stretch — the denominator of the drain progress.
+   * Reset when the queue empties, so the next dead zone starts its own drain from zero.
+   */
+  #queuePeak = 0;
+  /** The hand-placed position, held for re-application when a style swap recreates sources. */
+  #placedPosition: { lat: number; lon: number } | undefined;
+  /** Marks the armed relay target's position while a relayed report is being filed. */
+  #relayPin: maplibregl.Marker | undefined;
+  /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
+  #syncedUntil = 0;
+  #syncedTimer: ReturnType<typeof setTimeout> | undefined;
+  #lastState: MapViewState | undefined;
   /** The most recent fold, kept so it can be re-applied once the style is ready. */
   #pending: RenderedLog | undefined;
   /** Map-level listeners survive a style swap; the layers do not. */
   #clickBound = false;
+  /** The browser event a placement tap consumed — the detail listener must ignore that click. */
+  #placementClick: MouseEvent | TouchEvent | undefined;
   readonly root: HTMLElement;
 
   constructor(options: MapViewOptions) {
@@ -143,6 +181,26 @@ export class MapView {
     const empty = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
     map.addSource(WEDGE_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(MARKER_SOURCE, { type: 'geojson', data: empty() });
+    map.addSource(PLACED_SOURCE, { type: 'geojson', data: empty() });
+
+    // The hand-placed position pin, FIRST: it lives in the canvas (not a DOM marker, which
+    // would float above everything the map draws) precisely so every report renders over it.
+    // The pin is position furniture; a planted "Found it" flag on the same spot must win.
+    this.#glyphImage(map, 'placed-pin-img', 'edit_location', {
+      fill: cssToken('--md-sys-color-primary-container', '#862300'),
+      size: 64,
+    });
+    map.addLayer({
+      id: 'placed-pin',
+      type: 'symbol',
+      source: PLACED_SOURCE,
+      layout: {
+        'icon-image': 'placed-pin-img',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-anchor': 'bottom',
+      },
+    });
 
     // A bearing is a bounded sector: width is the reporter's stated confidence, length their
     // stated range. Both come from the report; neither is a default wearing their name.
@@ -173,26 +231,24 @@ export class MapView {
       type: 'symbol',
       source: WEDGE_SOURCE,
       layout: labelLayout(),
-      paint: LABEL_PAINT,
+      paint: labelPaint(),
     });
 
-    // omni, null and fix: a circle at a position, and nothing that implies a direction. No arrow,
+    // omni and null: a circle at a position, and nothing that implies a direction. No arrow,
     // no cone, no radius — interpreting how much ground a null report kills is fusion.
     map.addLayer({
       id: 'marker-circle',
       type: 'circle',
       source: MARKER_SOURCE,
+      filter: ['!=', ['get', 'kind'], 'fix'],
       paint: {
         // Each kind reads as the claim it is. `omni` is sized by the strength reported — the one
-        // scalar it carries — so two signal reports are not one indistinguishable dot; `fix` is
-        // the biggest and boldest mark on the map. Size never implies a direction.
+        // scalar it carries — so two signal reports are not one indistinguishable dot.
         // Only an omni carries a strength, so the interpolate reads through `to-number` with a
-        // fallback: the `case` above should keep a null from ever reaching it, and this makes the
+        // fallback: the filter should keep a null from ever reaching it, and this makes the
         // radius defined rather than resting on that.
         'circle-radius': [
           'case',
-          ['==', ['get', 'kind'], 'fix'],
-          14,
           ['==', ['get', 'kind'], 'omni'],
           ['interpolate', ['linear'], ['to-number', ['get', 'strength'], 5], 2, 6, 8, 12],
           8,
@@ -205,15 +261,30 @@ export class MapView {
           ['get', 'colour'],
         ],
         'circle-stroke-color': ['get', 'colour'],
-        'circle-stroke-width': [
-          'case',
-          ['==', ['get', 'kind'], 'null'],
-          3,
-          ['==', ['get', 'kind'], 'fix'],
-          5,
-          2,
-        ],
+        'circle-stroke-width': ['case', ['==', ['get', 'kind'], 'null'], 3, 2],
         'circle-opacity': 0.85,
+      },
+    });
+
+    // "Found it" is the report a hunt exists to produce, and it stopped looking like a bigger
+    // signal dot (feedback round 3): it plants the same flag the report bar and popup wear, in
+    // the observer's colour, twice the height of any circle — and, added after the placed-pin
+    // layer, it draws over the pin when the fox is found at the spot the hunter set. One image
+    // per palette swatch, from the shared glyph, so every surface agrees on what it looks like.
+    for (const colour of PALETTE) {
+      this.#glyphImage(map, `fix-flag-${colour}`, 'flag', { fill: colour, size: 88 });
+    }
+    map.addLayer({
+      id: 'fix-flag',
+      type: 'symbol',
+      source: MARKER_SOURCE,
+      filter: ['==', ['get', 'kind'], 'fix'],
+      layout: {
+        'icon-image': ['concat', 'fix-flag-', ['get', 'colour']],
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        // The pole plants at the reported position; the flag flies above it.
+        'icon-anchor': 'bottom',
       },
     });
 
@@ -249,10 +320,48 @@ export class MapView {
       type: 'symbol',
       source: MARKER_SOURCE,
       layout: labelLayout(),
-      paint: LABEL_PAINT,
+      paint: labelPaint(),
     });
 
     this.#bindClick();
+    // The swap that recreated these sources also emptied them; the pin state survives here.
+    this.#applyPlacedPin();
+  }
+
+  /**
+   * A shared glyph rasterized into a map image (the flag markers, the placed pin). The halo is
+   * the LIGHT map ground, not the dark label halo — half the Tol swatches are dark, and a dark
+   * halo turned those glyphs into blobs; a light halo cuts every colour out of the busy street
+   * detail the way a classic map marker does. `size` is device pixels at pixelRatio 2, so the
+   * on-map height is half of it. Re-added after every style swap — `setStyle(diff: false)`
+   * drops images along with the sources.
+   */
+  #glyphImage(
+    map: MapLibreMap,
+    id: string,
+    name: Parameters<typeof iconPath>[0],
+    options: { fill: string; size: number },
+  ): void {
+    if (map.hasImage(id)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = options.size;
+    canvas.height = options.size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // The glyph lives in Material Symbols' 0/-960/960/960 box; map it onto the canvas.
+    const path = new Path2D(iconPath(name));
+    const scale = options.size / 960;
+    ctx.setTransform(scale, 0, 0, scale, 0, options.size);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 110;
+    ctx.strokeStyle = cssToken('--fx-color-map-ground', '#F6F0EA');
+    ctx.stroke(path);
+    ctx.fillStyle = options.fill;
+    ctx.fill(path);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    map.addImage(id, ctx.getImageData(0, 0, options.size, options.size), { pixelRatio: 2 });
   }
 
   /**
@@ -273,11 +382,15 @@ export class MapView {
       const place = this.#placing;
       if (!place) return;
       this.#endPlacing();
+      // Remember the browser event this tap consumed: the layer-filtered listener below fires
+      // for the SAME click, and by then #placing is already cleared — so its guard alone let a
+      // placement tap inside a wedge also open that wedge's popup.
+      this.#placementClick = event.originalEvent;
       place({ lat: event.lngLat.lat, lon: event.lngLat.lng });
     });
 
-    map.on('click', ['wedge-fill', 'marker-circle'], (event) => {
-      if (this.#placing) return;
+    map.on('click', ['wedge-fill', 'marker-circle', 'fix-flag'], (event) => {
+      if (this.#placing || event.originalEvent === this.#placementClick) return;
       const feature = event.features?.[0];
       if (feature) this.#showDetail(event.lngLat, feature.properties as Record<string, unknown>);
     });
@@ -301,7 +414,8 @@ export class MapView {
     this.#banner = el(
       'div',
       { class: 'banner', 'data-testid': 'placing-banner' },
-      el('span', {}, prompt),
+      icon('edit_location', { label: prompt }),
+      el('span', { class: 'banner-text' }, prompt),
       cancel,
     );
     this.root.append(this.#banner);
@@ -315,13 +429,26 @@ export class MapView {
   }
 
   #showDetail(lngLat: maplibregl.LngLat, properties: Record<string, unknown>): void {
-    const lines = [
-      `${String(properties['label'])} — ${describeKind(String(properties['kind']))}`,
-      formatTime(Number(properties['display_at'])),
-    ];
+    const kind = String(properties['kind']) as ReportKind;
+
+    const content = el('div', { class: 'popup', 'data-testid': 'report-detail' });
+
+    // The report's kind identity — same icon, same hue as the bar button that filed it (US3
+    // scenario 3): the popup visibly belongs to the vocabulary the hunter already knows.
+    const title = `${String(properties['label'])} — ${describeKind(kind)}`;
+    content.append(
+      el(
+        'div',
+        { class: `popup-header kind-${kind}` },
+        icon(KIND_ICONS[kind] ?? 'explore', { label: title }),
+        el('span', { class: 'popup-title' }, title),
+      ),
+      el('p', {}, formatTime(Number(properties['display_at']))),
+    );
 
     // Every caveat the report carries travels with it. The map must not read as more certain than
     // the report it is drawing.
+    const lines = [];
     if (properties['relayed']) {
       lines.push(`Relayed by ${String(properties['entered_by'])} over the air`);
     }
@@ -330,8 +457,6 @@ export class MapView {
       lines.push('That phone never checked its clock — time may be off');
     if (properties['clock_suspect'])
       lines.push('That phone’s clock was wrong — time is approximate');
-
-    const content = el('div', { class: 'popup', 'data-testid': 'report-detail' });
     for (const line of lines) content.append(el('p', {}, line));
 
     // FR-010, and only for a report this phone entered. There is no moderator and no appeal: a
@@ -357,7 +482,87 @@ export class MapView {
   update(state: MapViewState): void {
     this.#pending = render(state.fold);
     this.#flush();
+
+    // Drain accounting (FR-011): the peak is the denominator, and reaching zero from a real
+    // drain earns a brief "all shared" confirmation before the bar goes quiet again.
+    if (state.queueDepth > this.#queuePeak) this.#queuePeak = state.queueDepth;
+    if (this.#queuePeak > 0 && state.queueDepth === 0) {
+      this.#queuePeak = 0;
+      this.#syncedUntil = Date.now() + 2000;
+      clearTimeout(this.#syncedTimer);
+      // The bar rebuilds on every position tick anyway; this only guarantees the flash also
+      // *ends* on time when the phone is sitting still.
+      this.#syncedTimer = setTimeout(() => {
+        if (this.#lastState) this.#updateStatus(this.#lastState);
+      }, 2100);
+    }
+
+    this.#lastState = state;
+    this.#syncPlacedPin(state.placed);
+    this.#syncRelayPin(state.relayTarget);
     this.#updateStatus(state);
+  }
+
+  /**
+   * The armed relay target's pin: where the OBSERVER stood, dashed like every relayed mark on
+   * this map. It exists exactly as long as the arming does — dropped on "Report for them",
+   * gone when the report files or the arming is cancelled.
+   */
+  #syncRelayPin(target: MapViewState['relayTarget']): void {
+    if (!target) {
+      this.#relayPin?.remove();
+      this.#relayPin = undefined;
+      return;
+    }
+    const map = this.#map;
+    if (!map) return;
+
+    if (!this.#relayPin) {
+      const pin = el(
+        'div',
+        { class: 'relay-pin', 'data-testid': 'relay-pin', 'aria-hidden': 'true' },
+        icon('record_voice_over', { label: target.callsign }),
+      );
+      this.#relayPin = new maplibregl.Marker({ element: pin, anchor: 'center' })
+        .setLngLat([target.position.lon, target.position.lat])
+        .addTo(map);
+    } else {
+      this.#relayPin.setLngLat([target.position.lon, target.position.lat]);
+    }
+  }
+
+  /**
+   * A pin at the hand-placed position, the moment it exists (FR-008a feedback). Placing without
+   * a mark left the hunter guessing whether — and where — the tap landed; the chip alone says
+   * "the spot you set" without showing the spot. Map data, not a DOM marker: DOM markers float
+   * above the whole canvas, and the pin must sit UNDER the reports — a flag planted at the spot
+   * the hunter set has to win. Invisible to the accessibility tree either way; the position
+   * chip carries the words.
+   */
+  #syncPlacedPin(placed: { lat: number; lon: number } | undefined): void {
+    this.#placedPosition = placed;
+    this.#applyPlacedPin();
+  }
+
+  /** Writes the placed position into its source — re-run after style swaps recreate it. */
+  #applyPlacedPin(): void {
+    const source = this.#map?.getSource(PLACED_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    // Not yet: #addLayers re-applies once the source exists again.
+    if (!source) return;
+
+    const placed = this.#placedPosition;
+    source.setData({
+      type: 'FeatureCollection',
+      features: placed
+        ? [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [placed.lon, placed.lat] },
+              properties: {},
+            },
+          ]
+        : [],
+    });
   }
 
   /** Pushes the latest fold to the map, if the style is ready to receive it. */
@@ -377,6 +582,26 @@ export class MapView {
 
   #updateStatus(state: MapViewState): void {
     clear(this.#statusBar);
+
+    // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
+    // reports" and "only mine" look identical otherwise, and the difference is the whole point.
+    // Each state is an icon + colour + shape triple (data-model.md §3) — never colour alone.
+    // The verb is load-bearing: "Everyone's reports" alone reads as a mystery button, and this
+    // chip exists to answer "am I looking at the whole picture?" — so it says what it is doing.
+    const syncChip = state.live
+      ? el(
+          'span',
+          { class: 'chip ok', 'data-testid': 'sync-state', 'data-state': 'live' },
+          icon('cloud_done', { label: 'Showing everyone’s reports' }),
+          el('span', { class: 'chip-label' }, 'Showing everyone’s reports'),
+        )
+      : el(
+          'span',
+          { class: 'chip warn', 'data-testid': 'sync-state', 'data-state': 'offline' },
+          icon('cloud_off', { label: 'No signal' }),
+          el('span', { class: 'chip-label' }, 'No signal — showing this phone only'),
+        );
+
     const chips: (HTMLElement | undefined)[] = [
       ...targetChips(state.target, state.fold.found),
 
@@ -384,17 +609,20 @@ export class MapView {
       // A creator whose only copy of it is the address bar has not been given anything.
       (this.#shareChip ??= shareChip(state.huntCode)),
 
-      // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
-      // reports" and "only mine" look identical otherwise, and the difference is the whole point.
-      state.live
-        ? el('span', { class: 'chip', 'data-testid': 'sync-state' }, 'Showing everyone’s reports')
-        : el(
-            'span',
-            { class: 'chip warn', 'data-testid': 'sync-state' },
-            'No signal — showing only what this phone has',
-          ),
+      syncChip,
 
-      queueChip(state.queueDepth),
+      queueChip(state.queueDepth, state.live, this.#drainedFraction(state.queueDepth)),
+
+      // The drain just finished: say so, briefly, then get out of the way (FR-011).
+      Date.now() < this.#syncedUntil
+        ? el(
+            'span',
+            { class: 'chip ok', 'data-testid': 'sync-flash' },
+            icon('cloud_done', { label: 'All shared' }),
+            el('span', { class: 'chip-label' }, 'All shared'),
+          )
+        : undefined,
+
       clockWarning(state.clockOffset),
 
       // Where the hunter is reporting from, and how that was established. A report needs one of
@@ -406,21 +634,87 @@ export class MapView {
       state.tilesUnavailable
         ? el(
             'span',
-            { class: 'chip', 'data-testid': 'tiles-state' },
-            'Map background unavailable out here — reports still show',
+            { class: 'chip dim', 'data-testid': 'tiles-state' },
+            icon('layers_clear', { label: 'No map out here' }),
+            el('span', { class: 'chip-label' }, 'No map out here — reports still show'),
           )
         : undefined,
+
+      // Relay: an affordance only when this device opted in (settings), a status only while
+      // armed. Everyone else's status bar never mentions it.
+      ...this.#relayChips(state),
+
+      this.#settingsButton(state.onOpenSettings),
     ];
 
     this.#statusBar.append(...chips.filter((c): c is HTMLElement => c !== undefined));
+  }
+
+  /** How much of this drain is already through: the determinate part of the draining chip. */
+  #drainedFraction(depth: number): number {
+    if (this.#queuePeak === 0) return 0;
+    return (this.#queuePeak - depth) / this.#queuePeak;
+  }
+
+  /**
+   * Relay affordances (feedback round 2): a "report for someone else" action while unarmed,
+   * a "relaying for X" status with its cancel while armed. Absent entirely when relay mode is
+   * off — the fringe feature costs the common case nothing.
+   */
+  #relayChips(state: MapViewState): HTMLElement[] {
+    if (!state.relayMode) return [];
+
+    if (state.relayTarget) {
+      const cancel = el(
+        'button',
+        { type: 'button', class: 'chip-action', 'data-testid': 'cancel-relay' },
+        icon('close', { label: 'Cancel' }),
+        el('span', { class: 'chip-label' }, 'Cancel'),
+      );
+      cancel.addEventListener('click', state.onCancelRelay);
+      return [
+        el(
+          'span',
+          { class: 'chip chip-with-action', 'data-testid': 'relay-armed' },
+          chipStatus('record_voice_over', `Next report files as ${state.relayTarget.callsign}’s`),
+          cancel,
+        ),
+      ];
+    }
+
+    const begin = el(
+      'button',
+      { type: 'button', class: 'chip-action', 'data-testid': 'begin-relay' },
+      icon('record_voice_over', { label: 'Report for someone else' }),
+      el('span', { class: 'chip-label' }, 'Report for someone else'),
+    );
+    begin.addEventListener('click', state.onBeginRelay);
+    return [el('span', { class: 'chip chip-with-action' }, begin)];
+  }
+
+  /** The settings gear: icon-only (universal), and the only door to the per-device switches. */
+  #settingsButton(onOpenSettings: () => void): HTMLElement {
+    const button = el(
+      'button',
+      {
+        type: 'button',
+        class: 'chip-action icon-only',
+        'data-testid': 'open-settings',
+        'aria-label': 'Settings',
+      },
+      icon('settings'),
+    );
+    button.addEventListener('click', onOpenSettings);
+    return el('span', { class: 'chip chip-with-action' }, button);
   }
 
   /** Always offered, never only on failure: a measured fix can be wrong, and FR-008 says so. */
   #placeButton(onPlace: () => void): HTMLElement {
     const button = el(
       'button',
-      { type: 'button', 'data-testid': 'place-position' },
-      'Set where you are',
+      { type: 'button', class: 'chip-action', 'data-testid': 'place-position' },
+      icon('edit_location', { label: 'Set where you are' }),
+      el('span', { class: 'chip-label' }, 'Set where you are'),
     );
     button.addEventListener('click', onPlace);
     return button;
@@ -431,6 +725,7 @@ export class MapView {
   }
 
   destroy(): void {
+    this.#relayPin?.remove();
     this.#map?.remove();
   }
 }
@@ -452,8 +747,13 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 
     return el(
       'span',
-      { class: 'chip', 'data-testid': 'gps-state', 'data-ready': 'true' },
-      el('span', {}, 'Reporting from where you set yourself'),
+      {
+        class: 'chip chip-with-action',
+        'data-testid': 'gps-state',
+        'data-ready': 'true',
+        'data-state': 'placed',
+      },
+      chipStatus('edit_location', 'Reporting from the spot you set'),
       place,
       ...(back ? [back] : []),
     );
@@ -461,8 +761,13 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
   if (state.position.status === 'ready') {
     return el(
       'span',
-      { class: 'chip', 'data-testid': 'gps-state', 'data-ready': 'true' },
-      el('span', {}, 'Reporting from your phone’s position'),
+      {
+        class: 'chip chip-with-action',
+        'data-testid': 'gps-state',
+        'data-ready': 'true',
+        'data-state': 'gps-ok',
+      },
+      chipStatus('my_location', 'Reporting from your phone’s fix'),
       place,
     );
   }
@@ -479,9 +784,28 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 
   return el(
     'span',
-    { class: 'chip danger', 'data-testid': 'gps-state', 'data-ready': 'false' },
-    el('span', {}, message),
+    {
+      class: 'chip danger chip-with-action',
+      'data-testid': 'gps-state',
+      'data-ready': 'false',
+      'data-state': 'gps-lost',
+    },
+    chipStatus('location_disabled', message),
     place,
+  );
+}
+
+/**
+ * The status half of a chip that also hosts actions: one pill, one element. It used to be an
+ * icon and a label as loose siblings fused by negative-margin CSS, which rendered with a seam —
+ * a wrapper is the honest structure.
+ */
+function chipStatus(name: Parameters<typeof icon>[0], label: string): HTMLElement {
+  return el(
+    'span',
+    { class: 'chip-status' },
+    icon(name, { label }),
+    el('span', { class: 'chip-label' }, label),
   );
 }
 
@@ -489,8 +813,9 @@ function positionChip(state: MapViewState, place: HTMLElement): HTMLElement {
 function useDeviceButton(onUseDevice: () => void): HTMLElement {
   const button = el(
     'button',
-    { type: 'button', 'data-testid': 'use-device-position' },
-    'Use my phone’s position',
+    { type: 'button', class: 'chip-action', 'data-testid': 'use-device-position' },
+    icon('my_location', { label: 'Use my phone’s fix' }),
+    el('span', { class: 'chip-label' }, 'Use my phone’s fix'),
   );
   button.addEventListener('click', onUseDevice);
   return button;

@@ -8,7 +8,14 @@
 import type { Report, RetractionReport } from '../log/types.js';
 import { envelope, type AuthorContext } from './author.js';
 
-export const RETRACT_LABEL = 'Take that back';
+/**
+ * "Delete" is what the button does from where the hunter stands: the report leaves the map.
+ * On the wire it is a retraction — a new appended fact, never a removal (Principle IV) — and
+ * that is exactly the constitution's split: the interface speaks plainly, the mapping absorbs
+ * the ugliness. ("Take that back" tried to say the wire semantics out loud and just read as
+ * awkward.)
+ */
+export const RETRACT_LABEL = 'Delete';
 
 /**
  * Appends a retraction. It removes nothing: the retracted report stays in the log forever, and any

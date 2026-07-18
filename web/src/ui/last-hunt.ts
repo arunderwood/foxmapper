@@ -6,9 +6,7 @@
  */
 import { forgetHunt, lastHunt, rememberHunt } from '../log/identity.js';
 
-export type Landing =
-  | { screen: 'hunt'; code: string }
-  | { screen: 'start' };
+export type Landing = { screen: 'hunt'; code: string } | { screen: 'start' };
 
 /**
  * The link wins over memory: a hunter opening a shared link means to go there, whatever they were

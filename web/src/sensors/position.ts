@@ -58,7 +58,9 @@ export function watchPosition(listener: PositionListener): () => void {
       });
     },
     (error) => {
-      listener(error.code === error.PERMISSION_DENIED ? { status: 'denied' } : { status: 'unavailable' });
+      listener(
+        error.code === error.PERMISSION_DENIED ? { status: 'denied' } : { status: 'unavailable' },
+      );
     },
     {
       enableHighAccuracy: true,

@@ -3,10 +3,27 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'playwright-report/**', 'test-results/**'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,
+  {
+    // Dev-time Node scripts (token generation): plain ESM under Node, so the Node globals
+    // have to be declared the same way the worker's are below.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
   {
     // The service worker is plain JS in a worker scope, so `no-undef` applies to it and the
     // ServiceWorkerGlobalScope names have to be declared.

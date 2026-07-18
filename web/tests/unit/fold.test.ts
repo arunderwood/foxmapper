@@ -55,8 +55,8 @@ describe('fold order-independence', () => {
   it('holds under an arbitrary permutation, not just reversal', () => {
     fc.assert(
       fc.property(logWithRealRetractionsArb, fc.integer(), (reports, seed) => {
-        const shuffled = [...reports].sort(
-          (a, b) => ((a.id + String(seed)) < (b.id + String(seed)) ? -1 : 1),
+        const shuffled = [...reports].sort((a, b) =>
+          a.id + String(seed) < b.id + String(seed) ? -1 : 1,
         );
         expect(foldSignature(shuffled)).toEqual(foldSignature(reports));
       }),

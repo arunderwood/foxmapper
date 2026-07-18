@@ -10,6 +10,7 @@
  * it is an **offer, never a gate**: everything works without it.
  */
 import { el } from './dom.js';
+import { icon } from './icons.js';
 
 /**
  * Asks the browser to exempt our storage from eviction.
@@ -69,12 +70,45 @@ export function addToHomeScreenOffer(onDismiss: () => void): HTMLElement | undef
   return notice;
 }
 
-/** The unsynced count, so a hunter knows reports are still stuck on their phone. */
-export function queueChip(depth: number): HTMLElement | undefined {
+/**
+ * The unsynced count, so a hunter knows reports are still stuck on their phone.
+ *
+ * Two states, visibly different (FR-011): **queued** (offline, holding) wears the warn
+ * container; **draining** (back in coverage, sending) wears primary with a determinate
+ * hairline — the count ticking down over a filling track is the app working, not broken.
+ */
+export function queueChip(
+  depth: number,
+  draining: boolean,
+  drainedFraction: number,
+): HTMLElement | undefined {
   if (depth === 0) return undefined;
-  return el(
+
+  const chip = el(
     'span',
-    { class: 'chip warn', 'data-testid': 'queue-depth' },
-    `${depth} report${depth === 1 ? '' : 's'} still on this phone`,
+    {
+      // Queued keeps the warn family but stays a pill: it sits BESIDE the offline chip (which
+      // squares off), and the count is its identity — data-model.md §3.
+      class: draining ? 'chip progress' : 'chip queued',
+      'data-testid': 'queue-depth',
+      'data-state': draining ? 'draining' : 'queued',
+    },
+    icon('upload', { label: 'to send' }),
+    el('span', { class: 'chip-label' }, `${depth} to send`),
   );
+
+  if (draining) {
+    chip.append(
+      el(
+        'span',
+        { class: 'chip-track', 'aria-hidden': 'true' },
+        el('span', {
+          class: 'chip-track-fill',
+          style: `width: ${Math.round(Math.max(0, Math.min(1, drainedFraction)) * 100)}%`,
+        }),
+      ),
+    );
+  }
+
+  return chip;
 }

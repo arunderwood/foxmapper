@@ -94,9 +94,7 @@ export function watchHeading(listener: HeadingListener): () => void {
         magnetic: normalizeHeading(orientation.webkitCompassHeading),
         // -1 means iOS itself does not trust the reading. Passing it through as a number would
         // record "minus one degrees of error", which is worse than admitting we do not know.
-        ...(typeof accuracy === 'number' && accuracy >= 0
-          ? { accuracyDegrees: accuracy }
-          : {}),
+        ...(typeof accuracy === 'number' && accuracy >= 0 ? { accuracyDegrees: accuracy } : {}),
       });
       return;
     }

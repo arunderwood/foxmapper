@@ -130,19 +130,22 @@ describe('each kind renders as its rule says', () => {
       expect(selfLabels).toEqual(['KI7XYZ ·11', 'KI7XYZ ·22']);
     });
 
-    it('says when a position was set by hand', () => {
-      // FR-008: measured and hand-placed are distinguished on the map, not on a tap.
+    it('carries placed on the feature but keeps it out of the map label', () => {
+      // Feedback round 3: with hand-placement a normal entry method, "set by hand" under
+      // every such report drowned the caveat that matters more (the voice hop). The fact
+      // still travels on the feature — the detail popup says it — but the primary view's
+      // label stays the callsign.
       const placed: Report = { ...bearing('a'), position_source: 'placed' };
-      expect(renderOf([placed]).wedges.features[0]!.properties.map_label).toBe(
-        'KI7XYZ\nset by hand',
-      );
+      const feature = renderOf([placed]).wedges.features[0]!;
+      expect(feature.properties.placed).toBe(true);
+      expect(feature.properties.map_label).toBe('KI7XYZ');
     });
 
-    it('carries both caveats at once when both apply', () => {
+    it('keeps the voice hop in the label even on a placed report', () => {
       const both: Report = { ...relayed('a'), position_source: 'placed' };
-      expect(renderOf([both]).wedges.features[0]!.properties.map_label).toBe(
-        'KI7XYZ\nvia W7NET\nset by hand',
-      );
+      const feature = renderOf([both]).wedges.features[0]!;
+      expect(feature.properties.placed).toBe(true);
+      expect(feature.properties.map_label).toBe('KI7XYZ\nvia W7NET');
     });
   });
 
@@ -222,7 +225,9 @@ describe('provenance is in the primary view, not a tooltip', () => {
     };
 
     expect(renderOf([mine]).markers.features[0]!.properties.label).toBe('KI7XYZ');
-    const labels = renderOf([mine, theirs]).markers.features.map((f) => f.properties.label).sort();
+    const labels = renderOf([mine, theirs])
+      .markers.features.map((f) => f.properties.label)
+      .sort();
     expect(labels).toEqual(['KI7XYZ ·11', 'KI7XYZ ·22']);
   });
 });

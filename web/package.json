@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@material/material-color-utilities": "^0.4.0",
     "@playwright/test": "^1.49.0",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/destination": "^7.3.5",

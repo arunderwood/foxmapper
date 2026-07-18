@@ -81,13 +81,11 @@ export const fixReportArb: fc.Arbitrary<FixReport> = baseArb().map((base) => ({
 }));
 
 export function retractionOfArb(targetId: fc.Arbitrary<string>): fc.Arbitrary<RetractionReport> {
-  return fc
-    .tuple(baseArb(), targetId)
-    .map(([base, retracts_id]) => ({
-      ...base,
-      kind: 'retraction' as const,
-      payload: { retracts_id },
-    }));
+  return fc.tuple(baseArb(), targetId).map(([base, retracts_id]) => ({
+    ...base,
+    kind: 'retraction' as const,
+    payload: { retracts_id },
+  }));
 }
 
 /** Every kind our interface can author. */

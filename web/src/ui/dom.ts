@@ -28,3 +28,13 @@ export function clear(node: HTMLElement): void {
 export function formatTime(epochMs: number): string {
   return new Date(epochMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * A design token's current value, for the code paths that paint outside CSS (map labels, the
+ * blank basemap ground). The token set stays the single source of truth
+ * (contracts/design-tokens.md §1); the fallback only exists for a detached document.
+ */
+export function cssToken(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}

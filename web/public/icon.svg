@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FoxMapper">
-  <rect width="512" height="512" fill="#101418" />
-  <!-- A bearing wedge from an observer: the whole product in one mark. Bounded, never a ray. -->
-  <path d="M256 336 L168 128 A224 224 0 0 1 344 128 Z" fill="#e5533d" fill-opacity="0.35" />
-  <path d="M256 336 L168 128 A224 224 0 0 1 344 128 Z" fill="none" stroke="#e5533d" stroke-width="10" stroke-linejoin="round" />
-  <circle cx="256" cy="336" r="30" fill="#4b9fff" stroke="#101418" stroke-width="8" />
+  <!-- The identity mark, evolved (spec 002, R3): same bounded bearing wedge — the whole product
+       in one shape — recoloured to the token palette. Ground is --md-sys-color-surface, the
+       wedge is the fox-rust seed the palette grows from, and the observer dot wears the neutral
+       ink instead of the old accent blue. Strokes sized to survive a 16px favicon; the mark
+       stays inside the 80% safe zone so maskable renders survive a circular crop. -->
+  <rect width="512" height="512" fill="#191210" />
+  <!-- A bearing wedge from an observer: bounded, never a ray. -->
+  <path d="M256 336 L168 128 A224 224 0 0 1 344 128 Z" fill="#E2633C" fill-opacity="0.4" />
+  <path d="M256 336 L168 128 A224 224 0 0 1 344 128 Z" fill="none" stroke="#E2633C" stroke-width="14" stroke-linejoin="round" />
+  <circle cx="256" cy="336" r="34" fill="#EFDFDB" stroke="#191210" stroke-width="10" />
 </svg>

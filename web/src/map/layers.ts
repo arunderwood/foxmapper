@@ -112,7 +112,7 @@ function propertiesOf(report: ObservationReport, ambiguous: ReadonlySet<string>)
     report_id: report.id,
     kind: report.kind,
     label,
-    map_label: mapLabel(label, relayed ? report.entered_by.callsign : undefined, placed),
+    map_label: mapLabel(label, relayed ? report.entered_by.callsign : undefined),
     colour: colourFor(report.observer.callsign),
     relayed,
     ...(relayed ? { entered_by: report.entered_by.callsign } : {}),
@@ -130,15 +130,16 @@ function propertiesOf(report: ObservationReport, ambiguous: ReadonlySet<string>)
 /**
  * The text drawn beside a report.
  *
- * Both caveats are here rather than in the popup because the constitution puts them in the primary
- * view: a relayed report crossed a voice hop where error enters, and a hand-placed position is
- * somebody's estimate of where they stood. A reader who has to tap to learn either one is reading a
- * map that looks more certain than it is.
+ * The voice hop stays in the primary view: a relayed report crossed the place where error
+ * enters, its outline dashes to mark it, and only words can say who carried it. The
+ * hand-placed caveat moved to the detail popup by maintainer call (feedback round 3): with
+ * placement being the normal entry method for whole classes of hunters, "set by hand" on
+ * every such report was clutter drowning the caveat that matters more — `placed` still
+ * travels on the feature and the popup still says it.
  */
-function mapLabel(label: string, enteredBy: string | undefined, placed: boolean): string {
+function mapLabel(label: string, enteredBy: string | undefined): string {
   const lines = [label];
   // Names the operator as well as marking the hop — a shape can mark it, but only words can say who.
   if (enteredBy) lines.push(`via ${enteredBy}`);
-  if (placed) lines.push('set by hand');
   return lines.join('\n');
 }

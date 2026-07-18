@@ -5,9 +5,7 @@
  * sync.ts sends it whenever it can. Nothing here awaits the network, which is what makes
  * "connectivity loss cannot lose or block a report" a structural property rather than a promise.
  */
-import type {
-  ClockOffset,
-} from '../log/clock.js';
+import type { ClockOffset } from '../log/clock.js';
 import type { Identity } from '../log/identity.js';
 import type { Position, PositionSource, Report } from '../log/types.js';
 import { FORMAT_VERSION } from '../log/types.js';

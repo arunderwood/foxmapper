@@ -10,17 +10,24 @@
  */
 import { huntLink } from './last-hunt.js';
 import { el } from './dom.js';
+import { icon } from './icons.js';
 
-/** The code, always readable, tapping to share or copy the link. */
+/**
+ * The code, always readable; the whole chip is the tap target — a gloved thumb gets the full
+ * 56px, not a nested 24px pill (SC-002). Share is one of the three sanctioned icon-first
+ * affordances, and the code beside it is its own label.
+ */
 export function shareChip(huntCode: string): HTMLElement {
   const button = el(
     'button',
     {
       type: 'button',
+      class: 'chip-action',
       'data-testid': 'share-hunt',
       'aria-label': `Hunt code ${huntCode} — tap to share`,
     },
-    huntCode,
+    icon('share', { label: huntCode }),
+    el('span', { class: 'chip-label mono' }, huntCode),
   );
 
   const status = el('span', { class: 'small dim', 'data-testid': 'share-status' });
@@ -29,7 +36,7 @@ export function shareChip(huntCode: string): HTMLElement {
     void share(huntCode, status);
   });
 
-  return el('span', { class: 'chip', 'data-testid': 'hunt-code' }, button, status);
+  return el('span', { class: 'chip chip-with-action', 'data-testid': 'hunt-code' }, button, status);
 }
 
 /**

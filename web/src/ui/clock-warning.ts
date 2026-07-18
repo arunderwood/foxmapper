@@ -7,16 +7,19 @@
  */
 import { isSkewed, type ClockOffset } from '../log/clock.js';
 import { el } from './dom.js';
+import { icon } from './icons.js';
 
 export function clockWarning(offset: ClockOffset): HTMLElement | undefined {
   if (!isSkewed(offset)) return undefined;
 
   const minutes = Math.round(Math.abs(offset ?? 0) / 60_000);
-  const direction = (offset ?? 0) > 0 ? 'ahead of' : 'behind';
+  const direction = (offset ?? 0) > 0 ? 'ahead' : 'behind';
+  const text = `Clock about ${minutes} min ${direction} — your report times will look wrong to others`;
 
   return el(
     'div',
     { class: 'chip warn', 'data-testid': 'clock-warning' },
-    `Your clock is about ${minutes} min ${direction} real time — your report times will look wrong to others`,
+    icon('schedule', { label: text }),
+    el('span', { class: 'chip-label' }, text),
   );
 }

@@ -32,19 +32,23 @@ import {
 } from './log/store.js';
 import { getOffset, measureOffset, type ClockOffset } from './log/clock.js';
 import { Sync } from './log/sync.js';
-import type { Log, Report } from './log/types.js';
+import { isRelayed, type Log, type Report } from './log/types.js';
 import { watchPosition, type PositionState } from './sensors/position.js';
 import { decideLanding, huntIsGone } from './ui/last-hunt.js';
 import { joinScreen, targetLine } from './ui/join.js';
 import { MapView } from './ui/map-view.js';
 import {
   bearingSheet,
+  dismissSheet,
   omniSheet,
   reportBar,
   simpleSheet,
   type ReportKind,
 } from './ui/report-entry.js';
 import { canRetract, composeRetraction } from './report/retract.js';
+import { relayContext, type RelayDetails } from './report/relay.js';
+import { loadRelayMode, openSettings } from './ui/settings.js';
+import { openRelaySheet } from './ui/relay-entry.js';
 import type { AuthorContext } from './report/author.js';
 import { addToHomeScreenOffer, requestPersistence } from './ui/storage.js';
 import type { Target } from './ui/target.js';
@@ -74,6 +78,10 @@ class App {
   #position: PositionState = { status: 'acquiring' };
   /** Set by hand on the map. Outranks the device fix: the hunter placed it because GPS was wrong. */
   #placed: { lat: number; lon: number } | undefined;
+  /** Per-device (settings.ts): relay affordances exist only when this is on. */
+  #relayMode = false;
+  /** Armed relay target: the next observation files as this observer's, then disarms. */
+  #relayTarget: RelayDetails | undefined;
   #clockOffset: ClockOffset = null;
   #queueDepth = 0;
   #live = false;
@@ -89,6 +97,7 @@ class App {
     this.#db = await openLogDb();
     // An offer, never a gate: if this is denied, everything still works.
     void requestPersistence();
+    this.#relayMode = await loadRelayMode(this.#db);
 
     const landing = decideLanding();
     if (landing.screen === 'start') {
@@ -278,7 +287,7 @@ class App {
       el(
         'div',
         { class: 'screen', 'data-testid': 'start-screen' },
-        el('h1', {}, 'FoxMapper'),
+        el('h1', { class: 'display' }, 'FoxMapper'),
         el('p', { class: 'dim' }, 'A shared map of who heard what, and from where.'),
         el('label', {}, 'What are you hunting?'),
         label,
@@ -334,8 +343,17 @@ class App {
 
     // The bar goes inside the map view, not into a second wrapper: nesting .map-view in itself
     // leaves the inner one with no height to fill.
-    this.#view.root.append(reportBar((kind) => this.#openEntry(kind)));
+    const bar = reportBar((kind) => this.#openEntry(kind));
+    this.#view.root.append(bar);
     this.#root.append(this.#view.root);
+
+    // The attribution offsets itself from the bar's *measured* height (FR-014: the licence
+    // stays clear of the controls). The bar's height is content-driven — labels wrap on narrow
+    // phones — so a constant here is a regression waiting for a small screen.
+    const viewRoot = this.#view.root;
+    new ResizeObserver(() => {
+      viewRoot.style.setProperty('--fx-report-bar-height', `${bar.offsetHeight}px`);
+    }).observe(bar);
 
     const offer = addToHomeScreenOffer(() => {});
     if (offer) this.#root.append(offer);
@@ -401,10 +419,17 @@ class App {
     }
 
     const options = {
-      context: () => this.#authorContext(),
+      // Own or relayed, decided here and nowhere else: an armed target wraps the context so the
+      // report files as the observer's (SC-011). Retractions bypass this — #retractionContext
+      // uses the raw #authorContext, because withdrawing is always the participant's own act.
+      context: () => {
+        const base = this.#authorContext();
+        if (!base) return undefined;
+        return this.#relayTarget ? relayContext(base, this.#relayTarget) : base;
+      },
       onSubmit: (report: Report) => void this.#submit(report),
     };
-    const close = (): void => sheetNode.remove();
+    const close = (): void => dismissSheet(sheetNode);
     const sheetNode =
       kind === 'bearing'
         ? bearingSheet(options, close)
@@ -484,6 +509,10 @@ class App {
   }
 
   async #submit(report: Report): Promise<void> {
+    // One report per arming: the relayed observation just filed, so the target disarms and the
+    // pin lifts. Relaying twice for the same hunter is two deliberate acts, not a sticky mode.
+    if (this.#relayTarget && isRelayed(report)) this.#relayTarget = undefined;
+
     // Durable first, then rendered, then sent. The order is the whole of Principle III.
     await putAuthored(this.#db, report);
     this.#log = add(this.#log, report);
@@ -506,6 +535,35 @@ class App {
       onPlace: () => this.#placePosition(),
       onUseDevice: () => {
         this.#placed = undefined;
+        this.#refresh();
+      },
+      relayMode: this.#relayMode,
+      relayTarget: this.#relayTarget
+        ? {
+            callsign: this.#relayTarget.observerCallsign,
+            position: this.#relayTarget.observerPosition,
+          }
+        : undefined,
+      onOpenSettings: () =>
+        openSettings({
+          db: this.#db,
+          relayMode: this.#relayMode,
+          onRelayMode: (enabled) => {
+            this.#relayMode = enabled;
+            // Switching relay off mid-arming disarms: an invisible armed target is a report
+            // waiting to wear the wrong name.
+            if (!enabled) this.#relayTarget = undefined;
+            this.#refresh();
+          },
+        }),
+      onBeginRelay: () =>
+        openRelaySheet((details) => {
+          this.#relayTarget = details;
+          this.#view?.center([details.observerPosition.lon, details.observerPosition.lat]);
+          this.#refresh();
+        }),
+      onCancelRelay: () => {
+        this.#relayTarget = undefined;
         this.#refresh();
       },
     });

@@ -43,11 +43,38 @@ export async function joinAs(page: Page, code: string, callsign: string): Promis
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
 }
 
+/**
+ * Taps the map on genuinely open ground, found by hit-testing rather than arithmetic. Every
+ * guessed point has eventually landed on chrome as the UI evolved — (200,200) on grown chips,
+ * a 0.7-height fraction on the settings gear, a measured chip/bar midpoint on the expanded
+ * attribution control. `elementFromPoint` answers the only question that matters: would this
+ * tap reach the canvas?
+ */
+export async function tapOpenMap(page: Page): Promise<void> {
+  const map = page.getByTestId('map');
+  const mapBox = await map.boundingBox();
+  if (!mapBox) throw new Error('map has no box');
+
+  const x = mapBox.x + mapBox.width / 2;
+  const y = await page.evaluate(
+    ({ x, top, height }) => {
+      for (let fraction = 0.35; fraction < 0.95; fraction += 0.05) {
+        const cy = top + height * fraction;
+        if (document.elementFromPoint(x, cy) instanceof HTMLCanvasElement) return cy;
+      }
+      return null;
+    },
+    { x, top: mapBox.y, height: mapBox.height },
+  );
+  if (y === null) throw new Error('no open map ground to tap');
+  await map.click({ position: { x: mapBox.width / 2, y: Math.round(y - mapBox.y) } });
+}
+
 /** Places the reporting position by hand: the point-at-map method (FR-008a). */
 export async function placePosition(page: Page): Promise<void> {
   await page.getByTestId('place-position').click();
   await page.getByTestId('placing-banner').waitFor();
-  await page.getByTestId('map').click({ position: { x: 200, y: 200 } });
+  await tapOpenMap(page);
   await page.locator('[data-testid="gps-state"][data-ready="true"]').waitFor();
 }
 

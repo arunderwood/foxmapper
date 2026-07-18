@@ -1,0 +1,206 @@
+#!/usr/bin/env node
+/**
+ * Generates web/src/ui/tokens.css — the design system's single source of truth.
+ *
+ * Seed: fox rust #E2633C, the colour the identity mark's bearing wedge already wears.
+ * Dark scheme only, by decision (spec assumption): this script hard-fails if asked for light.
+ *
+ * The output is committed. This script is a convenience for regenerating the reference tier,
+ * not a runtime dependency — if @material/material-color-utilities ever dies, the committed
+ * CSS stands alone and can be edited by hand. Deterministic: same seed, same bytes.
+ *
+ * A block marked HAND-TUNED below survives regeneration verbatim: values in it were adjusted
+ * against the contrast floors (contracts/design-tokens.md) and the unit test
+ * tests/unit/contrast.test.ts is the arbiter of every value, generated or tuned.
+ */
+// Deep relative imports: the package's barrel (index.js) uses extensionless ESM specifiers
+// Node rejects, and its exports map allows nothing but the barrel. Relative paths bypass the
+// map; the internal modules themselves use proper explicit-.js specifiers. Stable while the
+// version is pinned — and if this ever breaks, the committed tokens.css needs no script.
+import { Hct } from '../node_modules/@material/material-color-utilities/hct/hct.js';
+import { TonalPalette } from '../node_modules/@material/material-color-utilities/palettes/tonal_palette.js';
+import {
+  argbFromHex,
+  hexFromArgb,
+} from '../node_modules/@material/material-color-utilities/utils/string_utils.js';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SEED = '#E2633C';
+const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ui', 'tokens.css');
+
+if (process.argv.includes('--scheme=light')) {
+  console.error('FoxMapper is dark-only (spec 002, assumption). No light tokens are emitted.');
+  process.exit(1);
+}
+
+const seed = Hct.fromInt(argbFromHex(SEED));
+
+// M3's palette construction: primary at the seed's chroma, neutrals tinted by the seed hue.
+const palettes = {
+  primary: TonalPalette.fromHueAndChroma(seed.hue, Math.max(48, seed.chroma)),
+  neutral: TonalPalette.fromHueAndChroma(seed.hue, 5),
+  'neutral-variant': TonalPalette.fromHueAndChroma(seed.hue, 10),
+  error: TonalPalette.fromHueAndChroma(25, 84),
+};
+
+const tone = (palette, t) => hexFromArgb(palettes[palette].tone(t)).toUpperCase();
+
+/** Reference-tier steps actually consumed below — nothing speculative is emitted. */
+const REF_TONES = {
+  primary: [20, 30, 80, 90],
+  neutral: [6, 12, 17, 90, 95],
+  'neutral-variant': [30, 60, 80],
+  error: [30, 80, 90],
+};
+
+/** System tier: role → reference step. */
+const SYSTEM = {
+  surface: ['neutral', 6],
+  'surface-container': ['neutral', 12],
+  'surface-container-high': ['neutral', 17],
+  'on-surface': ['neutral', 90],
+  'on-surface-variant': ['neutral-variant', 80],
+  outline: ['neutral-variant', 60],
+  'outline-variant': ['neutral-variant', 30],
+  primary: ['primary', 80],
+  'on-primary': ['primary', 20],
+  'primary-container': ['primary', 30],
+  'on-primary-container': ['primary', 90],
+  error: ['error', 80],
+  'error-container': ['error', 30],
+  'on-error-container': ['error', 90],
+};
+
+/** The HAND-TUNED block survives regeneration verbatim. */
+const TUNED_BEGIN =
+  '  /* ---- HAND-TUNED (survives regeneration; contrast test is the arbiter) ---- */';
+const TUNED_END = '  /* ---- end HAND-TUNED ---- */';
+
+function existingTunedBlock() {
+  try {
+    const current = readFileSync(OUT, 'utf8');
+    const begin = current.indexOf(TUNED_BEGIN);
+    const end = current.indexOf(TUNED_END);
+    if (begin !== -1 && end !== -1) return current.slice(begin, end + TUNED_END.length);
+  } catch {
+    /* first generation */
+  }
+  return [
+    TUNED_BEGIN,
+    '  /* Extension roles M3 does not name, audited in research.md R2. Semantic statuses',
+    '     (never the only channel — icon and shape always accompany them), the CVD-safe',
+    '     report-kind hues (Tol-family, see contracts/iconography.md), and the blank-basemap',
+    '     ground — light on purpose: the per-callsign wire palette is tuned for a street map',
+    '     and must stay legible when the streets never arrive (docs/log-format.md). */',
+    '  --fx-color-warn: #FFCB69;',
+    '  --fx-color-warn-container: #4A3200;',
+    '  --fx-color-on-warn-container: #FFE0A6;',
+    '  --fx-color-ok: #8CD5B0;',
+    '  --fx-kind-bearing: #FFB598;',
+    '  --fx-kind-signal: #88CCEE;',
+    '  --fx-kind-null: #DDCC77;',
+    '  --fx-kind-fix: #44AA99;',
+    '  --fx-color-map-ground: #F6F0EA;',
+    '  /* Scrims: the only sanctioned translucency (surface-tinted; avoids color-mix for iOS 16). */',
+    '  --fx-color-scrim: rgba(25, 18, 16, 0.94);',
+    '  --fx-color-scrim-transparent: rgba(25, 18, 16, 0);',
+    '  --fx-color-backdrop: rgba(0, 0, 0, 0.6);',
+    TUNED_END,
+  ].join('\n');
+}
+
+const lines = [];
+lines.push('/*');
+lines.push(' * Design tokens — generated by scripts/generate-tokens.mjs. COMMITTED, not built.');
+lines.push(` * Seed ${SEED} (fox rust — the identity mark's wedge colour). Dark scheme only.`);
+lines.push(' *');
+lines.push(' * THE CONTRACT (specs/002-material3-ui-redesign/contracts/design-tokens.md):');
+lines.push(' * this file is the only place a colour, radius, easing, duration, opacity step,');
+lines.push(
+  ' * or type-scale value may be defined. Components consume var(--md-sys-*)/var(--fx-*).',
+);
+lines.push(' * Contrast floors are enforced by tests/unit/contrast.test.ts: 7:1 glanceable,');
+lines.push(' * 4.5:1 body, 3:1 non-text. The per-callsign palette in src/log/colour.ts is wire');
+lines.push(' * format (docs/log-format.md), not a token, and is never defined or overridden here.');
+lines.push(' *');
+lines.push(' * Regenerate: node scripts/generate-tokens.mjs   (HAND-TUNED block is preserved)');
+lines.push(' */');
+lines.push('');
+lines.push(':root {');
+lines.push('  /* ---- Reference tier (generated tonal palettes) ---- */');
+for (const [palette, tones] of Object.entries(REF_TONES)) {
+  for (const t of tones) {
+    lines.push(`  --md-ref-palette-${palette}-${t}: ${tone(palette, t)};`);
+  }
+}
+lines.push('');
+lines.push('  /* ---- System tier: colour ---- */');
+for (const [role, [palette, t]] of Object.entries(SYSTEM)) {
+  lines.push(`  --md-sys-color-${role}: var(--md-ref-palette-${palette}-${t});`);
+}
+lines.push('');
+lines.push(existingTunedBlock());
+lines.push('');
+lines.push(
+  '  /* ---- System tier: type scale (system stack; expressive scale, zero webfont bytes) ---- */',
+);
+lines.push("  --fx-font: system-ui, -apple-system, 'Segoe UI', sans-serif;");
+lines.push('  --fx-font-mono: ui-monospace, monospace;');
+lines.push('  --md-sys-typescale-display-size: 2.25rem;');
+lines.push('  --md-sys-typescale-display-weight: 800;');
+lines.push('  --md-sys-typescale-display-line-height: 1.15;');
+lines.push('  --md-sys-typescale-display-tracking: -0.02em;');
+lines.push('  --md-sys-typescale-headline-size: 1.5rem;');
+lines.push('  --md-sys-typescale-headline-weight: 700;');
+lines.push('  --md-sys-typescale-headline-line-height: 1.2;');
+lines.push('  --md-sys-typescale-title-size: 1.125rem;');
+lines.push('  --md-sys-typescale-title-weight: 650;');
+lines.push('  --md-sys-typescale-title-line-height: 1.25;');
+lines.push('  --md-sys-typescale-body-size: 1rem;');
+lines.push('  --md-sys-typescale-body-weight: 400;');
+lines.push('  --md-sys-typescale-body-line-height: 1.5;');
+lines.push('  --md-sys-typescale-label-size: 0.8125rem;');
+lines.push('  --md-sys-typescale-label-weight: 600;');
+lines.push('  --md-sys-typescale-label-line-height: 1.3;');
+lines.push('  --md-sys-typescale-label-tracking: 0.01em;');
+lines.push('');
+lines.push('  /* ---- System tier: shape ---- */');
+lines.push('  --md-sys-shape-corner-none: 0;');
+lines.push('  --md-sys-shape-corner-small: 8px;');
+lines.push('  --md-sys-shape-corner-medium: 12px;');
+lines.push('  --md-sys-shape-corner-large: 16px;');
+lines.push('  --md-sys-shape-corner-extra-large: 28px;');
+lines.push('  --md-sys-shape-corner-full: 999px;');
+lines.push('');
+lines.push(
+  '  /* ---- System tier: motion (calm instrument, expressive moments — spec FR-005) ---- */',
+);
+lines.push('  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);');
+lines.push('  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);');
+lines.push('  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);');
+lines.push('  --md-sys-motion-duration-short: 150ms;');
+lines.push('  --md-sys-motion-duration-medium: 300ms;');
+lines.push('  --md-sys-motion-duration-exit: 200ms;');
+lines.push('');
+lines.push(
+  '  /* ---- System tier: state layers (pressed boosted — a sunlit screen hides 12%) ---- */',
+);
+lines.push('  --md-sys-state-hover-opacity: 0.08;');
+lines.push('  --md-sys-state-focus-opacity: 0.1;');
+lines.push('  --md-sys-state-pressed-opacity: 0.16;');
+lines.push('');
+lines.push(
+  '  /* ---- Field constants: minimums, never targets (contracts/design-tokens.md §5) ---- */',
+);
+lines.push('  --fx-touch: 56px; /* gloved thumb; consumed only as min-height/min-width */');
+lines.push('  --fx-input-font: 16px; /* below this iOS zooms the viewport on focus */');
+lines.push('');
+lines.push('  color-scheme: dark;');
+lines.push('}');
+lines.push('');
+
+mkdirSync(dirname(OUT), { recursive: true });
+writeFileSync(OUT, lines.join('\n'));
+console.log(`wrote ${OUT}`);
