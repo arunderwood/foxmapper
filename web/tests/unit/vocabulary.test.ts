@@ -73,6 +73,14 @@ describe('the vocabulary firewall', () => {
     expect(surfaces).toContain('src/main.ts');
   });
 
+  it('covers the tour copy, which teaches a newcomer their first words (FR-011)', () => {
+    // The tour is the very first thing a first-timer reads, so protocol vocabulary leaking into it
+    // would be the worst place of all. `sourceFiles('src/ui')` already recurses into the tour
+    // directory, so the per-file scan below already checks it — this names the file so a future
+    // move of the tour out of `src/ui` cannot silently drop it from the firewall.
+    expect(surfaces).toContain('src/ui/tour/steps.ts');
+  });
+
   it.each(surfaces)('%s speaks no protocol vocabulary', (file) => {
     const offenders = literals(readFileSync(file, 'utf8')).filter((text) =>
       JARGON.some((pattern) => pattern.test(text)),

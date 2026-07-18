@@ -1,0 +1,187 @@
+/*
+ * The product tour: offer, scrim, spotlight, callout (contracts/tour-overlay.md).
+ *
+ * Like the rest of the app this file consumes tokens and defines none. It sits above the map and
+ * the status bar but is a transient guest — nothing here changes the layout underneath. Motion is
+ * expressed as ordinary transitions so the global reduced-motion kill in app.css neutralises it
+ * with no local special-casing; the explicit block at the foot is belt-and-braces for the spotlight
+ * move, the one thing that animates position.
+ */
+
+/* The first-run offer: a card that floats over the map without blocking it. Above the status bar
+   (z-index 3) but below the sheets (10) and the tour overlay (20) — it is an invitation, not a
+   gate. */
+.tour-offer {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  /* `bottom` is set in JS to sit just above the report bar's live position — the bar is not always
+     at the viewport edge (an install prompt can push it up), so a CSS constant cannot place this.
+     The value here is only the pre-measurement fallback. */
+  bottom: calc(var(--fx-report-bar-height, calc(var(--fx-touch) + 1rem)) + 0.75rem);
+  z-index: 8;
+  width: min(28rem, calc(100vw - 2rem));
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  padding: 1rem;
+  box-shadow: var(--md-sys-elevation-3, 0 8px 24px rgba(0, 0, 0, 0.35));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* The whole point of the offer is that it costs nothing to ignore (FR-002). It is *pointer
+     transparent*: taps fall through to the map and the controls beneath it, and only its own two
+     buttons catch a tap. So declining or reporting is never a tap the offer stole, on any screen —
+     which a positioned card, on a phone where the status bar and report bar leave no clear band,
+     otherwise could not promise. */
+  pointer-events: none;
+}
+
+.tour-offer button {
+  pointer-events: auto;
+  /* The field touch floor applies here as everywhere (SC-002): a gloved thumb, 56px minimum. */
+  min-height: var(--fx-touch);
+  padding: 0 1.25rem;
+}
+
+.tour-offer-text {
+  margin: 0;
+}
+
+.tour-offer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* The overlay proper. A full-viewport dialog; the darkening is done by the spotlight's box-shadow,
+   not a background here, so the one hole in the scrim tracks the highlighted control exactly. */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+/* The spotlight: a transparent rectangle over the anchor whose vast box-shadow IS the scrim, so the
+   control it frames stays lit while everything else dims. Pointer-transparent — a tap on the
+   control lands on the overlay behind it, which exits. Its position is re-measured every frame in
+   JS (it tracks a control the status bar can reflow under it), so it carries no CSS transition —
+   which also means there is nothing here for the reduced-motion preference to have to switch off. */
+.tour-spotlight {
+  position: fixed;
+  border-radius: var(--md-sys-shape-corner-medium, 12px);
+  box-shadow: 0 0 0 100vmax var(--fx-color-scrim, rgba(0, 0, 0, 0.62));
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+  pointer-events: none;
+}
+
+/* When there is nothing to point at, the scrim still has to darken the screen — the spotlight is
+   hidden, so a plain backdrop stands in. */
+.tour-overlay.tour-centred::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--fx-color-scrim, rgba(0, 0, 0, 0.62));
+}
+
+/* The step bubble. Positioned top or bottom so it never covers the control it describes (FR-006);
+   centred when there is no anchor. */
+.tour-callout {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  width: min(30rem, calc(100vw - 2rem));
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-corner-large);
+  padding: 1.25rem;
+  box-shadow: var(--md-sys-elevation-3, 0 8px 24px rgba(0, 0, 0, 0.45));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tour-callout:focus {
+  outline: none;
+}
+
+.tour-callout-bottom {
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.tour-callout-top {
+  top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.tour-overlay.tour-centred .tour-callout {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+.tour-step-title {
+  margin: 0;
+  font: var(--md-sys-typescale-title-weight) var(--md-sys-typescale-title-size) /
+    var(--md-sys-typescale-title-line-height) var(--fx-font);
+}
+
+.tour-step-body {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tour-progress {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-weight) var(--md-sys-typescale-label-size) /
+    var(--md-sys-typescale-label-line-height) var(--fx-font);
+}
+
+/* Exit sits apart on the left; Back and the primary Next/Done group on the right. */
+.tour-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tour-controls .tour-exit {
+  margin-right: auto;
+}
+
+/* The scripted estimate sample (FR-014): a soft region, never a point. */
+.tour-sample {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+  color: var(--fx-kind-bearing, var(--md-sys-color-primary));
+}
+
+.tour-sample-figure {
+  width: min(14rem, 100%);
+  height: auto;
+}
+
+.tour-sample-caption {
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-weight) var(--md-sys-typescale-label-size) /
+    var(--md-sys-typescale-label-line-height) var(--fx-font);
+  text-align: center;
+}
+
+/* Announced, not shown: the off-screen live region that reads each step aloud. */
+.tour-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+}

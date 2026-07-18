@@ -49,6 +49,8 @@ import { canRetract, composeRetraction } from './report/retract.js';
 import { relayContext, type RelayDetails } from './report/relay.js';
 import { loadRelayMode, openSettings } from './ui/settings.js';
 import { openRelaySheet } from './ui/relay-entry.js';
+import { markCompleted, markDeclined, readTourState } from './ui/tour/state.js';
+import { offerTour, runTour } from './ui/tour/tour.js';
 import type { AuthorContext } from './report/author.js';
 import { addToHomeScreenOffer, requestPersistence } from './ui/storage.js';
 import type { Target } from './ui/target.js';
@@ -407,6 +409,45 @@ class App {
       this.#live = false;
       this.#refresh();
     });
+
+    // The first hunt view is where the buttons and fields actually live, so it is where a
+    // first-timer is offered the tour (FR-001). An offer, never a gate: the map is already live
+    // above, and declining or ignoring it blocks nothing.
+    void this.#maybeOfferTour();
+  }
+
+  /**
+   * Offers the guided tour the first time this device reaches a hunt view (FR-001/FR-013).
+   *
+   * The check is local and the state is device-scoped: a returning participant — completed or
+   * declined — is not asked again, and no version bump re-offers on its own. They reach the current
+   * tour through Settings (FR-003). Reads no network; a fresh device offline still gets the offer.
+   */
+  async #maybeOfferTour(): Promise<void> {
+    const state = await readTourState(this.#db);
+    if (state.status !== 'unseen') return;
+    offerTour({
+      root: this.#root,
+      // Accepting from the offer means exiting early counts as declining (FR-013).
+      onAccept: () => this.#startTour(true),
+      onDecline: () => void markDeclined(this.#db),
+    });
+  }
+
+  /**
+   * Runs the overlay. `fromOffer` distinguishes the first-run offer — where exiting early is a
+   * decline — from a relaunch out of Settings, where exiting leaves the recorded status untouched
+   * (contracts/tour-state.md). Finishing always records completion and leaves a live hunt view
+   * (FR-015) — the overlay simply lifts off the map that is already running beneath it.
+   */
+  #startTour(fromOffer: boolean): void {
+    runTour({
+      root: this.#root,
+      onFinish: () => void markCompleted(this.#db),
+      onExit: () => {
+        if (fromOffer) void markDeclined(this.#db);
+      },
+    });
   }
 
   #openEntry(kind: ReportKind): void {
@@ -557,6 +598,8 @@ class App {
             if (!enabled) this.#relayTarget = undefined;
             this.#refresh();
           },
+          // Relaunch from Settings (FR-003): not the first-run offer, so exiting leaves state as is.
+          onReplayTour: () => this.#startTour(false),
         }),
       onBeginRelay: () =>
         openRelaySheet((details) => {

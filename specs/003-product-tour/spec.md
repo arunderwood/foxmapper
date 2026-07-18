@@ -16,7 +16,7 @@
 - Q: When the tour's content materially changes (version bump), what happens for a device that already completed an older version? → A: No re-offer for now — the version is recorded but a bump does not itself re-offer the tour; how to re-offer after a material change is decided per-update, out of scope here. Returning users still reach the current tour via the manual relaunch affordance (FR-003).
 - Q: Which surfaces beyond the core loop should the first-visit tour include? → A: Core loop only — join/target, map + estimate, the three report kinds, and share. Retract, settings, and relay are out of the guided walkthrough (relay only surfaces at all when its per-device mode is on, per the edge case).
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - A first-timer is walked through the hunt loop (Priority: P1)
 
@@ -38,7 +38,7 @@ three report kinds (bearing, signal-strength, "I hear nothing here") are each sh
 credible-region/uncertainty display is called out honestly, and that finishing lands on a usable
 hunt view. Verify declining leaves the app immediately usable with no added steps.
 
-**Field Validation** *(deferred milestone — not a gate)*: A hunter who has never seen FoxMapper is
+**Field Validation** _(deferred milestone — not a gate)_: A hunter who has never seen FoxMapper is
 handed a phone at the start of a real hunt, takes the tour once, and then files a correct report
 during the hunt without further coaching. The observation that proves it: they contribute usable
 evidence on their first hunt having had only the tour, not a person, explain the tool.
@@ -69,7 +69,7 @@ evidence on their first hunt having had only the tour, not a person, explain the
 Direction finding is a team sport: one radio produces a wedge, three radios produce a fix. A person
 who finishes the tour should not only know how to report — they should know how to get their friends
 into the same hunt. The tour includes a step that points out how to invite others (share the hunt)
-and frames the pitch a hunter would actually make: no account, no install, just open the link and
+and frames the pitch a hunter would actually make: just send the link, and whoever opens it can
 start reporting.
 
 **Why this priority**: The request names two goals — ready to use it, and ready to introduce it to a
@@ -77,11 +77,11 @@ team. This story delivers the second. It builds on US1's walkthrough but is a di
 testable slice: the team-invitation step and its framing.
 
 **Independent Test**: Complete the tour and confirm it includes a step that points at the
-share/invite affordance, explains how a teammate joins, and states that joining needs no account or
-install. In a comprehension check, a participant who just finished can describe how they would bring
-a friend into the hunt.
+share/invite affordance and explains how a teammate joins — by opening the shared link and
+reporting. In a comprehension check, a participant who just finished can describe how they would
+bring a friend into the hunt.
 
-**Field Validation** *(deferred milestone — not a gate)*: A hunter who took the tour sends the hunt
+**Field Validation** _(deferred milestone — not a gate)_: A hunter who took the tour sends the hunt
 link to two friends on the repeater, and those friends join and file reports without being walked
 through anything. The observation that proves it: a team assembles into one hunt off the strength of
 one person's tour.
@@ -90,8 +90,8 @@ one person's tour.
 
 1. **Given** the tour is running, **When** it reaches the team step, **Then** it points out the
    share/invite affordance and explains, in plain language, how a teammate joins the same hunt.
-2. **Given** the team step, **When** the participant reads it, **Then** it makes clear that joining
-   requires no account, no install, and no payment.
+2. **Given** the team step, **When** the participant reads it, **Then** it conveys that a teammate
+   joins simply by opening the shared link and can start reporting right away.
 
 ---
 
@@ -113,7 +113,7 @@ tour step anchors to, or add a new first-class report kind the tour does not men
 the check flags it and surfaces the required action. Make an unrelated change and confirm the check
 stays quiet.
 
-**Field Validation** *(deferred milestone — not a gate)*: Not applicable — this is a
+**Field Validation** _(deferred milestone — not a gate)_: Not applicable — this is a
 maintainer-facing safeguard, validated by its test suite rather than by outdoor use. Its downstream
 payoff shows up in US1/US2 field validation staying true over successive releases.
 
@@ -157,7 +157,7 @@ payoff shows up in US1/US2 field validation staying true over successive release
   NOT assume relay mode is on; if it covers relay at all, it does so only when that affordance is
   present.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -184,7 +184,10 @@ payoff shows up in US1/US2 field validation staying true over successive release
   estimate, in plain language, as a region that grows less certain with poor reports; it MUST NOT
   present the estimate as a precise point (Constitution: Honest Uncertainty).
 - **FR-010**: The tour MUST include a step showing how to bring others into the hunt (share/invite)
-  and MUST frame that joining requires no account, install, or payment.
+  and MUST explain, in plain language, how a teammate joins — by opening the shared link and
+  reporting. (The zero-cost-of-entry guarantee itself — no account, install, or payment — remains a
+  product invariant per the Constitution's Cost of entry; the tour is no longer required to spell it
+  out in copy.)
 - **FR-011**: All tour copy MUST use the language hunters speak (fox, bearing, null, S-meter, "I hear
   nothing here") and MUST NOT expose protocol jargon such as NRQ, DFS, or PHG (Constitution: Plain
   Language Over Jargon).
@@ -226,7 +229,7 @@ payoff shows up in US1/US2 field validation staying true over successive release
   tour" (at minimum: tour-step anchors, the set of first-class report kinds, the primary hunt-loop
   controls, and the ordered walkthrough itself), so the check's scope is understood and maintainable.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Tour**: An ordered sequence of steps that together walk the core hunt loop. Carries a version
   that records which tour a device saw; a version increase does not by itself re-offer the tour (see
@@ -238,7 +241,7 @@ payoff shows up in US1/US2 field validation staying true over successive release
 - **Tour Anchor**: The stable identifier that ties a step to its UI control and against which the
   staleness check runs.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
@@ -247,7 +250,7 @@ payoff shows up in US1/US2 field validation staying true over successive release
   the three report kinds (bearing, signal-strength, "I hear nothing here") and locate the
   uncertainty display, in a first-use test.
 - **SC-003**: After completing the tour, a participant can correctly describe how to bring a teammate
-  into the hunt and state that joining needs no account or install, in a comprehension check.
+  into the hunt — share the hunt so a teammate opens the link and reports — in a comprehension check.
 - **SC-004**: The tour starts, advances, and completes with the network disabled for 100% of its
   steps.
 - **SC-005**: Declining or skipping the tour adds zero extra steps to joining and to filing a report,

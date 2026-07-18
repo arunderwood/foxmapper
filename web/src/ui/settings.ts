@@ -22,6 +22,8 @@ export interface SettingsOptions {
   relayMode: boolean;
   /** Fired on every toggle; the caller owns app state and re-render. Persistence happens here. */
   onRelayMode: (enabled: boolean) => void;
+  /** Relaunch the first-visit tour on demand (FR-003). Settings closes first, then the tour runs. */
+  onReplayTour: () => void;
   db: FoxmapperDb;
 }
 
@@ -41,6 +43,19 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
     toggle.setAttribute('aria-pressed', String(enabled));
     void setMeta(options.db, RELAY_MODE_KEY, enabled);
     options.onRelayMode(enabled);
+  });
+
+  // The relaunch affordance (FR-003): the tour is never a one-time thing. Closing settings first
+  // means the tour runs over the live hunt view, not over the settings sheet.
+  const replayTour = el(
+    'button',
+    { type: 'button', 'data-testid': 'replay-tour' },
+    icon('explore', { label: 'Take the tour' }),
+    el('span', {}, 'Take the tour'),
+  );
+  replayTour.addEventListener('click', () => {
+    onClose();
+    options.onReplayTour();
   });
 
   const close = el(
@@ -68,6 +83,7 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
       'Relay mode is for net control: it adds a way to file reports for hunters calling theirs ' +
         'in over the radio.',
     ),
+    replayTour,
   );
 
   backdrop.append(panel);
