@@ -183,31 +183,35 @@ test.describe('compass dial', () => {
     await joinAs(page, await createHunt(), 'KI7ROT');
 
     await page.getByTestId('report-bearing').click();
-    const rose = page.getByTestId('compass-dial').locator('.rose-rotator');
-    const svg = page.getByTestId('compass-dial').locator('.dial-rose');
+    const rotator = page.getByTestId('compass-dial').locator('.rose-rotator');
 
     // The rose is a near-circular shape drawn symmetric about the viewBox origin. Rotate it about
     // its own centre and its on-screen bounding box barely moves; rotate it about a corner and the
     // whole rose swings off — its box centre lands far from the dial. Set two headings via the
-    // accessible field and assert the rose's box centre stays put, and on the dial's centre.
-    const centreAt = async (deg: number): Promise<{ x: number; y: number }> => {
+    // accessible field and measure the rose's box centre against the dial's own.
+    const centreAt = async (deg: number): Promise<{ rose: number[]; svg: number[] }> => {
       await page.getByTestId('heading-input').fill(String(deg));
-      await expect(page.getByTestId('heading-input')).toHaveValue(`${deg}.0`);
-      const box = await rose.boundingBox();
-      if (!box) throw new Error('no rose box');
-      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      // The fill commits synchronously and rotates the rose; wait for the transform to land rather
+      // than race it. (The numeric field keeps the raw typed value while focused, so its formatting
+      // is not what to key off — the applied rotation is.)
+      await expect(rotator).toHaveAttribute('style', new RegExp(`rotate\\(-?${deg}deg\\)`));
+      return page.evaluate(() => {
+        const dial = document.querySelector('[data-testid="compass-dial"]')!;
+        const rose = dial.querySelector('.rose-rotator')!.getBoundingClientRect();
+        const svg = dial.querySelector('.dial-rose')!.getBoundingClientRect();
+        return {
+          rose: [rose.x + rose.width / 2, rose.y + rose.height / 2],
+          svg: [svg.x + svg.width / 2, svg.y + svg.height / 2],
+        };
+      });
     };
-
-    const svgBox = await svg.boundingBox();
-    if (!svgBox) throw new Error('no svg box');
-    const svgCentre = { x: svgBox.x + svgBox.width / 2, y: svgBox.y + svgBox.height / 2 };
 
     const c0 = await centreAt(0);
     const c90 = await centreAt(90);
 
     // Invariant under rotation (about centre), and coincident with the dial centre.
-    expect(Math.hypot(c90.x - c0.x, c90.y - c0.y)).toBeLessThan(4);
-    expect(Math.hypot(c0.x - svgCentre.x, c0.y - svgCentre.y)).toBeLessThan(8);
+    expect(Math.hypot(c90.rose[0]! - c0.rose[0]!, c90.rose[1]! - c0.rose[1]!)).toBeLessThan(4);
+    expect(Math.hypot(c0.rose[0]! - c0.svg[0]!, c0.rose[1]! - c0.svg[1]!)).toBeLessThan(8);
   });
 
   test('accessible without the gesture: set by the numeric field alone (SC-010)', async ({
