@@ -29,8 +29,6 @@ export interface Position {
 
 export type PositionSource = 'measured' | 'placed';
 
-export type HeadingSource = 'compass' | 'manual';
-
 /**
  * Raw APRS Q digit. Authored reports are capped at {3,4,5} — worst <64°, best <16°.
  * Compass error is 10–30° near metal, so the scale's <1° steps are unreachable on purpose.
@@ -76,9 +74,6 @@ export interface BearingPayload {
   heading_magnetic: number;
   declination: number;
   wmm_epoch: string;
-  heading_source: HeadingSource;
-  /** iOS `webkitCompassAccuracy` only. Android exposes no equivalent. */
-  compass_accuracy_deg?: number;
   confidence_q: ConfidenceQ;
   max_range_r: MaxRangeR;
 }

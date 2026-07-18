@@ -15,7 +15,8 @@ import { canRetract, composeRetraction } from '../../src/report/retract.js';
 import { encodeBearing, encodeNull, encodeOmni } from '../../src/aprs/mapping.js';
 import { fold } from '../../src/log/fold.js';
 import { toLog } from '../../src/log/gset.js';
-import { isRelayed } from '../../src/log/types.js';
+import { isRelayed, type BearingReport } from '../../src/log/types.js';
+import { wedgeFor } from '../../src/map/wedge.js';
 import type { AuthorContext } from '../../src/report/author.js';
 import { confidenceQArb, maxRangeRArb, strengthSArb } from './arbitraries.js';
 
@@ -31,7 +32,7 @@ const context: AuthorContext = {
   clock_offset_ms: null,
 };
 
-const draft = { heading_magnetic: 256.2, heading_source: 'compass' as const };
+const draft = { heading_magnetic: 256.2 };
 
 describe('the envelope', () => {
   it('gives every report a distinct random id', () => {
@@ -102,25 +103,39 @@ describe('bearing entry', () => {
     expect(report.payload.heading_true).toBeLessThan(20);
   });
 
-  it('keeps the manual source when the reporter typed the heading', () => {
-    const report = composeBearing({
-      ...context,
-      draft: { heading_magnetic: 271, heading_source: 'manual' },
-      confidence_q: 3,
-      max_range_r: 1,
-    });
-    expect(report.payload.heading_source).toBe('manual');
-    expect(report.payload.compass_accuracy_deg).toBeUndefined();
+  it('records a bearing, never where the number came from (003 FR-010)', () => {
+    // A bearing is a bearing: a compass freeze, a dial twist and a typed figure are the same fact.
+    const report = composeBearing({ ...context, draft, confidence_q: 4, max_range_r: 3 });
+    expect(Object.keys(report.payload).sort()).toEqual(
+      ['confidence_q', 'declination', 'heading_magnetic', 'heading_true', 'max_range_r', 'wmm_epoch'].sort(),
+    );
+    expect(report.payload).not.toHaveProperty('heading_source');
+    expect(report.payload).not.toHaveProperty('compass_accuracy_deg');
+    // Nothing about the origin leaks into the serialized log either.
+    expect(JSON.stringify(report)).not.toMatch(/heading_source|compass_accuracy/);
   });
 
-  it('records compass accuracy where the platform gives one', () => {
-    const report = composeBearing({
-      ...context,
-      draft: { ...draft, compass_accuracy_deg: 12 },
-      confidence_q: 4,
-      max_range_r: 3,
-    });
-    expect(report.payload.compass_accuracy_deg).toBe(12);
+  it('produces the same payload however the heading was set (SC-006/SC-008)', () => {
+    // Frozen, twisted, typed — only heading_magnetic differs; no field names the source.
+    const frozen = composeBearing({ ...context, draft: { heading_magnetic: 256.2 }, confidence_q: 4, max_range_r: 3 });
+    const typed = composeBearing({ ...context, draft: { heading_magnetic: 100.0 }, confidence_q: 4, max_range_r: 3 });
+    const { heading_true: _ft, heading_magnetic: _fm, declination: _fd, ...frozenRest } = frozen.payload;
+    const { heading_true: _tt, heading_magnetic: _tm, declination: _td, ...typedRest } = typed.payload;
+    expect(frozenRest).toEqual(typedRest);
+  });
+
+  it('still accepts a legacy payload that carries the removed fields (back-compat)', () => {
+    // Readers MUST ignore heading_source/compass_accuracy_deg, not choke on them.
+    const legacy: BearingReport = {
+      ...composeBearing({ ...context, draft, confidence_q: 4, max_range_r: 3 }),
+    };
+    const withOldFields = {
+      ...legacy,
+      payload: { ...legacy.payload, heading_source: 'compass', compass_accuracy_deg: 12 },
+    } as unknown as BearingReport;
+    // The one consumer that reads a bearing payload — the wedge — renders it unchanged.
+    expect(() => wedgeFor(withOldFields)).not.toThrow();
+    expect(wedgeFor(withOldFields)).toEqual(wedgeFor(legacy));
   });
 
   it('offers exactly three confidence buttons and three range buttons', () => {

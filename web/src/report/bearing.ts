@@ -2,9 +2,10 @@
  * Bearing entry.
  *
  * The compass **drafts** the heading and the reporter sees and can adjust it before submitting
- * (FR-006). That is not politeness: compass error is 10–30° near a vehicle or an antenna, and a
- * heading the reporter never saw would be a number the log attributes to them that they never
- * claimed.
+ * (feature 001's FR-008b). That is not politeness: compass error is 10–30° near a vehicle or an
+ * antenna, and a heading the reporter never saw would be a number the log attributes to them that
+ * they never claimed. A bearing is a bearing, though — the log records the number, not whether it
+ * came from the compass or was set by hand (004 FR-010).
  */
 import type { BearingPayload, BearingReport, ConfidenceQ, MaxRangeR } from '../log/types.js';
 import { declinationAt, normalizeHeading, toTrueHeading } from '../sensors/declination.js';
@@ -28,11 +29,8 @@ export const RANGE_CHOICES = [
 ] as const;
 
 export interface BearingDraft {
-  /** What the compass said, or what the reporter typed. Always magnetic. */
+  /** What the compass said, or what the reporter set on the dial. Always magnetic. */
   heading_magnetic: number;
-  heading_source: 'compass' | 'manual';
-  /** iOS only; absent on Android, where the platform exposes nothing. */
-  compass_accuracy_deg?: number;
 }
 
 export interface BearingEntry extends AuthorContext {
@@ -44,8 +42,9 @@ export interface BearingEntry extends AuthorContext {
 
 /**
  * Both magnetic and true are recorded, plus the declination and the model epoch — so the bearing
- * stays reinterpretable when the magnetic model updates, and the provenance of the number is never
- * lost. A log storing only `heading_true` would assert a conversion it cannot show its work for.
+ * stays reinterpretable when the magnetic model updates. A log storing only `heading_true` would
+ * assert a conversion it cannot show its work for. Where the number came from — compass, twist, or
+ * keypad — is deliberately not recorded: a bearing is a bearing (004 FR-010).
  */
 export function composeBearing(entry: BearingEntry): BearingReport {
   const declination = declinationAt(entry.position.lat, entry.position.lon);
@@ -56,10 +55,6 @@ export function composeBearing(entry: BearingEntry): BearingReport {
     heading_magnetic: magnetic,
     declination: declination.degrees,
     wmm_epoch: declination.epoch,
-    heading_source: entry.draft.heading_source,
-    ...(entry.draft.compass_accuracy_deg !== undefined
-      ? { compass_accuracy_deg: entry.draft.compass_accuracy_deg }
-      : {}),
     confidence_q: entry.confidence_q,
     max_range_r: entry.max_range_r,
   };

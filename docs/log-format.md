@@ -76,8 +76,6 @@ store it; a stored flag can disagree with the two names it summarises.
   "heading_magnetic": 256.2,
   "declination": 15.2,
   "wmm_epoch": "WMM2025",
-  "heading_source": "compass",
-  "compass_accuracy_deg": 12,
   "confidence_q": 4,
   "max_range_r": 3
 }
@@ -89,8 +87,6 @@ store it; a stored flag can disagree with the two names it summarises.
 | `heading_magnetic` | number 0–359.9 | yes | What the device reported. Both mobile platforms give magnetic. |
 | `declination` | number | yes | Signed degrees added to get true. |
 | `wmm_epoch` | string | yes | Model that produced `declination`, e.g. `"WMM2025"`. |
-| `heading_source` | enum | yes | `compass` \| `manual`. |
-| `compass_accuracy_deg` | number | no | iOS only. **Absent on Android — the platform exposes nothing.** |
 | `confidence_q` | integer, **one of {3,4,5}** authored; 0–9 ingested | yes | Raw APRS Q digit. |
 | `max_range_r` | integer, **one of {1,3,5}** authored; 0–9 ingested | yes | Raw APRS R digit. Range = 2^R miles. |
 
@@ -98,6 +94,13 @@ store it; a stored flag can disagree with the two names it summarises.
 reinterpretable. A log storing only `heading_true` asserts a conversion it cannot show its work
 for, and becomes unrecoverable when the magnetic model updates. A reimplementer can recompute
 `heading_true` from `heading_magnetic` and their own model, and check ours.
+
+**Why the number's origin is not recorded.** A bearing is a bearing: whether the reporter froze the
+device compass, twisted the on-screen dial, or typed the figure, the log stores only the heading they
+vouched for. Earlier versions carried a `heading_source` (`compass`/`manual`) and an iOS
+`compass_accuracy_deg`; nothing ever read them and neither reached the air, so they were removed.
+Readers **MUST** accept a `bearing` payload with or without those keys and **MUST** ignore them if
+present — their absence is not an error and implies no source.
 
 **Why `confidence_q` is capped at 5.** The APRS Q scale runs to 9 (<1°). We emit only 3, 4 or 5 —
 worst <64°, best **<16°**. Real compass error is 10–30° near a vehicle or antenna. An interface

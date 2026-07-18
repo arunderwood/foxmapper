@@ -244,6 +244,125 @@ label {
   gap: 0.5rem;
 }
 
+/*
+ * ---- Compass dial (feature 003) ----
+ *
+ * A rotating rose read under a fixed top index. The rose is one SVG group rotated by an inline
+ * `transform` set per frame in JS (compass-dial.ts) — CSS must NOT transition that transform, or it
+ * would fight the JS damping. The `data-state` attribute drives the live/frozen treatment.
+ */
+.compass-dial {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+}
+
+.dial-face {
+  position: relative;
+  width: min(72vw, 260px);
+  aspect-ratio: 1;
+  /* The face owns the drag; scrolling the sheet starts anywhere but here (FR-019). */
+  touch-action: none;
+  cursor: grab;
+}
+
+.dial-face:active {
+  cursor: grabbing;
+}
+
+.dial-rose {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* The face div is the single pointer target: the twist must land the same whether the finger is
+     over a tick, a numeral, or bare rose, so the SVG and its children never intercept the gesture. */
+  pointer-events: none;
+}
+
+.rose-rotator {
+  transform-origin: center;
+  will-change: transform;
+}
+
+.rose-face {
+  fill: var(--md-sys-color-surface-container-high);
+  stroke: var(--md-sys-color-outline-variant);
+  stroke-width: 1;
+}
+
+.rose-tick {
+  stroke: var(--md-sys-color-on-surface-variant);
+  stroke-width: 1;
+}
+
+.rose-tick.major {
+  stroke: var(--md-sys-color-on-surface);
+  stroke-width: 2;
+}
+
+.rose-cardinal {
+  fill: var(--md-sys-color-on-surface);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rose-cardinal.north {
+  fill: var(--fx-kind-bearing);
+}
+
+/* The fixed index: a bearing marker at 12 o'clock that never rotates — "toward the fox". */
+.dial-index {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 14px solid var(--fx-kind-bearing);
+  pointer-events: none;
+}
+
+/* Frozen reads unmistakably as captured; live gets a soft breathing ring (killed under reduced
+   motion by the global rule). */
+.compass-dial[data-state='frozen'] .dial-face,
+.compass-dial[data-state='by-hand'] .dial-face {
+  outline: 2px solid var(--fx-kind-bearing);
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+.compass-dial[data-state='live'] .rose-face {
+  animation: dial-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dial-live-pulse {
+  50% {
+    stroke: var(--fx-kind-bearing);
+  }
+}
+
+.dial-degrees-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--md-sys-typescale-label-size);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.dial-degrees {
+  width: 6.5rem;
+  text-align: center;
+}
+
+.dial-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 /* ---- Map ---- */
 
 .map-view {
