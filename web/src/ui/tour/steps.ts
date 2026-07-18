@@ -2,9 +2,9 @@
  * The tour's ordered walkthrough (data-model.md §TourStep).
  *
  * Each step is a stable `id`, the `data-testid` `anchor` it spotlights, and plain-language copy.
- * The order **is** the hunt loop (FR-007): who you are hunting, the map and its estimate, the three
- * ways any radio contributes, how to bring a team in, and where you land. Copy uses only the words a
- * hunter says on the repeater — no NRQ/DFS/PHG (FR-011, guarded by the vocabulary test).
+ * The order **is** the hunt loop (FR-007): the map and its estimate, the three ways any radio
+ * contributes, how to bring a team in, and where you land. Copy uses only the words a hunter says on
+ * the repeater — no NRQ/DFS/PHG (FR-011, guarded by the vocabulary test).
  *
  * These `anchor` strings are a contract: they are the tour's link to real controls and the surface
  * the drift check runs against (manifest.ts). Renaming one here without renaming the control it
@@ -36,17 +36,11 @@ export interface Tour {
  */
 export const STEPS: TourStep[] = [
   {
-    id: 'target',
-    anchor: 'target-label',
-    title: 'This is your fox',
-    body: 'Up top is the name of what you are hunting. Everything on this screen is about working out where the fox is transmitting from.',
-  },
-  {
     id: 'estimate',
     anchor: 'map',
     sample: true,
     title: 'Where the fox might be',
-    body: 'As reports come in, the map shades the ground the fox is most likely on — a whole region, never a single dot. Few or disagreeing reports mean a wide, unsure region; better ones tighten it. It stays honest about how sure it is.',
+    body: 'The map shades the ground the fox is most likely on — a whole region, never a single dot. Few or clashing reports leave it wide; better ones pull it tight. It never looks more certain than the reports are.',
   },
   {
     id: 'bearing',

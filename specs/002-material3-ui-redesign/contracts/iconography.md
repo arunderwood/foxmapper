@@ -13,8 +13,8 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 | `cell_tower` | Signal report kind | Labeled ("Signal") |
 | `signal_disconnected` | Nothing-here report kind | Labeled ("Nothing here") |
 | `flag` | Found-it report kind | Labeled ("Found it") |
-| `cloud_done` | live / synced status | Labeled (short status) |
-| `cloud_off` | offline status | Labeled (short status) |
+| `cloud_done` | live / synced status | **Icon-only allowed** (scope in `aria-label`) |
+| `cloud_off` | offline status | **Icon-only allowed** (scope in `aria-label`) |
 | `upload` | queued / draining status | Labeled (count) |
 | `my_location` | GPS fix ok; locate-me action | **Icon-only allowed** (universal) |
 | `location_disabled` | GPS lost | Labeled |
@@ -31,10 +31,14 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 ## Rules
 
 1. **Label policy is the constitution's plain-language principle operationalized**
-   (FR-007): only `close`, `share`, `my_location`, and `settings` may ever appear without a
-   visible text label. Everything else pairs icon + short hunter-language label. A new icon enters
-   the icon-only list only by demonstrating universality (a first-time hunter names its
-   meaning unprompted — same 4-of-5 bar as SC-005).
+   (FR-007): only `close`, `share`, `my_location`, `settings`, and the two sync-status glyphs
+   (`cloud_done`, `cloud_off`) may ever appear without a visible text label. Everything else pairs
+   icon + short hunter-language label. A new icon enters the icon-only list only by demonstrating
+   universality (a first-time hunter names its meaning unprompted — same 4-of-5 bar as SC-005).
+   The sync pair is admitted on a different basis: the cloud-with-check / cloud-with-slash contrast
+   is the universally-read online/offline idiom, and carrying the *scope* it stands for
+   ("everyone's reports" vs "this phone only", FR-018) is the job of the chip's `aria-label`, not a
+   visible caption that repeated in words what the icon and its colour already say.
 2. **Shape before colour** (FR-015): the four report-kind icons must be distinguishable as
    silhouettes. Hue (from `--fx-kind-*`) is reinforcement. The contract test for this is
    SC-007's "distinguishable with colour removed" check applied to the report bar.

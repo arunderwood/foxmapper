@@ -20,6 +20,7 @@ import {
   renderedFeatures,
   reportBearing,
   reportHeardNothing,
+  sourceFeatureCount,
 } from './helpers.js';
 
 /** Joins with no geolocation at all — the app must not pretend it knows where this phone is. */
@@ -162,6 +163,32 @@ test('a measured position is still recorded as measured — the fix did not brea
 
   await expect.poll(async () => (await renderedFeatures(page)).length).toBe(1);
   expect((await renderedFeatures(page))[0]!.placed).toBe(false);
+
+  await context.close();
+});
+
+test('the phone’s own fix drops a "you are here" pin, and a hand-placed position takes it over', async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 48.79, longitude: -122.51 });
+  const page = await context.newPage();
+
+  const code = await createHunt();
+  await joinAs(page, code, 'W7PIN');
+
+  // Reporting from the phone's fix now leaves a mark on the map, the way a manual placement does.
+  await expect(page.getByTestId('gps-state')).toHaveAttribute('data-state', 'gps-ok');
+  await expect.poll(() => sourceFeatureCount(page, 'device-position')).toBe(1);
+  expect(await sourceFeatureCount(page, 'placed-position')).toBe(0);
+
+  // A position set by hand outranks the device's — the placed pin takes over and the device pin
+  // clears, so the map never shows two "you are here" marks at once.
+  await placePosition(page);
+  await expect(page.getByTestId('gps-state')).toHaveAttribute('data-state', 'placed');
+  await expect.poll(() => sourceFeatureCount(page, 'device-position')).toBe(0);
+  expect(await sourceFeatureCount(page, 'placed-position')).toBe(1);
 
   await context.close();
 });

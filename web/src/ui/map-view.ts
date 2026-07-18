@@ -27,6 +27,8 @@ const WEDGE_SOURCE = 'reports-wedges';
 const MARKER_SOURCE = 'reports-markers';
 /** The hand-placed position, as map data rather than a DOM marker — see #addLayers. */
 const PLACED_SOURCE = 'placed-position';
+/** The device's own GPS fix, as map data. Shown only when nothing was placed by hand. */
+const DEVICE_SOURCE = 'device-position';
 
 /**
  * Resolved when layers are added, not at import: the values come from the token set, and the
@@ -128,6 +130,8 @@ export class MapView {
   #queuePeak = 0;
   /** The hand-placed position, held for re-application when a style swap recreates sources. */
   #placedPosition: { lat: number; lon: number } | undefined;
+  /** The device fix, held for the same re-application. Cleared while a hand-placed position wins. */
+  #devicePosition: { lat: number; lon: number } | undefined;
   /** Marks the armed relay target's position while a relayed report is being filed. */
   #relayPin: maplibregl.Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
@@ -182,6 +186,7 @@ export class MapView {
     map.addSource(WEDGE_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(MARKER_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(PLACED_SOURCE, { type: 'geojson', data: empty() });
+    map.addSource(DEVICE_SOURCE, { type: 'geojson', data: empty() });
 
     // The hand-placed position pin, FIRST: it lives in the canvas (not a DOM marker, which
     // would float above everything the map draws) precisely so every report renders over it.
@@ -199,6 +204,28 @@ export class MapView {
         'icon-allow-overlap': true,
         'icon-ignore-placement': true,
         'icon-anchor': 'bottom',
+      },
+    });
+
+    // The device's own fix, marked the moment there is one (feedback: filing from the phone's fix
+    // left the map with no "you are here"). Same reason as the placed pin to live in the canvas
+    // rather than a DOM marker — every report renders over it. It wears `my_location`, the icon the
+    // position chip already uses for the fix, so map and chip agree; the crosshair is symmetric, so
+    // it anchors at its centre rather than a pin's point. Only ever one self-pin: `#syncDevicePin`
+    // clears this the instant a hand-placed position exists, which is what the placed pin shows.
+    this.#glyphImage(map, 'device-pin-img', 'my_location', {
+      fill: cssToken('--md-sys-color-primary', '#FFB59B'),
+      size: 56,
+    });
+    map.addLayer({
+      id: 'device-pin',
+      type: 'symbol',
+      source: DEVICE_SOURCE,
+      layout: {
+        'icon-image': 'device-pin-img',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-anchor': 'center',
       },
     });
 
@@ -326,6 +353,7 @@ export class MapView {
     this.#bindClick();
     // The swap that recreated these sources also emptied them; the pin state survives here.
     this.#applyPlacedPin();
+    this.#applyDevicePin();
   }
 
   /**
@@ -499,6 +527,14 @@ export class MapView {
 
     this.#lastState = state;
     this.#syncPlacedPin(state.placed);
+    // The device fix, but only when it is the position a report would actually use: no hand-placed
+    // position overriding it. `positionChip` makes the same call for its "from your phone's fix"
+    // wording, so the map's self-pin and the chip always tell one story.
+    this.#syncDevicePin(
+      !state.placed && state.position.status === 'ready'
+        ? { lat: state.position.fix.lat, lon: state.position.fix.lon }
+        : undefined,
+    );
     this.#syncRelayPin(state.relayTarget);
     this.#updateStatus(state);
   }
@@ -565,6 +601,38 @@ export class MapView {
     });
   }
 
+  /**
+   * A pin at the device's own fix — the counterpart to the placed pin, for a hunter reporting from
+   * GPS. It is the position the next report would carry, so it appears exactly when the position
+   * chip reads "from your phone's fix": a live fix and nothing set by hand. A hand-placed position
+   * outranks the device's (positionChip), so this clears the moment one exists and the placed pin
+   * takes over — the two never show at once.
+   */
+  #syncDevicePin(device: { lat: number; lon: number } | undefined): void {
+    this.#devicePosition = device;
+    this.#applyDevicePin();
+  }
+
+  /** Writes the device fix into its source — re-run after style swaps recreate it. */
+  #applyDevicePin(): void {
+    const source = this.#map?.getSource(DEVICE_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+
+    const device = this.#devicePosition;
+    source.setData({
+      type: 'FeatureCollection',
+      features: device
+        ? [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [device.lon, device.lat] },
+              properties: {},
+            },
+          ]
+        : [],
+    });
+  }
+
   /** Pushes the latest fold to the map, if the style is ready to receive it. */
   #flush(): void {
     const map = this.#map;
@@ -585,21 +653,32 @@ export class MapView {
 
     // FR-018. A hunter acting on this map must know whether it is the whole picture. "Everyone's
     // reports" and "only mine" look identical otherwise, and the difference is the whole point.
-    // Each state is an icon + colour + shape triple (data-model.md §3) — never colour alone.
-    // The verb is load-bearing: "Everyone's reports" alone reads as a mystery button, and this
-    // chip exists to answer "am I looking at the whole picture?" — so it says what it is doing.
+    // Each state is an icon + colour + shape triple (data-model.md §3) — never colour alone — and
+    // here the icon carries it alone: cloud-with-check for the whole picture, cloud-with-slash for
+    // this phone only (contracts/iconography.md §1). The scope still reaches assistive tech through
+    // the chip's `aria-label`; only the redundant wording is gone.
     const syncChip = state.live
       ? el(
           'span',
-          { class: 'chip ok', 'data-testid': 'sync-state', 'data-state': 'live' },
+          {
+            class: 'chip ok icon-only',
+            'data-testid': 'sync-state',
+            'data-state': 'live',
+            role: 'img',
+            'aria-label': 'Showing everyone’s reports',
+          },
           icon('cloud_done', { label: 'Showing everyone’s reports' }),
-          el('span', { class: 'chip-label' }, 'Showing everyone’s reports'),
         )
       : el(
           'span',
-          { class: 'chip warn', 'data-testid': 'sync-state', 'data-state': 'offline' },
-          icon('cloud_off', { label: 'No signal' }),
-          el('span', { class: 'chip-label' }, 'No signal — showing this phone only'),
+          {
+            class: 'chip warn icon-only',
+            'data-testid': 'sync-state',
+            'data-state': 'offline',
+            role: 'img',
+            'aria-label': 'No signal — showing this phone only',
+          },
+          icon('cloud_off', { label: 'No signal — showing this phone only' }),
         );
 
     const chips: (HTMLElement | undefined)[] = [

@@ -178,6 +178,38 @@ test.describe('compass dial', () => {
       .toBe(1);
   });
 
+  test('the rose rotates about the dial centre, not a corner', async ({ page, context }) => {
+    await grantPosition(context);
+    await joinAs(page, await createHunt(), 'KI7ROT');
+
+    await page.getByTestId('report-bearing').click();
+    const rose = page.getByTestId('compass-dial').locator('.rose-rotator');
+    const svg = page.getByTestId('compass-dial').locator('.dial-rose');
+
+    // The rose is a near-circular shape drawn symmetric about the viewBox origin. Rotate it about
+    // its own centre and its on-screen bounding box barely moves; rotate it about a corner and the
+    // whole rose swings off — its box centre lands far from the dial. Set two headings via the
+    // accessible field and assert the rose's box centre stays put, and on the dial's centre.
+    const centreAt = async (deg: number): Promise<{ x: number; y: number }> => {
+      await page.getByTestId('heading-input').fill(String(deg));
+      await expect(page.getByTestId('heading-input')).toHaveValue(`${deg}.0`);
+      const box = await rose.boundingBox();
+      if (!box) throw new Error('no rose box');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    const svgBox = await svg.boundingBox();
+    if (!svgBox) throw new Error('no svg box');
+    const svgCentre = { x: svgBox.x + svgBox.width / 2, y: svgBox.y + svgBox.height / 2 };
+
+    const c0 = await centreAt(0);
+    const c90 = await centreAt(90);
+
+    // Invariant under rotation (about centre), and coincident with the dial centre.
+    expect(Math.hypot(c90.x - c0.x, c90.y - c0.y)).toBeLessThan(4);
+    expect(Math.hypot(c0.x - svgCentre.x, c0.y - svgCentre.y)).toBeLessThan(8);
+  });
+
   test('accessible without the gesture: set by the numeric field alone (SC-010)', async ({
     page,
     context,

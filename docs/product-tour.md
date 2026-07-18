@@ -1,9 +1,8 @@
 # The product tour, and keeping it honest
 
-FoxMapper offers first-time visitors an optional guided tour of the core hunt loop — what you're
-hunting, the map and its credible-region estimate, the three ways any radio can report, and how to
-bring a team in. It is a thin, client-only overlay that anchors each step to a control that already
-exists. It lives in [`web/src/ui/tour/`](../web/src/ui/tour/) and is relaunchable any time from
+FoxMapper offers first-time visitors an optional guided tour of the core hunt loop — the map and its
+credible-region estimate, the three ways any radio can report, and how to bring a team in. It is a
+thin, client-only overlay that anchors each step to a control that already exists. It lives in [`web/src/ui/tour/`](../web/src/ui/tour/) and is relaunchable any time from
 **Settings → Take the tour**.
 
 A tour that points at the wrong thing is worse than no tour: it teaches a newcomer something false on
@@ -13,13 +12,12 @@ may invalidate the tour**, so the drift check's scope is understood and maintain
 ## What the tour depends on
 
 - **Step anchors** — each step points at a control by its `data-testid`. The current anchors are
-  declared in [`manifest.ts`](../web/src/ui/tour/steps.ts) (derived from the steps): `target-label`,
-  `map`, `report-bearing`, `report-omni`, `report-null`, `share-hunt`. The `finish`
-  step is anchorless.
+  declared in [`manifest.ts`](../web/src/ui/tour/steps.ts) (derived from the steps): `map`,
+  `report-bearing`, `report-omni`, `report-null`, `share-hunt`. The `finish` step is anchorless.
 - **The set of first-class report kinds** — the tour teaches the three _contribute_ kinds
   (`bearing`, `omni`, `null`). These are `coveredKinds` in `manifest.ts`.
-- **The primary hunt-loop controls** the tour walks — the target line, the map/estimate, the report
-  bar and its kind buttons, and the share affordance.
+- **The primary hunt-loop controls** the tour walks — the map/estimate, the report bar and its kind
+  buttons, and the share affordance.
 - **The ordered walkthrough itself** — the fixed order in
   [`steps.ts`](../web/src/ui/tour/steps.ts), which is the hunt loop.
 
@@ -32,7 +30,7 @@ change is done:
    longer makes sense.
 2. The set of **first-class report kinds changes** — a new way to contribute evidence is added, or an
    existing one is removed.
-3. A **primary hunt-loop control** the tour walks (target, map/estimate, report bar, share) is
+3. A **primary hunt-loop control** the tour walks (map/estimate, report bar, share) is
    removed or relocated.
 4. The **ordered walkthrough** is restructured.
 
