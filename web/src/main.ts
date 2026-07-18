@@ -56,6 +56,7 @@ import { addToHomeScreenOffer, requestPersistence } from './ui/storage.js';
 import type { Target } from './ui/target.js';
 import { el, clear } from './ui/dom.js';
 import { limitsNotice } from './ui/limits.js';
+import { captureError, initAnalytics, track } from './analytics/posthog.js';
 
 const API_ORIGIN = import.meta.env['VITE_API_ORIGIN'] ?? window.location.origin;
 
@@ -103,6 +104,7 @@ class App {
 
     const landing = decideLanding();
     if (landing.screen === 'start') {
+      track('app_opened', { screen: 'start' });
       this.#renderStart();
       return;
     }
@@ -117,6 +119,7 @@ class App {
 
     const identity = await currentIdentity(this.#db);
     if (!identity) {
+      track('app_opened', { screen: 'join' });
       // Joining is a purely local act, so the join screen goes up now and the target fills in
       // behind it. Awaiting the fetch here meant a captive portal or a weak link left the
       // participant looking at nothing at all for the life of the request — offline it rejected
@@ -135,6 +138,7 @@ class App {
       return;
     }
     this.#identity = identity;
+    track('app_opened', { screen: 'hunt' });
 
     void this.#fetchTarget().then((target) => {
       if (target) {
@@ -271,6 +275,7 @@ class App {
             }),
           });
           const hunt = (await response.json()) as { code: string };
+          track('hunt_created');
           window.location.href = `/h/${hunt.code}`;
         } catch {
           create.toggleAttribute('disabled', false);
@@ -312,6 +317,7 @@ class App {
           void currentIdentity(this.#db).then((identity) => {
             if (!identity) return;
             this.#identity = identity;
+            track('hunt_joined');
             this.#renderHunt();
           });
         },
@@ -326,6 +332,7 @@ class App {
       center: DEFAULT_CENTER,
       onTilesUnavailable: () => {
         this.#tilesUnavailable = true;
+        track('tiles_unavailable');
         this.#refresh();
       },
       // FR-010. Only what this phone entered, and only ever as a new fact: the original stays in
@@ -426,11 +433,18 @@ class App {
   async #maybeOfferTour(): Promise<void> {
     const state = await readTourState(this.#db);
     if (state.status !== 'unseen') return;
+    track('tour_offered');
     offerTour({
       root: this.#root,
       // Accepting from the offer means exiting early counts as declining (FR-013).
-      onAccept: () => this.#startTour(true),
-      onDecline: () => void markDeclined(this.#db),
+      onAccept: () => {
+        track('tour_accepted');
+        this.#startTour(true);
+      },
+      onDecline: () => {
+        track('tour_declined');
+        void markDeclined(this.#db);
+      },
     });
   }
 
@@ -443,8 +457,12 @@ class App {
   #startTour(fromOffer: boolean): void {
     runTour({
       root: this.#root,
-      onFinish: () => void markCompleted(this.#db),
+      onFinish: () => {
+        track('tour_completed');
+        void markCompleted(this.#db);
+      },
       onExit: () => {
+        track('tour_exited', { from_offer: fromOffer });
         if (fromOffer) void markDeclined(this.#db);
       },
     });
@@ -546,12 +564,26 @@ class App {
   #placePosition(then?: () => void): void {
     this.#view?.beginPlacing('Tap the map where you are standing', (position) => {
       this.#placed = position;
+      // The event, never the coordinate: that a hunter placed themselves by hand, not where.
+      track('position_placed');
       this.#refresh();
       then?.();
     });
   }
 
   async #submit(report: Report): Promise<void> {
+    // A retraction is a fact about another report, not an observation — count it as its own act.
+    // Everything else carries only the shape of the report, never its place, callsign, or content.
+    if (report.kind === 'retraction') {
+      track('report_retracted');
+    } else {
+      track('report_submitted', {
+        kind: report.kind,
+        source: isRelayed(report) ? 'relayed' : 'own',
+        position_source: report.position_source,
+      });
+    }
+
     // One report per arming: the relayed observation just filed, so the target disarms and the
     // pin lifts. Relaying twice for the same hunter is two deliberate acts, not a sticky mode.
     if (this.#relayTarget && isRelayed(report)) this.#relayTarget = undefined;
@@ -593,6 +625,7 @@ class App {
           relayMode: this.#relayMode,
           onRelayMode: (enabled) => {
             this.#relayMode = enabled;
+            track('relay_mode_toggled', { enabled });
             // Switching relay off mid-arming disarms: an invisible armed target is a report
             // waiting to wear the wrong name.
             if (!enabled) this.#relayTarget = undefined;
@@ -621,10 +654,14 @@ class App {
   }
 }
 
+// Before anything renders, so an error thrown during startup is still caught (a no-op when the
+// device has opted out or no key is configured — see analytics/posthog.ts).
+initAnalytics();
+
 const root = document.getElementById('app');
 if (root) {
   const app = new App(root);
-  void app.start();
+  void app.start().catch((error: unknown) => captureError(error));
 }
 
 if ('serviceWorker' in navigator) {
