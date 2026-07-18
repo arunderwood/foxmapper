@@ -60,6 +60,13 @@ join screen's callsign input accepting a click. Three runs.
   The blank ground's lightness is load-bearing: the per-callsign wire palette
   (docs/log-format.md) is tuned for a street map and several Tol swatches vanish on a dark
   ground. Tokenized, but light — the token carries a comment saying why.
+- **FR-011's "loading" states resolve to the drain presentation alone** (flagged by the
+  2026-07-17 cross-artifact analysis: no task named a loading state). Surveyed: joining is a
+  purely local act with no pending state by design (`join.ts` — "Nothing here awaits the
+  network"), tile fetching is the third-party basemap's own affair (out of scope per FR-009,
+  with the `tiles-off` chip covering absence), and the queue drain — the one loading-like
+  state FoxMapper draws — was designed in T022 (`.chip.progress`, whose CSS comment cites
+  FR-011). No unstyled loading state exists; nothing to add.
 - **Queued chip stayed in the warn colour family** rather than a fully distinct colour: it
   renders *beside* the offline chip (not instead of it), so its identity is icon + count +
   pill shape (data-model.md §3 says exactly this; the story spec was initially stricter than

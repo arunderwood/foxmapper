@@ -213,4 +213,8 @@ states keep legacy variables alive for unconverted surfaces — mixed but functi
   frequently (memory: merge, don't rebase, once pushed)
 - The per-callsign palette freeze (contracts/design-tokens.md §8) is checked in T030 —
   any diff to web/src/log/colour.ts fails review
+- FR-011's "loading" leg resolves to the queue-drain presentation (T022) — it is the only
+  loading-like state FoxMapper draws. Joining is a purely local act with no pending state
+  (web/src/ui/join.ts), and tile fetching belongs to the third-party basemap, out of scope
+  per FR-009. Recorded in findings.md
 - Commit after each task or logical group; each checkpoint is a valid deploy point
