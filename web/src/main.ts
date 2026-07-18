@@ -628,7 +628,23 @@ if (root) {
 }
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js', { type: 'module' });
-  });
+  if (import.meta.env.DEV) {
+    // The offline shell is a production feature. On the Vite dev server it would cache modules at
+    // stable URLs like /src/main.ts and then serve them stale, hiding every source edit until the
+    // worker is manually cleared. Tear down any worker a prior prod build (or an earlier dev run)
+    // left registered so a plain reload always reflects the latest code.
+    void navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) void registration.unregister();
+    });
+    // Also drop the shell caches a prior worker filled, so nothing stale lingers in Application.
+    if ('caches' in window) {
+      void caches.keys().then((keys) => {
+        for (const key of keys) if (key.startsWith('foxmapper-')) void caches.delete(key);
+      });
+    }
+  } else {
+    window.addEventListener('load', () => {
+      void navigator.serviceWorker.register('/sw.js', { type: 'module' });
+    });
+  }
 }
