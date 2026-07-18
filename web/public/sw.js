@@ -80,6 +80,12 @@ self.addEventListener('fetch', (event) => {
   // into an archive we manage, which is the thing the policy forbids.
   if (url.origin !== self.location.origin) return;
 
+  // The Vite dev server serves modules at stable URLs, so cache-first would pin them to whatever
+  // was fetched first and hide every source edit. These paths never exist in a production build —
+  // Vite bundles and fingerprints — so always going to network here costs prod nothing and keeps
+  // the dev server honest even if a worker from a prior prod build is still registered.
+  if (/^\/(src|@vite|@id|@fs|node_modules)\//.test(url.pathname)) return;
+
   // Navigations: network first, shell second. A hunter opening the app out of coverage gets the
   // app, not a browser error page — which is the whole reason this file exists.
   if (request.mode === 'navigate') {
