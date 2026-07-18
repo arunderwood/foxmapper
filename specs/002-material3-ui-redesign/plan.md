@@ -44,9 +44,10 @@ current); dark scheme only
 **Project Type**: Web SPA, existing single-project layout under `web/`
 
 **Performance Goals**: First-load critical path ≤ 330 KB gzipped (baseline measured
-2026-07-16: 292.4 KB JS + 11.4 KB CSS ≈ 304 KB); usable map view ≤ 10 s on Chrome
+2026-07-16: 292.4 KB JS + 11.4 KB CSS ≈ 304 KB); interactive join screen ≤ 10 s on Chrome
 DevTools "Slow 3G" profile and never > 120% of the pre-redesign build on the same profile
-(SC-003); redesign's own additions ≤ 20 KB gzipped
+(SC-003 — first load lands on the join screen, so that is the measured milestone, matching
+quickstart.md and T038); redesign's own additions ≤ 20 KB gzipped
 
 **Constraints**: Offline-first (no runtime fetch of any font, icon, stylesheet, or image
 beyond map tiles — SC-009); 56 px touch floor; 16 px input minimum; 7:1 contrast on
