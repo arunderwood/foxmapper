@@ -55,7 +55,7 @@ import type { AuthorContext } from './report/author.js';
 import { addToHomeScreenOffer, requestPersistence } from './ui/storage.js';
 import type { Target } from './ui/target.js';
 import { el, clear } from './ui/dom.js';
-import { limitsNotice } from './ui/limits.js';
+import { landingField, landingScreen } from './ui/landing.js';
 import { captureError, initAnalytics, track } from './analytics/posthog.js';
 
 const API_ORIGIN = import.meta.env['VITE_API_ORIGIN'] ?? window.location.origin;
@@ -248,23 +248,39 @@ class App {
     clear(this.#root);
 
     const label = el('input', {
+      id: 'new-label',
       type: 'text',
       placeholder: 'Saturday fox',
       'data-testid': 'new-label',
     });
     const frequency = el('input', {
+      id: 'new-frequency',
       type: 'text',
       placeholder: '146.52',
       'data-testid': 'new-frequency',
     });
     const create = el(
       'button',
-      { type: 'button', class: 'primary', 'data-testid': 'create-hunt' },
+      { type: 'submit', class: 'primary', 'data-testid': 'create-hunt' },
       'Start a hunt',
     );
+    // Failure has a home inside the card, next to the button that caused it, rather than as an
+    // orphan below the screen. Hidden until there is something to say.
+    const status = el('p', { class: 'notice', 'data-testid': 'create-status', hidden: true });
 
-    create.addEventListener('click', () => {
+    const form = el(
+      'form',
+      { class: 'landing-form', 'data-testid': 'create-form' },
+      landingField('Name your new hunt', label, 'new-label'),
+      landingField('Frequency', frequency, 'new-frequency'),
+      create,
+      status,
+    );
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
       void (async () => {
+        status.hidden = true;
         create.toggleAttribute('disabled', true);
         try {
           const response = await fetch(`${API_ORIGIN}/api/hunts`, {
@@ -279,30 +295,15 @@ class App {
           window.location.href = `/h/${hunt.code}`;
         } catch {
           create.toggleAttribute('disabled', false);
-          this.#root.append(
-            el(
-              'div',
-              { class: 'notice' },
-              'Could not reach the server. Starting a hunt needs a signal; joining one does not.',
-            ),
-          );
+          status.textContent =
+            'Could not reach the server. Starting a hunt needs a signal; joining one does not.';
+          status.hidden = false;
         }
       })();
     });
 
     this.#root.append(
-      el(
-        'div',
-        { class: 'screen', 'data-testid': 'start-screen' },
-        el('h1', { class: 'display' }, 'FoxMapper'),
-        el('p', { class: 'dim' }, 'A shared map of who heard what, and from where.'),
-        el('label', {}, 'What are you hunting?'),
-        label,
-        el('label', {}, 'Frequency (however you say it)'),
-        frequency,
-        create,
-        limitsNotice(),
-      ),
+      landingScreen({ testid: 'start-screen', kicker: 'Starting a new hunt', form }),
     );
   }
 

@@ -92,7 +92,6 @@ test('the limits are in the interface, not in terms of service', async ({ page, 
   const limits = page.getByTestId('limits');
   await expect(limits).toBeVisible();
   await expect(limits).toContainText(/not certified/i);
-  await expect(limits).toContainText(/only as good as the reports/i);
   await expect(limits).toContainText(/anyone with the hunt link/i);
 });
 

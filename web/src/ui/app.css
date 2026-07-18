@@ -236,6 +236,147 @@ label {
   }
 }
 
+/* ---- Landing: the two entry screens (src/ui/landing.ts) ----
+ *
+ * The real hunt map is the backdrop; one panel floats over it carrying everything a visitor needs
+ * in a single view. It fills the viewport and does not scroll — the panel is trimmed to fit a
+ * phone, and on a taller screen it simply sits centred with more map showing around it. The map
+ * does the selling; the panel does the work.
+ */
+.landing {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  /* A fade only: translating a full-bleed backdrop would show a bare strip while it slid in. */
+  animation: landing-in var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+@keyframes landing-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The product, full-bleed behind everything. */
+.landing-map-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* A vignette over the map: darkest at the edges, so the panel reads and the streets recede. */
+.landing-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% 45%,
+    var(--fx-color-scrim-transparent) 0%,
+    var(--fx-color-backdrop) 55%,
+    var(--fx-color-scrim) 100%
+  );
+}
+
+/* The one panel: a near-opaque scrim tint, so every field and line is legible over the streets.
+   `overflow` is a safety valve for the shortest phones; the content is sized not to need it. */
+.landing-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 30rem;
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.1rem;
+  background: var(--fx-color-scrim);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+}
+
+.landing-wordmark {
+  margin: 0;
+}
+
+/* The one line of promise: the fox, the radio, the shared live map. Full brightness, it reads first. */
+.landing-blurb {
+  margin: 0;
+  font-size: var(--md-sys-typescale-body-size);
+  line-height: 1.4;
+  color: var(--md-sys-color-on-surface);
+}
+
+.landing-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Which of the two doors you came through, in the panel's own words and the one accent colour. */
+.landing-kicker {
+  margin: 0;
+  font-size: var(--md-sys-typescale-label-size);
+  font-weight: var(--md-sys-typescale-label-weight);
+  letter-spacing: var(--md-sys-typescale-label-tracking);
+  color: var(--md-sys-color-primary);
+}
+
+/* The hunt you are joining: the confirmation a handed-a-link hunter needs before typing a callsign. */
+.landing-target {
+  margin: 0;
+  font-size: var(--md-sys-typescale-title-size);
+  font-weight: var(--md-sys-typescale-title-weight);
+  line-height: var(--md-sys-typescale-title-line-height);
+  color: var(--md-sys-color-on-surface);
+}
+
+.landing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Label and its input, one unit: tight enough to read together, unlike the gap between fields. */
+.landing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.landing-fineprint {
+  margin: 0;
+}
+
+/* The three words on the map, as a tight term/definition grid so they cost almost no height. */
+.landing-glossary {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.6rem;
+  font-size: var(--md-sys-typescale-label-size);
+  line-height: 1.3;
+}
+
+.landing-glossary-term {
+  margin: 0;
+  font-weight: 700;
+  color: var(--md-sys-color-primary);
+  white-space: nowrap;
+}
+
+.landing-glossary-def {
+  margin: 0;
+}
+
 .stack {
   display: flex;
   flex-direction: column;
