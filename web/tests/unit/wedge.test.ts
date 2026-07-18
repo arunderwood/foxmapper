@@ -31,7 +31,6 @@ function bearing(headingTrue: number, q: ConfidenceQ = 4, r: MaxRangeR = 3): Bea
       heading_magnetic: headingTrue - 15.2,
       declination: 15.2,
       wmm_epoch: 'WMM2025',
-      heading_source: 'compass',
       confidence_q: q,
       max_range_r: r,
     },

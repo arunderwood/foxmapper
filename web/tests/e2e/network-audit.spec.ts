@@ -11,7 +11,7 @@
  * of the report bar — the licence unmet is not a cosmetic fault.
  */
 import { test, expect } from '@playwright/test';
-import { createHunt, grantPosition, reportHeardNothing } from './helpers.js';
+import { createHunt, grantPosition, reportBearing, reportHeardNothing } from './helpers.js';
 
 const TILE_HOST = 'tiles.openfreemap.org';
 
@@ -54,6 +54,9 @@ test('a full session fetches nothing but the bundle and tiles', async ({ page, c
   // of it may leave the allowed hosts.
   await context.setOffline(true);
   await reportHeardNothing(page);
+  // A full bearing entry on the dial (set by hand, no compass events) must issue no request either
+  // — the compass, dial, and twist are entirely client-side (SC-009, FR-017).
+  await reportBearing(page);
   await expect(page.getByTestId('queue-depth')).toBeVisible();
   await context.setOffline(false);
   await expect(page.getByTestId('queue-depth')).toHaveCount(0, { timeout: 30_000 });

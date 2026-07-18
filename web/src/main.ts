@@ -432,7 +432,9 @@ class App {
     const close = (): void => dismissSheet(sheetNode);
     const sheetNode =
       kind === 'bearing'
-        ? bearingSheet(options, close)
+        ? // A relayed bearing was called over voice — net control has nothing to point at the fox,
+          // so the dial opens in by-hand mode with no live compass (FR-012).
+          bearingSheet(options, close, this.#relayTarget ? 'by-hand' : 'auto')
         : kind === 'omni'
           ? omniSheet(options, close)
           : simpleSheet(kind, options, close);

@@ -40,7 +40,6 @@ const bearing = (id: string): Report => ({
     heading_magnetic: 256.2,
     declination: 15.2,
     wmm_epoch: 'WMM2025',
-    heading_source: 'compass',
     confidence_q: 4,
     max_range_r: 3,
   },

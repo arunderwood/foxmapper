@@ -57,7 +57,6 @@ export const bearingReportArb: fc.Arbitrary<BearingReport> = fc
       heading_magnetic: headingArb,
       declination: fc.double({ min: -30, max: 30, noNaN: true, noDefaultInfinity: true }),
       wmm_epoch: fc.constant('WMM2025'),
-      heading_source: fc.constantFrom('compass' as const, 'manual' as const),
       confidence_q: confidenceQArb,
       max_range_r: maxRangeRArb,
     }),

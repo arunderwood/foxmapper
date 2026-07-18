@@ -15,7 +15,7 @@ import { composeHeardNothing } from '../report/heard_nothing.js';
 import { composeFix } from '../report/fix.js';
 import type { AuthorContext } from '../report/author.js';
 import type { ConfidenceQ, MaxRangeR, Report, StrengthS } from '../log/types.js';
-import { watchHeading, needsPermission, requestPermission } from '../sensors/heading.js';
+import { compassDial, type DialMode } from './compass-dial.js';
 import { el } from './dom.js';
 import { icon, type IconName } from './icons.js';
 
@@ -184,69 +184,18 @@ function sheet(
 /**
  * Bearing entry.
  *
- * The compass **drafts** the heading and the reporter can adjust it before submitting. A heading
- * they never saw would be a number the log attributes to them that they never claimed — and with
- * 10–30° of compass error near a vehicle, that number is often wrong.
+ * The heading is set on a compass dial (compass-dial.ts): a device with a compass goes live and the
+ * hunter freezes it; any device can twist the rose to set or correct the bearing. Nothing is
+ * committed until a freeze or a twist — no due-north default is ever filed (FR-003a) — and the log
+ * records only the number, never where it came from (FR-010). Relay entry uses the by-hand dial
+ * (`mode: 'by-hand'`): net control has nothing to point at the fox.
  */
-export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLElement {
-  // Undefined, not zero. A heading of 0 is due north — a real claim — and starting there means a
-  // reporter who never touches this control files a due-north bearing under their own callsign.
-  // Range is guarded exactly this way (FR-006c); a wedge's direction deserves it at least as much.
-  let magnetic: number | undefined;
-  let source: 'compass' | 'manual' = 'manual';
-  let accuracy: number | undefined;
-  let stopWatching: (() => void) | undefined;
-
-  const readout = el('input', {
-    type: 'number',
-    inputmode: 'decimal',
-    min: '0',
-    max: '359.9',
-    step: '0.1',
-    'data-testid': 'heading-input',
-    'aria-label': 'Bearing in degrees',
-  });
-
-  // Typing overrides the compass permanently: the reporter has made a claim, and a sensor update
-  // that silently overwrote it would replace their number with the phone's.
-  readout.addEventListener('input', () => {
-    stopWatching?.();
-    stopWatching = undefined;
-    source = 'manual';
-    accuracy = undefined;
-    magnetic = readout.value.trim() === '' ? undefined : Number(readout.value);
-    status.textContent = 'Using the bearing you typed';
-    refresh();
-  });
-
-  const status = el(
-    'p',
-    { class: 'small dim', 'data-testid': 'heading-status' },
-    'Point the phone at the fox',
-  );
-
-  const useCompass = el(
-    'button',
-    { type: 'button', 'data-testid': 'use-compass' },
-    'Use the compass',
-  );
-  useCompass.addEventListener('click', () => {
-    // Must be inside a gesture handler on iOS or requestPermission rejects.
-    void (async () => {
-      if (needsPermission() && !(await requestPermission())) {
-        status.textContent = 'No compass access — type the bearing instead';
-        return;
-      }
-      source = 'compass';
-      status.textContent = 'Compass live — check it, then adjust if it looks wrong';
-      stopWatching = watchHeading((heading) => {
-        magnetic = heading.magnetic;
-        accuracy = heading.accuracyDegrees;
-        readout.value = heading.magnetic.toFixed(1);
-        refresh();
-      });
-    })();
-  });
+export function bearingSheet(
+  options: EntryOptions,
+  onClose: () => void,
+  mode: DialMode = 'auto',
+): HTMLElement {
+  const dial = compassDial({ mode, onChange: () => refresh() });
 
   const confidence = choiceRow<ConfidenceQ>(
     'confidence',
@@ -271,7 +220,9 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
   function refresh(): void {
     send.toggleAttribute(
       'disabled',
-      magnetic === undefined || confidence.value() === undefined || range.value() === undefined,
+      dial.committedHeading() === undefined ||
+        confidence.value() === undefined ||
+        range.value() === undefined,
     );
   }
   refresh();
@@ -281,6 +232,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
   send.addEventListener('click', () => {
     const q = confidence.value();
     const r = range.value();
+    const magnetic = dial.committedHeading();
     if (q === undefined || r === undefined || magnetic === undefined) return;
 
     // Own or relayed is the caller's concern: main.ts injects the armed relay target into
@@ -291,15 +243,11 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
       return;
     }
 
-    stopWatching?.();
+    dial.destroy();
     options.onSubmit(
       composeBearing({
         ...context,
-        draft: {
-          heading_magnetic: magnetic,
-          heading_source: source,
-          ...(accuracy !== undefined ? { compass_accuracy_deg: accuracy } : {}),
-        },
+        draft: { heading_magnetic: magnetic },
         confidence_q: q,
         max_range_r: r,
       }),
@@ -309,7 +257,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
 
   const cancel = el('button', { type: 'button' }, 'Cancel');
   cancel.addEventListener('click', () => {
-    stopWatching?.();
+    dial.destroy();
     onClose();
   });
 
@@ -317,10 +265,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
     'bearing',
     'Which way is the fox?',
     [
-      el('label', { for: 'heading' }, 'Degrees'),
-      readout,
-      useCompass,
-      status,
+      dial.node,
       el('h2', {}, 'How sure are you?'),
       confidence.node,
       el('h2', {}, 'How far could it be?'),
@@ -329,7 +274,7 @@ export function bearingSheet(options: EntryOptions, onClose: () => void): HTMLEl
       el('div', { class: 'sheet-actions' }, cancel, send),
     ],
     () => {
-      stopWatching?.();
+      dial.destroy();
       onClose();
     },
   );
