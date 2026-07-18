@@ -111,7 +111,7 @@ web/
 │   │   │   └── sample.ts        # scripted credible-region sample for the estimate step (FR-014)
 │   │   ├── tour.css             # overlay/scrim/spotlight styles (imported by app.css)
 │   │   ├── settings.ts          # + "Take the tour" relaunch entry (data-testid="replay-tour")
-│   │   ├── map-view.ts          # + data-testid on the map container for the estimate step anchor
+│   │   ├── map-view.ts          # data-testid="map" on the map container (already present) — estimate-step anchor
 │   │   └── report-entry.ts      # unchanged; KIND_BUTTONS/ReportKind are read by manifest.ts
 │   └── main.ts                  # wire first-run offer + relaunch; owns app state (existing pattern)
 └── tests/

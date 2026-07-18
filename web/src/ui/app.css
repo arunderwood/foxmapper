@@ -8,6 +8,9 @@
  * var(--md-sys-*)/var(--fx-*), never define a colour, radius, duration, or easing of its own.
  */
 @import './tokens.css';
+/* The product tour overlay/offer. Imported here so its rules ship with the app shell and are
+   available offline the moment a hunt view renders (FR-012). */
+@import './tour.css';
 
 * {
   box-sizing: border-box;

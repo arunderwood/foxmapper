@@ -32,8 +32,8 @@ Single web client under `web/`. Source in `web/src/`, tests in `web/tests/`. Rep
 
 **Purpose**: Create the tour module skeleton so later tasks edit existing files.
 
-- [ ] T001 Scaffold `web/src/ui/tour/` with stub files `tour.ts`, `steps.ts`, `manifest.ts`, `state.ts`, `sample.ts`, each exporting typed placeholders per [data-model.md](data-model.md)
-- [ ] T002 [P] Create `web/src/ui/tour.css` and import it from `web/src/ui/app.css`
+- [X] T001 Scaffold `web/src/ui/tour/` with stub files `tour.ts`, `steps.ts`, `manifest.ts`, `state.ts`, `sample.ts`, each exporting typed placeholders per [data-model.md](data-model.md)
+- [X] T002 [P] Create `web/src/ui/tour.css` and import it from `web/src/ui/app.css`
 
 ---
 
@@ -43,10 +43,10 @@ Single web client under `web/`. Source in `web/src/`, tests in `web/tests/`. Rep
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Add `data-testid="map"` to the MapLibre container element in `web/src/ui/map-view.ts` (the estimate-step anchor)
-- [ ] T004 [P] Add a "Take the tour" relaunch button with `data-testid="replay-tour"` to the settings sheet in `web/src/ui/settings.ts`, exposed via an `onReplayTour` callback (wired in `main.ts` later)
-- [ ] T005 Define `Tour`/`TourStep` types and the ordered step skeleton (7 steps: `target`, `estimate`, `report-bar`, `bearing`, `omni`, `null`, `finish`) with their `anchor` testids in `web/src/ui/tour/steps.ts` (copy filled in US1; `share` inserted in US2)
-- [ ] T006 Define `anchors[]` (from the step anchors) and `coveredKinds` (derived from `KIND_BUTTONS` in `web/src/ui/report-entry.ts`: `bearing`, `omni`, `null`) in `web/src/ui/tour/manifest.ts`
+- [X] T003 Verify the MapLibre container in `web/src/ui/map-view.ts` already carries `data-testid="map"` (present at `map-view.ts:147`) — the estimate-step anchor. No code change expected; the task pins the anchor for the drift test.
+- [X] T004 [P] Add a "Take the tour" relaunch button with `data-testid="replay-tour"` to the settings sheet in `web/src/ui/settings.ts`, exposed via an `onReplayTour` callback (wired in `main.ts` later)
+- [X] T005 Define `Tour`/`TourStep` types and the ordered step skeleton in `web/src/ui/tour/steps.ts`: 7 steps (US1), each a stable `id` mapped to its existing `anchor` (`data-testid`) per [data-model.md](data-model.md) — `target`→`target-label`, `estimate`→`map`, `report-bar`→`report-bar`, `bearing`→`report-bearing`, `omni`→`report-omni`, `null`→`report-null`, and the anchorless `finish` (copy filled in US1; `share`→`share-hunt` inserted in US2)
+- [X] T006 Define `anchors[]` = the step `anchor` testids that already exist in `web/src` (`target-label`, `map`, `report-bar`, `report-bearing`, `report-omni`, `report-null`; `share-hunt` added in US2 — **not** bare `bearing`/`omni`/`null`/`target`) and `coveredKinds` = the `KIND_BUTTONS` kinds in `web/src/ui/report-entry.ts` (`bearing`, `omni`, `null`) in `web/src/ui/tour/manifest.ts`
 
 **Checkpoint**: Anchors resolve and declarations exist — US1, US2, and US3 can now proceed (US3 in parallel with US1/US2).
 
@@ -64,17 +64,17 @@ shown → finish lands on a usable hunt view; declining leaves the app usable wi
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T007 [P] [US1] Unit test for tour-state transitions (unseen→completed / unseen→declined; relaunch leaves status intact; missing record reads as unseen) over `fake-indexeddb` in `web/tests/unit/tour-state.test.ts`
-- [ ] T008 [P] [US1] E2e spec in `web/tests/e2e/tour.spec.ts` covering: offer on first hunt view → accept → ordered spotlights → progress "N of M" → finish → no re-offer; decline and mid-tour exit leave joining/reporting with zero extra steps (SC-005); keyboard (→/Enter/←/Esc), scrim-click exit, focus trapped in callout, and reduced-motion instant (FR-020); and full start→finish with `context.setOffline(true)` making no network request (FR-012, SC-004)
+- [X] T007 [P] [US1] Unit test for tour-state transitions (unseen→completed / unseen→declined; relaunch leaves status intact; missing record reads as unseen; a completed or declined record stamped with an older `version` still reads as seen — a `TOUR_VERSION` bump does not, on its own, re-offer (FR-013)) over `fake-indexeddb` in `web/tests/unit/tour-state.test.ts`
+- [X] T008 [P] [US1] E2e spec in `web/tests/e2e/tour.spec.ts` covering: offer on first hunt view → accept → ordered spotlights → progress "N of M" → finish → no re-offer; decline and mid-tour exit leave joining/reporting with zero extra steps (SC-005); keyboard (→/Enter/←/Esc), scrim-click exit, focus trapped in callout, and reduced-motion instant (FR-020); and full start→finish with `context.setOffline(true)` making no network request (FR-012, SC-004)
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Implement `web/src/ui/tour/state.ts`: `readTourState`/`markCompleted`/`markDeclined` over the `meta` store (`getMeta`/`setMeta`) plus the `TOUR_VERSION` constant, per [contracts/tour-state.md](contracts/tour-state.md)
-- [ ] T010 [P] [US1] Implement `web/src/ui/tour/sample.ts`: a fixed illustrative credible-region sample for the estimate step that renders a *region* (not a point), visibly marked as an example, never written to the log (FR-014, Principle I)
-- [ ] T011 [US1] Implement the overlay engine in `web/src/ui/tour/tour.ts`: scrim + spotlight cutout (measure anchor rect, re-measure on resize/scroll, centered fallback if anchor absent), callout with title/body/`tour-progress`/`tour-next`/`tour-back`/`tour-exit`, keyboard handling, focus trap, `aria-live` announcements, `role="dialog"`/`aria-modal`, and reduced-motion behavior, per [contracts/tour-overlay.md](contracts/tour-overlay.md) (depends on T005, T009, T010)
-- [ ] T012 [US1] Fill plain-language copy for the 7 non-share steps in `web/src/ui/tour/steps.ts` — hunter vocabulary only; the `omni` step carries the explicit stock-handheld message (FR-008); the `estimate` step describes the estimate as a region that grows less certain, never a point (FR-009) and sets `sample: true`
-- [ ] T013 [P] [US1] Style the overlay in `web/src/ui/tour.css`: scrim, spotlight cutout, callout positioning, phone-viewport rules that keep the anchor visible (FR-006), and a `prefers-reduced-motion` block
-- [ ] T014 [US1] Wire the tour into `web/src/main.ts`: render the `tour-offer` on first hunt view when `status === 'unseen'` (accept → run, decline → `markDeclined`); run on `onReplayTour` from settings; on finish → `markCompleted` and leave a live hunt view (FR-015); mount offer/overlay into `#app` (depends on T003, T004, T009, T011, T012)
+- [X] T009 [US1] Implement `web/src/ui/tour/state.ts`: `readTourState`/`markCompleted`/`markDeclined` over the `meta` store (`getMeta`/`setMeta`) plus the `TOUR_VERSION` constant, per [contracts/tour-state.md](contracts/tour-state.md)
+- [X] T010 [P] [US1] Implement `web/src/ui/tour/sample.ts`: a fixed illustrative credible-region sample for the estimate step that renders a *region* (not a point), visibly marked as an example, never written to the log (FR-014, Principle I)
+- [X] T011 [US1] Implement the overlay engine in `web/src/ui/tour/tour.ts`: scrim + spotlight cutout (measure anchor rect, re-measure on resize/scroll, centered fallback if anchor absent), callout with title/body/`tour-progress`/`tour-next`/`tour-back`/`tour-exit`, keyboard handling, focus trap, `aria-live` announcements, `role="dialog"`/`aria-modal`, and reduced-motion behavior, per [contracts/tour-overlay.md](contracts/tour-overlay.md) (depends on T005, T009, T010)
+- [X] T012 [US1] Fill plain-language copy for the 7 non-share steps in `web/src/ui/tour/steps.ts` — hunter vocabulary only; the `omni` step carries the explicit stock-handheld message (FR-008); the `estimate` step describes the estimate as a region that grows less certain, never a point (FR-009) and sets `sample: true`
+- [X] T013 [P] [US1] Style the overlay in `web/src/ui/tour.css`: scrim, spotlight cutout, callout positioning, phone-viewport rules that keep the anchor visible (FR-006), and a `prefers-reduced-motion` block
+- [X] T014 [US1] Wire the tour into `web/src/main.ts`: render the `tour-offer` on first hunt view when `status === 'unseen'` (accept → run, decline → `markDeclined`); run on `onReplayTour` from settings; on finish → `markCompleted` and leave a live hunt view (FR-015); mount offer/overlay into `#app` (depends on T003, T004, T009, T011, T012)
 
 ### Field Validation for User Story 1 (deferred milestone — does not gate US2)
 
@@ -94,12 +94,12 @@ a teammate joins, and states joining needs no account or install.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T016 [US2] Extend `web/tests/e2e/tour.spec.ts` to assert the `share` step appears before `finish`, spotlights `share-hunt`, and its copy states no account/install/payment (FR-010)
+- [X] T016 [US2] Extend `web/tests/e2e/tour.spec.ts` to assert the `share` step appears before `finish`, spotlights `share-hunt`, and its copy states no account/install/payment (FR-010)
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Insert the `share` step (anchor `share-hunt`) immediately before `finish` in `web/src/ui/tour/steps.ts` and add `share-hunt` to `anchors[]` in `web/src/ui/tour/manifest.ts`
-- [ ] T018 [US2] Write the share-step copy in `web/src/ui/tour/steps.ts`: how a teammate joins the same hunt and that joining needs no account, install, or payment (plain language, FR-010/FR-011)
+- [X] T017 [US2] Insert the `share` step (anchor `share-hunt`) immediately before `finish` in `web/src/ui/tour/steps.ts` and add `share-hunt` to `anchors[]` in `web/src/ui/tour/manifest.ts`
+- [X] T018 [US2] Write the share-step copy in `web/src/ui/tour/steps.ts`: how a teammate joins the same hunt and that joining needs no account, install, or payment (plain language, FR-010/FR-011)
 
 ### Field Validation for User Story 2 (deferred milestone — does not gate US3)
 
@@ -123,11 +123,11 @@ copy from US1/US2 to exist.
 
 ### Tests / Implementation for User Story 3
 
-- [ ] T020 [US3] Implement the drift test in `web/tests/unit/tour-manifest.test.ts`: assert every string in `manifest.anchors` occurs as a `data-testid` in `web/src`; assert `manifest.coveredKinds` equals the `KIND_BUTTONS` kinds in `web/src/ui/report-entry.ts`; assert every non-`finish` step's `anchor` is present in `manifest.anchors` — per [contracts/tour-drift-check.md](contracts/tour-drift-check.md) (depends on T005, T006)
-- [ ] T021 [P] [US3] Extend `web/tests/unit/vocabulary.test.ts` to scan the tour step copy in `web/src/ui/tour/steps.ts` for banned protocol vocabulary (NRQ/DFS/PHG) (FR-011) (depends on step copy: T012, T018)
-- [ ] T022 [US3] Add a `PostToolUse` hook to `.claude/settings.json` that runs the drift test after Edit/Write to watched paths (`web/src/ui/report-entry.ts`, `share.ts`, `join.ts`, `target.ts`, `map-view.ts`, `settings.ts`, `web/src/ui/tour/**`) and prints the result and the required action on failure (FR-017, FR-018)
-- [ ] T023 [P] [US3] Write `docs/product-tour.md` defining what counts as a "significant change that may invalidate the tour" (anchors, first-class report kinds, primary hunt-loop controls, the ordered walkthrough) (FR-019)
-- [ ] T024 [US3] Verify SC-008: temporarily rename a watched anchor and separately add a `ReportKind` → confirm `tour-manifest` fails naming each; make an unrelated edit → confirm it stays green; revert all temporary changes (depends on T020)
+- [X] T020 [US3] Implement the drift test in `web/tests/unit/tour-manifest.test.ts`: assert every string in `manifest.anchors` occurs as a `data-testid` in `web/src`; assert `manifest.coveredKinds` equals the `KIND_BUTTONS` kinds in `web/src/ui/report-entry.ts`; assert every non-`finish` step's `anchor` is present in `manifest.anchors` — per [contracts/tour-drift-check.md](contracts/tour-drift-check.md) (depends on T005, T006)
+- [X] T021 [P] [US3] Extend `web/tests/unit/vocabulary.test.ts` to scan the tour step copy in `web/src/ui/tour/steps.ts` for banned protocol vocabulary (NRQ/DFS/PHG) (FR-011) (depends on step copy: T012, T018)
+- [X] T022 [US3] Add a `PostToolUse` hook to `.claude/settings.json` that runs the drift test after Edit/Write to watched paths (`web/src/ui/report-entry.ts`, `share.ts`, `join.ts`, `target.ts`, `map-view.ts`, `settings.ts`, `web/src/ui/tour/**`) and prints the result and the required action on failure (FR-017, FR-018)
+- [X] T023 [P] [US3] Write `docs/product-tour.md` defining what counts as a "significant change that may invalidate the tour" (anchors, first-class report kinds, primary hunt-loop controls, the ordered walkthrough) (FR-019)
+- [X] T024 [US3] Verify SC-008: temporarily rename a watched anchor and separately add a `ReportKind` → confirm `tour-manifest` fails naming each; make an unrelated edit → confirm it stays green; revert all temporary changes (depends on T020)
 
 **Field Validation for User Story 3**: N/A — a maintainer-facing safeguard, validated by its own test
 suite (T020, T024). Its payoff shows up in US1/US2 field validation staying true across releases.
@@ -138,9 +138,9 @@ suite (T020, T024). Its payoff shows up in US1/US2 field validation staying true
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Run `npm run typecheck`, `npm run lint`, and `npm run format` and resolve anything the new files introduce
-- [ ] T026 Run the full [quickstart.md](quickstart.md) validation: `test:unit`, `test:e2e -- tour`, `tour-manifest`, and the three SC-008 drift cases
-- [ ] T027 [P] Add a pointer to the tour and its relaunch location (settings) in the `web/` README/docs
+- [X] T025 [P] Run `npm run typecheck`, `npm run lint`, and `npm run format` and resolve anything the new files introduce
+- [X] T026 Run the full [quickstart.md](quickstart.md) validation: `test:unit`, `test:e2e -- tour`, `tour-manifest`, and the three SC-008 drift cases
+- [X] T027 [P] Add a pointer to the tour and its relaunch location (settings) in the `web/` README/docs
 
 ---
 
