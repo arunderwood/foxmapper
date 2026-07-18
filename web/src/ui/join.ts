@@ -8,7 +8,7 @@
 import { join } from '../log/identity.js';
 import type { FoxmapperDb } from '../log/store.js';
 import { el } from './dom.js';
-import { limitsNotice } from './limits.js';
+import { landingField, landingScreen } from './landing.js';
 import type { Target } from './target.js';
 
 export interface JoinOptions {
@@ -52,9 +52,8 @@ export function joinScreen(options: JoinOptions): HTMLElement {
 
   const form = el(
     'form',
-    { class: 'stack', 'data-testid': 'join-form' },
-    el('label', { for: 'callsign' }, 'Your callsign'),
-    input,
+    { class: 'landing-form', 'data-testid': 'join-form' },
+    landingField('Your callsign', input, 'callsign'),
     submit,
   );
 
@@ -69,28 +68,22 @@ export function joinScreen(options: JoinOptions): HTMLElement {
     void join(options.db, callsign).then((identity) => options.onJoined(identity.callsign));
   });
 
-  return el(
-    'div',
-    { class: 'screen', 'data-testid': 'join-screen' },
-    // Display scale: the join screen is one of the sanctioned expressive moments (FR-005) —
-    // the first thing a handed-a-link hunter sees gets the biggest type in the app.
-    el('h1', { class: 'display' }, 'FoxMapper'),
-    // The target is shown before any report arrives, so a joining hunter knows what they are
-    // chasing. Offline it is simply the code — which does not block joining.
-    //
-    // Always the same element, so the caller can fill the target in when it lands rather than
-    // re-rendering this screen underneath someone who is typing their callsign into it.
-    el(
-      'p',
-      { class: 'dim', 'data-testid': 'join-target' },
-      targetLine(options.target, options.huntCode),
-    ),
-    form,
-    el(
-      'p',
-      { class: 'small dim' },
-      'No account. No app to install. Your callsign stays on your phone.',
-    ),
-    limitsNotice(),
+  // The target is the head of the card: a handed-a-link hunter confirms which hunt they are about
+  // to join before they type a callsign into it. Offline it is simply the code — which does not
+  // block joining.
+  //
+  // Always the same element, so the caller can fill the target in when it lands rather than
+  // re-rendering this screen underneath someone who is typing their callsign into it.
+  const target = el(
+    'p',
+    { class: 'landing-target', 'data-testid': 'join-target' },
+    targetLine(options.target, options.huntCode),
   );
+
+  return landingScreen({
+    testid: 'join-screen',
+    kicker: 'Joining this hunt',
+    head: target,
+    form,
+  });
 }
