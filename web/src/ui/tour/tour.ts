@@ -43,9 +43,11 @@ export function offerTour(offer: TourOffer): void {
     'aria-label': 'Take the tour',
   });
 
-  let raf = 0;
+  let barObserver: ResizeObserver | undefined;
+  let reposition: (() => void) | undefined;
   const dismiss = (): void => {
-    cancelAnimationFrame(raf);
+    barObserver?.disconnect();
+    if (reposition) window.removeEventListener('resize', reposition);
     card.remove();
   };
 
@@ -82,20 +84,28 @@ export function offerTour(offer: TourOffer): void {
   // Sit the offer just above the report bar so it never covers a report button (FR-002). The bar is
   // not necessarily at the viewport bottom — an "add to home screen" notice can sit below it and
   // push it up — and its labels wrap taller on a narrow phone, so the offer is pinned to the bar's
-  // *live* top rather than to the viewport or a guessed height. Tracked each frame while the offer
-  // is shown, so it stays put through any reflow; it is a transient card, and this is the same cheap
-  // per-frame follow the tour spotlight uses.
+  // *live* top rather than to the viewport or a guessed height. It is measured once and then only on
+  // the two events that can move the bar: the bar wrapping to a new height, and the map view around
+  // it reflowing (that install notice appearing) — both watched with a ResizeObserver, plus a window
+  // resize. Deliberately NOT a per-frame loop: the offer shows on every hunt view, and a rAF that
+  // forced layout every frame for the life of the card kept the page from ever going idle.
   const bar = document.querySelector<HTMLElement>('[data-testid="report-bar"]');
   if (bar) {
     const gap = 12;
-    const track = (): void => {
+    reposition = (): void => {
       const rect = bar.getBoundingClientRect();
       if (rect.height > 0) {
         card.style.bottom = `${Math.max(0, Math.round(window.innerHeight - rect.top)) + gap}px`;
       }
-      raf = requestAnimationFrame(track);
     };
-    track();
+    reposition();
+    barObserver = new ResizeObserver(reposition);
+    barObserver.observe(bar);
+    // The bar can also *move* without resizing — the install notice growing shrinks the map view
+    // and slides the bar up — so watch that container too.
+    const container = bar.closest('.map-view');
+    if (container) barObserver.observe(container);
+    window.addEventListener('resize', reposition);
   }
 }
 
