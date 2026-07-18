@@ -4,38 +4,45 @@
 # take minutes to appear instead of seconds — and it fails silently, only in production, on the
 # one requirement (SC-002) that the whole product is for.
 
-services:
-  - type: web
-    name: foxmapper
-    runtime: docker
-    # One image: the relay serves the PWA from the same origin it streams from.
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    plan: starter
-    healthCheckPath: /health
-    # Wait for CI. The default is `commit`, which ships every push to main whether the tests
-    # passed or not — and the one thing this service exists for is a hunt happening outdoors,
-    # where nobody is watching the dashboard and a red build looks exactly like a green one.
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: foxmapper-db
-          property: connectionString
-      - key: BIND_ADDR
-        value: 0.0.0.0:8080
-      - key: RUST_LOG
-        value: foxmapper_server=info,tower_http=warn
-    # Render's proxy terminates HTTP/2 and does not buffer proxied responses, which is what SSE
-    # needs. The relay sets `X-Accel-Buffering: no` and `Cache-Control: no-transform` on the
-    # stream itself as well, because that header is what any nginx in the path reads — and the
-    # next place this gets deployed will have one.
-    #
-    # T069 exists because none of the above can be trusted without checking: `curl -N` against the
-    # deployed URL must show events arriving one at a time. A burst means a proxy is buffering and
-    # SC-002 is failing invisibly.
+# Grouping the relay and its database under a project keeps them together in the Render
+# dashboard instead of landing in "Ungrouped Services". The environment is where the resources
+# actually live; `production` is the only one this blueprint deploys.
+projects:
+  - name: foxmapper
+    environments:
+      - name: production
+        services:
+          - type: web
+            name: foxmapper
+            runtime: docker
+            # One image: the relay serves the PWA from the same origin it streams from.
+            dockerfilePath: ./Dockerfile
+            dockerContext: .
+            plan: starter
+            healthCheckPath: /health
+            # Wait for CI. The default is `commit`, which ships every push to main whether the tests
+            # passed or not — and the one thing this service exists for is a hunt happening outdoors,
+            # where nobody is watching the dashboard and a red build looks exactly like a green one.
+            autoDeployTrigger: checksPass
+            envVars:
+              - key: DATABASE_URL
+                fromDatabase:
+                  name: foxmapper-db
+                  property: connectionString
+              - key: BIND_ADDR
+                value: 0.0.0.0:8080
+              - key: RUST_LOG
+                value: foxmapper_server=info,tower_http=warn
+            # Render's proxy terminates HTTP/2 and does not buffer proxied responses, which is what SSE
+            # needs. The relay sets `X-Accel-Buffering: no` and `Cache-Control: no-transform` on the
+            # stream itself as well, because that header is what any nginx in the path reads — and the
+            # next place this gets deployed will have one.
+            #
+            # T069 exists because none of the above can be trusted without checking: `curl -N` against the
+            # deployed URL must show events arriving one at a time. A burst means a proxy is buffering and
+            # SC-002 is failing invisibly.
 
-databases:
-  - name: foxmapper-db
-    plan: basic-256mb
-    postgresMajorVersion: '18'
+        databases:
+          - name: foxmapper-db
+            plan: basic-256mb
+            postgresMajorVersion: '18'
