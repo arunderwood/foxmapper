@@ -424,6 +424,12 @@ label {
 }
 
 .rose-rotator {
+  /* Spin about the rose's own centre (0,0 in the viewBox), not a corner. `transform-origin: center`
+     alone is ambiguous on an SVG <g>: its reference box depends on the browser's default
+     `transform-box`, and the wrong default pins the origin to a viewBox corner off-frame, so the
+     rose swings around an edge instead of rotating in place. Anchoring the box to the group's own
+     fill geometry — symmetric about (0,0) — makes `center` resolve to the dial centre everywhere. */
+  transform-box: fill-box;
   transform-origin: center;
   will-change: transform;
 }
@@ -575,6 +581,13 @@ label {
 
 .chip .chip-label {
   min-width: 0;
+}
+
+/* A status chip whose glyph carries the whole meaning (the sync-scope chip, FR-018): square the
+   padding so it reads as a status badge rather than a truncated label. The scope it stands for
+   still reaches assistive tech through the chip's own aria-label. */
+.chip.icon-only {
+  padding: 0.3rem;
 }
 
 .chip.dim {

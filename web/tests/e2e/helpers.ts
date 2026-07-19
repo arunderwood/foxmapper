@@ -196,3 +196,14 @@ export async function renderedFeatures(page: Page): Promise<RenderedFeature[]> {
     return [...collect('reports-wedges'), ...collect('reports-markers')];
   });
 }
+
+/** How many features a named map source currently holds — used for the self-position pins. */
+export async function sourceFeatureCount(page: Page, sourceId: string): Promise<number> {
+  return page.evaluate((id) => {
+    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+    const source = map?.getSource(id) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return 0;
+    const serialized = source.serialize() as { data?: GeoJSON.FeatureCollection };
+    return serialized.data?.features?.length ?? 0;
+  }, sourceId);
+}

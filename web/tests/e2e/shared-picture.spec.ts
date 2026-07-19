@@ -146,15 +146,16 @@ test('the map says whether it is showing everyone or only this phone', async ({ 
   const code = await createHunt();
   const a = await secondDevice(browser, code, 'KI7XYZ');
 
-  await expect(a.page.getByTestId('sync-state')).toContainText(/everyone/i);
+  // The chip is icon-only now (cloud-with-check vs cloud-with-slash); the scope FR-018 requires is
+  // carried in its aria-label, so assert that rather than visible text.
+  await expect(a.page.getByTestId('sync-state')).toHaveAttribute('aria-label', /everyone/i);
 
   await a.context.setOffline(true);
-  // The redesign shortened the wording ("No signal — this phone only"); what FR-018 requires
-  // is the distinction itself, so assert the state and the phrase's load-bearing halves.
+  // What FR-018 requires is the distinction itself: the state flips and the label names the scope.
   await expect(a.page.getByTestId('sync-state')).toHaveAttribute('data-state', 'offline', {
     timeout: 10_000,
   });
-  await expect(a.page.getByTestId('sync-state')).toContainText(/this phone only/i);
+  await expect(a.page.getByTestId('sync-state')).toHaveAttribute('aria-label', /this phone only/i);
 
   await a.context.close();
 });

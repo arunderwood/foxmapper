@@ -54,13 +54,9 @@ test('the sync vocabulary: live → offline → queued → draining → synced',
   const offline = await look(sync);
   expectDistinct(live, offline, 'live/offline');
 
-  // FR-016: the warning tier is glanceable and wraps, never truncates.
-  const offlineStyles = await sync.evaluate((node) => ({
-    whiteSpace: getComputedStyle(node).whiteSpace,
-    overflowWrap: getComputedStyle(node).overflowWrap,
-  }));
-  expect(offlineStyles.whiteSpace).toBe('normal');
-  expect(offlineStyles.overflowWrap).toBe('anywhere');
+  // The chip is icon-only; FR-018's scope ("this phone only") rides on its aria-label so it is
+  // never lost to a hunter on a screen reader even though the caption is gone.
+  await expect(sync).toHaveAttribute('aria-label', /this phone only/i);
 
   // Queued: two reports held on this phone, counted, in the warn container. It sits BESIDE
   // the offline chip (both visible at once), so its identity is icon + count + pill shape —

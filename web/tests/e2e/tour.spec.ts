@@ -13,7 +13,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createHunt, grantPosition, joinAs } from './helpers.js';
 
 /** The fixed order of the walkthrough (data-model.md), share included (US2). */
-const STEP_ORDER = ['target', 'estimate', 'bearing', 'omni', 'null', 'share', 'finish'] as const;
+const STEP_ORDER = ['estimate', 'bearing', 'omni', 'null', 'share', 'finish'] as const;
 
 async function openHunt(page: Page, context: Parameters<typeof grantPosition>[0]): Promise<void> {
   const code = await createHunt('tour walkthrough');
@@ -83,9 +83,8 @@ test('the estimate step shows a region sample and the omni step names the stock 
   await openHunt(page, context);
   await page.getByTestId('tour-offer-accept').click();
 
-  // estimate: the scripted credible-region sample stands in on an empty hunt (FR-014), and it is a
-  // region, not a point.
-  await page.getByTestId('tour-next').click(); // target -> estimate
+  // estimate: the walkthrough opens here now, and the scripted credible-region sample stands in on
+  // an empty hunt (FR-014) — a region, not a point.
   await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
   await expect(page.getByTestId('tour-sample')).toBeVisible();
 
@@ -104,7 +103,9 @@ test('the share step spotlights the share affordance and explains how a teammate
   await openHunt(page, context);
   await page.getByTestId('tour-offer-accept').click();
 
-  for (const to of ['estimate', 'bearing', 'omni', 'null', 'share']) {
+  // The walkthrough opens on estimate; advance to the share step.
+  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
+  for (const to of ['bearing', 'omni', 'null', 'share']) {
     await page.getByTestId('tour-next').click();
     await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', to);
   }
@@ -126,20 +127,20 @@ test('is fully operable by keyboard, and the scrim and Esc both exit', async ({
 }) => {
   await openHunt(page, context);
   await page.getByTestId('tour-offer-accept').click();
-  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'target');
+  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
 
   // Focus lands in the callout when a step becomes active (FR-020).
   await expect(page.getByTestId('tour-callout')).toBeFocused();
 
   // Arrow keys advance and go back.
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
+  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'bearing');
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'target');
+  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
 
   // Enter (with focus on the callout, not a button) advances too.
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
+  await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'bearing');
 
   // Esc exits, leaving the hunt usable.
   await page.keyboard.press('Escape');
@@ -164,8 +165,8 @@ test('honours reduced motion: the overlay runs with no animation over 50ms (FR-0
   await expect(page.getByTestId('tour-overlay')).toBeVisible();
 
   // Advance a few steps — including the spotlight jumping between anchors — and confirm nothing
-  // decorates the journey.
-  for (const to of ['estimate', 'bearing', 'omni']) {
+  // decorates the journey. (The walkthrough opens on estimate.)
+  for (const to of ['bearing', 'omni', 'null']) {
     await page.getByTestId('tour-next').click();
     await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', to);
     const longest = await page.evaluate(() =>

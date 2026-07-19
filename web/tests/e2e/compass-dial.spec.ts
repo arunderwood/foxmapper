@@ -178,6 +178,42 @@ test.describe('compass dial', () => {
       .toBe(1);
   });
 
+  test('the rose rotates about the dial centre, not a corner', async ({ page, context }) => {
+    await grantPosition(context);
+    await joinAs(page, await createHunt(), 'KI7ROT');
+
+    await page.getByTestId('report-bearing').click();
+    const rotator = page.getByTestId('compass-dial').locator('.rose-rotator');
+
+    // The rose is a near-circular shape drawn symmetric about the viewBox origin. Rotate it about
+    // its own centre and its on-screen bounding box barely moves; rotate it about a corner and the
+    // whole rose swings off — its box centre lands far from the dial. Set two headings via the
+    // accessible field and measure the rose's box centre against the dial's own.
+    const centreAt = async (deg: number): Promise<{ rose: number[]; svg: number[] }> => {
+      await page.getByTestId('heading-input').fill(String(deg));
+      // The fill commits synchronously and rotates the rose; wait for the transform to land rather
+      // than race it. (The numeric field keeps the raw typed value while focused, so its formatting
+      // is not what to key off — the applied rotation is.)
+      await expect(rotator).toHaveAttribute('style', new RegExp(`rotate\\(-?${deg}deg\\)`));
+      return page.evaluate(() => {
+        const dial = document.querySelector('[data-testid="compass-dial"]')!;
+        const rose = dial.querySelector('.rose-rotator')!.getBoundingClientRect();
+        const svg = dial.querySelector('.dial-rose')!.getBoundingClientRect();
+        return {
+          rose: [rose.x + rose.width / 2, rose.y + rose.height / 2],
+          svg: [svg.x + svg.width / 2, svg.y + svg.height / 2],
+        };
+      });
+    };
+
+    const c0 = await centreAt(0);
+    const c90 = await centreAt(90);
+
+    // Invariant under rotation (about centre), and coincident with the dial centre.
+    expect(Math.hypot(c90.rose[0]! - c0.rose[0]!, c90.rose[1]! - c0.rose[1]!)).toBeLessThan(4);
+    expect(Math.hypot(c0.rose[0]! - c0.svg[0]!, c0.rose[1]! - c0.svg[1]!)).toBeLessThan(8);
+  });
+
   test('accessible without the gesture: set by the numeric field alone (SC-010)', async ({
     page,
     context,
