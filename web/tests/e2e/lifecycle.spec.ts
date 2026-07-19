@@ -60,6 +60,53 @@ test('a target this device was never told is not invented', async ({ page, conte
   await expect(page.getByTestId('target-label')).toHaveCount(0);
 });
 
+test('a hunter can leave a hunt and start another from the hunt menu', async ({
+  page,
+  context,
+}) => {
+  await grantPosition(context, AT);
+  const codeA = await createHunt('Saturday fox');
+  await joinAs(page, codeA, 'KI7XYZ');
+  await expect(page.getByTestId('target-label')).toHaveText('Saturday fox');
+
+  // The hunt name is the way into the menu; the standalone gear is gone.
+  await page.getByTestId('open-settings').click();
+  await page.getByTestId('start-new-hunt').click();
+
+  // Leaving forgets the hunt on this device, so the confirmation hands its link back first — the
+  // durable handle for a hunt a hunter who has not saved it needs now, not after they have gone.
+  await expect(page.getByTestId('new-hunt-confirm')).toBeVisible();
+  await expect(page.getByTestId('leave-hunt-link')).toContainText(`/h/${codeA}`);
+  await expect(page.getByTestId('copy-link')).toBeVisible();
+
+  // Cancelling leaves them exactly where they were, still in hunt A.
+  await page.getByTestId('cancel-new-hunt').click();
+  await expect(page.getByTestId('new-hunt-confirm')).toHaveCount(0);
+  await expect(page.getByTestId('target-label')).toHaveText('Saturday fox');
+
+  // Confirming this time: they land where a newcomer lands — the create screen — and the old hunt is
+  // forgotten, so it no longer shows in the primary view.
+  await page.getByTestId('open-settings').click();
+  await page.getByTestId('start-new-hunt').click();
+  await page.getByTestId('confirm-new-hunt').click();
+
+  await expect(page.getByTestId('start-screen')).toBeVisible();
+  await expect(page.getByTestId('create-hunt')).toBeVisible();
+  await expect(page.getByTestId('target-label')).toHaveCount(0);
+
+  // And they can create a second, distinct hunt from there — the whole point of leaving. The
+  // callsign is device-scoped and survives the leave, so creating drops straight into the new hunt's
+  // map, a distinct hunt with its own name.
+  await page.getByTestId('new-label').fill('Sunday fox');
+  await page.getByTestId('new-frequency').fill('147.00');
+  await page.getByTestId('create-hunt').click();
+
+  await page.getByTestId('report-bar').waitFor();
+  await expect(page).toHaveURL(/\/h\/[a-z0-9-]+$/);
+  await expect(page).not.toHaveURL(new RegExp(`/h/${codeA}$`));
+  await expect(page.getByTestId('target-label')).toHaveText('Sunday fox');
+});
+
 test('a purged hunt lands the participant where a newcomer lands — FR-004c', async ({
   page,
   context,

@@ -34,7 +34,7 @@ import { getOffset, measureOffset, type ClockOffset } from './log/clock.js';
 import { Sync } from './log/sync.js';
 import { isRelayed, type Log, type Report } from './log/types.js';
 import { watchPosition, type PositionState } from './sensors/position.js';
-import { decideLanding, huntIsGone } from './ui/last-hunt.js';
+import { decideLanding, huntIsGone, leaveHunt } from './ui/last-hunt.js';
 import { joinScreen, targetLine } from './ui/join.js';
 import { MapView } from './ui/map-view.js';
 import {
@@ -160,6 +160,17 @@ class App {
    */
   #huntGone(): void {
     huntIsGone();
+    this.#teardownHunt();
+    this.#renderStart();
+  }
+
+  /**
+   * Tears the live hunt down to nothing: stops the network and sensors, destroys the map, and resets
+   * the hunt-scoped state so the next screen starts clean. Shared by the two ways out of a hunt — the
+   * server-confirmed death (`#huntGone`) and the hunter's own choice to leave (`#leaveForNewHunt`).
+   * It does not forget the code or render: the caller decides what leaving *means*.
+   */
+  #teardownHunt(): void {
     this.#sync?.stop();
     this.#sync = undefined;
     this.#stopPosition?.();
@@ -170,6 +181,18 @@ class App {
     this.#huntCode = '';
     this.#target = undefined;
     this.#log = toLog([]);
+  }
+
+  /**
+   * The hunter chose to leave and start another (from the hunt menu, past the confirmation). Forget
+   * the code — that is what unsticks `decideLanding()` so the create screen is reachable — tear the
+   * hunt down, and render it. The create flow re-remembers the new code on the full-page redirect it
+   * already does, so the handoff completes cleanly.
+   */
+  #leaveForNewHunt(): void {
+    track('hunt_left');
+    leaveHunt();
+    this.#teardownHunt();
     this.#renderStart();
   }
 
@@ -634,6 +657,9 @@ class App {
           },
           // Relaunch from Settings (FR-003): not the first-run offer, so exiting leaves state as is.
           onReplayTour: () => this.#startTour(false),
+          onStartNewHunt: () => this.#leaveForNewHunt(),
+          huntCode: this.#huntCode,
+          huntLabel: this.#target?.label,
         }),
       onBeginRelay: () =>
         openRelaySheet((details) => {

@@ -26,7 +26,8 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 | `send` | submit report | Labeled ("Send") — primary action never icon-only |
 | `edit_location` | set-position-by-hand; the placed-position pin | Labeled (pin decorative — the chip carries the words) |
 | `record_voice_over` | relay: mode toggle, arming flow, armed chip, observer pin | Labeled (pin decorative — the armed chip carries the words) |
-| `settings` | the per-device settings pane | **Icon-only allowed** (universal) |
+| `settings` | the hunt menu (settings + start a new hunt), reached from the hunt-name chip | Labeled by the hunt name it sits beside; **icon-only allowed** (universal) elsewhere |
+| `add` | start a new hunt (from the hunt menu) | Labeled ("Start a new hunt") |
 
 ## Rules
 

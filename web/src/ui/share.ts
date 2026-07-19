@@ -70,12 +70,22 @@ async function share(huntCode: string, status: HTMLElement): Promise<void> {
     }
   }
 
+  await copyHuntLink(huntCode, status);
+}
+
+/**
+ * Copy the hunt link to the clipboard, and say so; if the clipboard is denied, show the bare link
+ * to read out or copy by hand. Either way the hunter leaves with the thing they came for.
+ *
+ * Shared by the share chip (its no-`navigator.share` branch) and the leave-hunt confirmation, so
+ * "come back with its link" copies exactly the way sharing does.
+ */
+export async function copyHuntLink(huntCode: string, status: HTMLElement): Promise<void> {
+  const link = huntLink(huntCode);
   try {
     await navigator.clipboard.writeText(link);
     status.textContent = `Link copied. ${OPEN_TO_ANYONE}`;
   } catch {
-    // No clipboard access. Show the link so it can be read out or copied by hand — the hunter
-    // still leaves with the thing they came for.
     status.textContent = `${link} — ${OPEN_TO_ANYONE}`;
   }
 }

@@ -1,10 +1,15 @@
 /**
- * Settings: the pane for the switches that are about THIS DEVICE, not the hunt.
+ * The hunt menu: reached from the hunt-name chip, home to the per-device switches AND the one action
+ * that is about the hunt — leaving it to start another.
  *
- * One resident so far — relay mode. Relay is net control's tool; for every other hunter its
- * affordances are clutter on a screen that should read as an instrument, so it ships off and
- * is switched on here, per device (the meta store is device-scoped, deliberately not keyed by
- * hunt: net control at the club's desk is net control for every hunt they open).
+ * The switches are device-scoped and outlive any one hunt. Relay is the first — net control's tool;
+ * for every other hunter its affordances are clutter on a screen that should read as an instrument,
+ * so it ships off and is switched on here, per device (the meta store is device-scoped, deliberately
+ * not keyed by hunt: net control at the club's desk is net control for every hunt they open).
+ *
+ * "Start a new hunt" is the exception that earns its place here: a hunter is in one hunt at a time,
+ * and this is the clean handoff out of the current one — the only path from inside a hunt back to the
+ * create screen.
  */
 import type { FoxmapperDb } from '../log/store.js';
 import { getMeta, setMeta } from '../log/store.js';
@@ -18,7 +23,9 @@ import {
 } from '../analytics/posthog.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
+import { huntLink } from './last-hunt.js';
 import { dismissSheet } from './report-entry.js';
+import { copyHuntLink } from './share.js';
 
 const RELAY_MODE_KEY = 'relay_mode';
 
@@ -32,6 +39,12 @@ export interface SettingsOptions {
   onRelayMode: (enabled: boolean) => void;
   /** Relaunch the first-visit tour on demand (FR-003). Settings closes first, then the tour runs. */
   onReplayTour: () => void;
+  /** Leave the current hunt and go to the create screen. Confirmed here; the caller tears down. */
+  onStartNewHunt: () => void;
+  /** The current hunt's code, so the confirmation can hand back its link before you leave. */
+  huntCode: string;
+  /** The current hunt's name, for the confirmation copy. Undefined until the target has loaded. */
+  huntLabel?: string | undefined;
   db: FoxmapperDb;
 }
 
@@ -65,6 +78,29 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
     onClose();
     options.onReplayTour();
   });
+
+  // The one action here that acts on the hunt rather than the device. Settings closes first, then the
+  // confirmation goes up over the live map — leaving is a decision, and it names what you leave.
+  const startNewHunt = el(
+    'button',
+    { type: 'button', 'data-testid': 'start-new-hunt' },
+    icon('add', { label: 'Start a new hunt' }),
+    el('span', {}, 'Start a new hunt'),
+  );
+  startNewHunt.addEventListener('click', () => {
+    onClose();
+    confirmStartNewHunt(options);
+  });
+  const startNewHuntSection = el(
+    'div',
+    { class: 'sheet-leave' },
+    startNewHunt,
+    el(
+      'p',
+      { class: 'small dim' },
+      'Leaves this hunt for the create screen. This hunt keeps running — come back with its link.',
+    ),
+  );
 
   const close = el(
     'button',
@@ -150,11 +186,89 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
     panel.append(analyticsToggle, analyticsNote, feedback);
   }
 
+  // Last, and set apart: leaving the hunt is a different kind of act from the device switches above.
+  panel.append(startNewHuntSection);
+
   backdrop.append(panel);
   backdrop.addEventListener('click', (event) => {
     if (event.target === backdrop) onClose();
   });
   return backdrop;
+}
+
+/**
+ * The confirmation before leaving: leaving forgets the hunt on this device, so it names the hunt and
+ * hands back its link first. The hunt is not destroyed — its log stays here and it stays live on the
+ * server — but a hunter who has not saved the link needs it now, not after they have gone.
+ */
+function confirmStartNewHunt(options: SettingsOptions): void {
+  const label = options.huntLabel ?? 'this hunt';
+  const backdrop = el('div', { class: 'sheet-backdrop', 'data-testid': 'new-hunt-confirm' });
+  const dismiss = (): void => dismissSheet(backdrop);
+
+  const linkText = el(
+    'code',
+    { class: 'link-copyable', 'data-testid': 'leave-hunt-link' },
+    huntLink(options.huntCode),
+  );
+  const status = el('span', {
+    class: 'small dim',
+    'data-testid': 'copy-link-status',
+    role: 'status',
+  });
+  const copyLink = el(
+    'button',
+    { type: 'button', 'data-testid': 'copy-link' },
+    icon('share', { label: 'Copy link' }),
+    el('span', {}, 'Copy link'),
+  );
+  copyLink.addEventListener('click', () => {
+    void copyHuntLink(options.huntCode, status);
+  });
+
+  const close = el(
+    'button',
+    { type: 'button', class: 'icon-button', 'data-testid': 'close-new-hunt-confirm' },
+    icon('close'),
+  );
+  close.addEventListener('click', dismiss);
+
+  const cancel = el('button', { type: 'button', 'data-testid': 'cancel-new-hunt' }, 'Cancel');
+  cancel.addEventListener('click', dismiss);
+
+  const confirm = el(
+    'button',
+    { type: 'button', class: 'primary', 'data-testid': 'confirm-new-hunt' },
+    'Start a new hunt',
+  );
+  confirm.addEventListener('click', () => {
+    dismiss();
+    options.onStartNewHunt();
+  });
+
+  const panel = el(
+    'div',
+    { class: 'sheet', role: 'dialog', 'aria-label': 'Start a new hunt' },
+    el(
+      'header',
+      { class: 'sheet-header' },
+      icon('add', { label: 'Start a new hunt' }),
+      el('h2', {}, 'Start a new hunt'),
+      close,
+    ),
+    el('p', {}, `Leave “${label}” and start a new one?`),
+    el('p', { class: 'small dim' }, 'It keeps running — come back to it with its link:'),
+    linkText,
+    copyLink,
+    status,
+    el('div', { class: 'sheet-actions' }, cancel, confirm),
+  );
+
+  backdrop.append(panel);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) dismiss();
+  });
+  document.body.append(backdrop);
 }
 
 /** Opens settings over whatever is showing; exits through the shared sheet motion. */

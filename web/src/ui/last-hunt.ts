@@ -39,6 +39,16 @@ export function huntIsGone(): void {
   forgetHunt();
 }
 
+/**
+ * The hunter chose to leave and start another: a clean handoff, not a hunt that died. Forgetting the
+ * code is the whole point — it is what unsticks `decideLanding()` from routing back here, so the
+ * create screen becomes reachable. The hunt itself is untouched (its log stays on this device, and
+ * it stays live on the server); leaving is recoverable by reopening its link.
+ */
+export function leaveHunt(): void {
+  forgetHunt();
+}
+
 export function huntLink(code: string): string {
   return `${window.location.origin}/h/${code}`;
 }
