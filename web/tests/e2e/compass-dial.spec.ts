@@ -182,6 +182,13 @@ test.describe('compass dial', () => {
     await grantPosition(context);
     await joinAs(page, await createHunt(), 'KI7ROT');
 
+    // This test measures the rose's on-screen box at two headings. The sheet opens on a
+    // translateY entrance, so measuring while it is still sliding up shifts the rose vertically
+    // between the two reads and the comparison catches the slide, not the rotation. Reduced motion
+    // seats the sheet at rest immediately; the rotation under test is a static transform, unchanged
+    // by it.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
     await page.getByTestId('report-bearing').click();
     const rotator = page.getByTestId('compass-dial').locator('.rose-rotator');
 
