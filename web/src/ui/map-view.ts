@@ -682,7 +682,9 @@ export class MapView {
         );
 
     const chips: (HTMLElement | undefined)[] = [
-      ...targetChips(state.target, state.fold.found),
+      // The hunt name is also the way into the menu (settings + start a new hunt), so the standalone
+      // gear is gone: one affordance in the bar, not two that mean nearly the same thing.
+      ...targetChips(state.target, state.fold.found, state.onOpenSettings),
 
       // FR-001: the code is how a hunt is shared, and it is normally read aloud over a repeater.
       // A creator whose only copy of it is the address bar has not been given anything.
@@ -722,8 +724,6 @@ export class MapView {
       // Relay: an affordance only when this device opted in (settings), a status only while
       // armed. Everyone else's status bar never mentions it.
       ...this.#relayChips(state),
-
-      this.#settingsButton(state.onOpenSettings),
     ];
 
     this.#statusBar.append(...chips.filter((c): c is HTMLElement => c !== undefined));
@@ -772,21 +772,6 @@ export class MapView {
   }
 
   /** The settings gear: icon-only (universal), and the only door to the per-device switches. */
-  #settingsButton(onOpenSettings: () => void): HTMLElement {
-    const button = el(
-      'button',
-      {
-        type: 'button',
-        class: 'chip-action icon-only',
-        'data-testid': 'open-settings',
-        'aria-label': 'Settings',
-      },
-      icon('settings'),
-    );
-    button.addEventListener('click', onOpenSettings);
-    return el('span', { class: 'chip chip-with-action' }, button);
-  }
-
   /** Always offered, never only on failure: a measured fix can be wrong, and FR-008 says so. */
   #placeButton(onPlace: () => void): HTMLElement {
     const button = el(

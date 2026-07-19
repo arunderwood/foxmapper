@@ -844,6 +844,29 @@ label {
   gap: 0.5rem;
 }
 
+/* Leaving the hunt sits below the device switches, set apart by a rule: a different kind of act,
+   not one more toggle. */
+.sheet-leave {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+/* The hunt link, shown to copy or read out before leaving. A long code wraps rather than spilling,
+   and one tap selects the whole thing. */
+.link-copyable {
+  font-family: var(--fx-font-mono);
+  font-size: var(--md-sys-typescale-label-size);
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 /* ---- Chips that do something ----
  *
  * Actions in the status bar are real buttons at the real floor: a gloved thumb gets 56px, not
