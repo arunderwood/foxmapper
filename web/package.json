@@ -19,12 +19,12 @@
     "geomagnetism": "^0.2.0",
     "idb": "^8.0.0",
     "maplibre-gl": "^5.0.0",
-    "posthog-js": "^1.408.0"
+    "posthog-js": "^1.409.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@material/material-color-utilities": "^0.4.0",
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/destination": "^7.3.5",
     "@types/node": "^26.1.2",
@@ -34,7 +34,7 @@
     "prettier": "^3.9.6",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.65.0",
-    "vite": "^8.1.5",
+    "vite": "^8.2.0",
     "vitest": "^4.1.10"
   }
 }
