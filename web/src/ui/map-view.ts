@@ -15,7 +15,7 @@ import {
 } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import { createBasemap } from '../map/basemap.js';
-import { render, type RenderedLog } from '../map/layers.js';
+import { bearingDetailLine, render, type RenderedLog } from '../map/layers.js';
 import type { FoldResult } from '../log/fold.js';
 import type { ClockOffset } from '../log/clock.js';
 import { clockWarning } from './clock-warning.js';
@@ -479,6 +479,21 @@ export class MapView {
       ),
       el('p', {}, formatTime(Number(properties['display_at']))),
     );
+
+    // A bearing both ways (005 FR-010): the map speaks true; the parenthesis is what the same
+    // direction reads on a handheld compass. Content, not caveat — it sits above the caveat lines.
+    if (kind === 'bearing') {
+      content.append(
+        el(
+          'p',
+          { 'data-testid': 'bearing-both-ways' },
+          bearingDetailLine(
+            Number(properties['heading_true']),
+            Number(properties['heading_magnetic']),
+          ),
+        ),
+      );
+    }
 
     // Every caveat the report carries travels with it. The map must not read as more certain than
     // the report it is drawing.

@@ -21,6 +21,7 @@ import {
   openFeedback,
   setAnalyticsEnabled,
 } from '../analytics/posthog.js';
+import { declinationAt, describeDeclination } from '../sensors/declination.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { huntLink } from './last-hunt.js';
@@ -45,7 +46,38 @@ export interface SettingsOptions {
   huntCode: string;
   /** The current hunt's name, for the confirmation copy. Undefined until the target has loaded. */
   huntLabel?: string | undefined;
+  /**
+   * Where this device is — hand-placed outranking measured, the same rule a report uses — for the
+   * local true/magnetic detail (005 FR-010). Undefined when there is no position, and the section
+   * says so rather than disappearing: an absent section is a mystery, an explained one is not.
+   */
+  position?: { lat: number; lon: number } | undefined;
   db: FoxmapperDb;
+}
+
+/**
+ * The on-demand corner of 005: the one place declination is spoken about, in plain words,
+ * computed on-device at sheet-open. Never in the way of any reporting flow (FR-010/FR-011).
+ */
+function northSection(position: { lat: number; lon: number } | undefined): HTMLElement {
+  if (!position) {
+    return el(
+      'p',
+      { class: 'small dim', 'data-testid': 'north-note' },
+      'Set where you are to see the local difference between true and magnetic north.',
+    );
+  }
+  const declination = declinationAt(position.lat, position.lon);
+  return el(
+    'div',
+    { 'data-testid': 'north-note' },
+    el('p', { style: 'margin:0' }, describeDeclination(declination)),
+    el(
+      'p',
+      { class: 'small dim', style: 'margin:.25rem 0 0' },
+      'Bearings on the map are true north; a handheld compass reads magnetic.',
+    ),
+  );
 }
 
 export function settingsSheet(options: SettingsOptions, onClose: () => void): HTMLElement {
@@ -127,6 +159,7 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
       'Relay mode is for net control: it adds a way to file reports for hunters calling theirs ' +
         'in over the radio.',
     ),
+    northSection(options.position),
     replayTour,
   );
 

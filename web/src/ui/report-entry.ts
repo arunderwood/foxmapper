@@ -16,6 +16,7 @@ import { composeFix } from '../report/fix.js';
 import type { AuthorContext } from '../report/author.js';
 import type { ConfidenceQ, MaxRangeR, Report, StrengthS } from '../log/types.js';
 import { compassDial, type DialMode } from './compass-dial.js';
+import { declinationAt } from '../sensors/declination.js';
 import { el } from './dom.js';
 import { icon, type IconName } from './icons.js';
 
@@ -195,7 +196,27 @@ export function bearingSheet(
   onClose: () => void,
   mode: DialMode = 'auto',
 ): HTMLElement {
-  const dial = compassDial({ mode, onChange: () => refresh() });
+  // Declination is fixed once, at sheet-open, from the report's origin position — the observer's,
+  // not necessarily this operator's (an armed relay target already wears the observer's position
+  // in the context). The same value drives the dial's display and the stored conversion, so the
+  // preview the reporter saw and the payload agree by construction (005 research R2). The caller
+  // refuses to open this sheet without a position; the fallback below is belt to that braces and
+  // is unreachable past the NO_POSITION guard on send.
+  const openContext = options.context();
+  // The empty-epoch fallback can never reach a payload: with no position the NO_POSITION guard
+  // refuses the send, so this exists only to keep the dial constructible.
+  const declination = openContext
+    ? declinationAt(openContext.position.lat, openContext.position.lon)
+    : { degrees: 0, epoch: '', stale: true };
+
+  // The compass-drafting sheet speaks true north (005 FR-002); the relay sheet opens in magnetic,
+  // because a bearing dictated over the air is almost always a physical-compass reading (FR-005).
+  const dial = compassDial({
+    mode,
+    declination,
+    defaultReference: mode === 'auto' ? 'true' : 'magnetic',
+    onChange: () => refresh(),
+  });
 
   const confidence = choiceRow<ConfidenceQ>(
     'confidence',
@@ -232,8 +253,8 @@ export function bearingSheet(
   send.addEventListener('click', () => {
     const q = confidence.value();
     const r = range.value();
-    const magnetic = dial.committedHeading();
-    if (q === undefined || r === undefined || magnetic === undefined) return;
+    const committed = dial.committedHeading();
+    if (q === undefined || r === undefined || committed === undefined) return;
 
     // Own or relayed is the caller's concern: main.ts injects the armed relay target into
     // this context, so the sheet neither knows nor cares whose observation it is filing.
@@ -246,8 +267,11 @@ export function bearingSheet(
     dial.destroy();
     options.onSubmit(
       composeBearing({
+        // The dial's committed value passes through verbatim — the number on screen is the number
+        // the log stores, in whichever frame it was entered (005 FR-003).
         ...context,
-        draft: { heading_magnetic: magnetic },
+        draft: committed,
+        declination,
         confidence_q: q,
         max_range_r: r,
       }),

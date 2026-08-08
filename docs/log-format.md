@@ -84,7 +84,7 @@ store it; a stored flag can disagree with the two names it summarises.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `heading_true` | number 0–359.9 | yes | Degrees clockwise from **true** north. |
-| `heading_magnetic` | number 0–359.9 | yes | What the device reported. Both mobile platforms give magnetic. |
+| `heading_magnetic` | number 0–359.9 | yes | The same direction, degrees clockwise from **magnetic** north. |
 | `declination` | number | yes | Signed degrees added to get true. |
 | `wmm_epoch` | string | yes | Model that produced `declination`, e.g. `"WMM2025"`. |
 | `confidence_q` | integer, **one of {3,4,5}** authored; 0–9 ingested | yes | Raw APRS Q digit. |
@@ -94,6 +94,13 @@ store it; a stored flag can disagree with the two names it summarises.
 reinterpretable. A log storing only `heading_true` asserts a conversion it cannot show its work
 for, and becomes unrecoverable when the magnetic model updates. A reimplementer can recompute
 `heading_true` from `heading_magnetic` and their own model, and check ours.
+
+**Either heading field may be the verbatim-entered one.** A bearing entered against true north
+(the on-screen dial's default frame) stores the entered value as `heading_true` and derives
+`heading_magnetic`; one entered against magnetic (a relayed physical-compass reading) stores the
+entered value as `heading_magnetic` and derives `heading_true`. The invariant
+`heading_true = normalize(heading_magnetic + declination)` holds either way, the shape is
+identical, and which side was entered is deliberately not recorded — a bearing is a bearing.
 
 **Why the number's origin is not recorded.** A bearing is a bearing: whether the reporter froze the
 device compass, twisted the on-screen dial, or typed the figure, the log stores only the heading they

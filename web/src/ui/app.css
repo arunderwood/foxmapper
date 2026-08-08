@@ -493,6 +493,14 @@ label {
   }
 }
 
+.dial-degrees-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .dial-degrees-label {
   display: flex;
   align-items: center;
@@ -504,6 +512,30 @@ label {
 .dial-degrees {
   width: 6.5rem;
   text-align: center;
+}
+
+/* The unit is part of the field's meaning, not decoration: "220.0 ° magnetic" reads as one fact. */
+.dial-ref-unit {
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+/*
+ * The reference switch shows the converted number it would switch to (005 FR-005) — a real
+ * button on the 56px floor, styled as a quiet chip so the default flow never mistakes it for a
+ * required step.
+ */
+.dial-ref-switch {
+  min-height: 56px;
+  padding: 0 1rem;
+  border-radius: 1.75rem;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-size);
+}
+
+.dial-ref-switch[disabled] {
+  opacity: 0.45;
 }
 
 .dial-controls {

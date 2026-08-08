@@ -660,6 +660,12 @@ class App {
           onStartNewHunt: () => this.#leaveForNewHunt(),
           huntCode: this.#huntCode,
           huntLabel: this.#target?.label,
+          // Same precedence a report uses: a hand-placed position outranks the fix (005 FR-010).
+          position:
+            this.#placed ??
+            (this.#position.status === 'ready'
+              ? { lat: this.#position.fix.lat, lon: this.#position.fix.lon }
+              : undefined),
         }),
       onBeginRelay: () =>
         openRelaySheet((details) => {

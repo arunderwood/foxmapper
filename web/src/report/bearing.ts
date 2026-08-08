@@ -6,9 +6,20 @@
  * antenna, and a heading the reporter never saw would be a number the log attributes to them that
  * they never claimed. A bearing is a bearing, though — the log records the number, not whether it
  * came from the compass or was set by hand (004 FR-010).
+ *
+ * Since feature 005 a draft names the reference its number is expressed in (true or magnetic),
+ * because entry surfaces now display true north with the reference labeled (005 FR-002/FR-005).
+ * The reference is a draft-time input only: both headings land in every payload, and which one was
+ * entered is deliberately not recorded — a bearing is still a bearing.
  */
 import type { BearingPayload, BearingReport, ConfidenceQ, MaxRangeR } from '../log/types.js';
-import { declinationAt, normalizeHeading, toTrueHeading } from '../sensors/declination.js';
+import {
+  normalizeHeading,
+  toMagneticHeading,
+  toTrueHeading,
+  type Declination,
+  type NorthReference,
+} from '../sensors/declination.js';
 import { envelope, type AuthorContext } from './author.js';
 
 /**
@@ -29,12 +40,19 @@ export const RANGE_CHOICES = [
 ] as const;
 
 export interface BearingDraft {
-  /** What the compass said, or what the reporter set on the dial. Always magnetic. */
-  heading_magnetic: number;
+  /** What the dial displayed and the reporter vouched for, expressed in `reference`. */
+  heading: number;
+  reference: NorthReference;
 }
 
 export interface BearingEntry extends AuthorContext {
   draft: BearingDraft;
+  /**
+   * The declination the entry surface displayed with — computed once at sheet-open from the
+   * report's origin position, so the conversion the reporter previewed and the one stored here
+   * are the same number by construction (005 research R2).
+   */
+  declination: Declination;
   /** Both required. This is what makes an unbounded or zero-width wedge unrepresentable. */
   confidence_q: ConfidenceQ;
   max_range_r: MaxRangeR;
@@ -43,16 +61,23 @@ export interface BearingEntry extends AuthorContext {
 /**
  * Both magnetic and true are recorded, plus the declination and the model epoch — so the bearing
  * stays reinterpretable when the magnetic model updates. A log storing only `heading_true` would
- * assert a conversion it cannot show its work for. Where the number came from — compass, twist, or
- * keypad — is deliberately not recorded: a bearing is a bearing (004 FR-010).
+ * assert a conversion it cannot show its work for.
+ *
+ * The **entered value is stored verbatim in its own field** and the counterpart is derived
+ * (005 FR-003): the number the reporter saw and the number the log carries are identical by
+ * construction, never by round-trip luck.
  */
 export function composeBearing(entry: BearingEntry): BearingReport {
-  const declination = declinationAt(entry.position.lat, entry.position.lon);
-  const magnetic = normalizeHeading(entry.draft.heading_magnetic);
+  const entered = normalizeHeading(entry.draft.heading);
+  const declination = entry.declination;
 
   const payload: BearingPayload = {
-    heading_true: toTrueHeading(magnetic, declination.degrees),
-    heading_magnetic: magnetic,
+    heading_true:
+      entry.draft.reference === 'true' ? entered : toTrueHeading(entered, declination.degrees),
+    heading_magnetic:
+      entry.draft.reference === 'magnetic'
+        ? entered
+        : toMagneticHeading(entered, declination.degrees),
     declination: declination.degrees,
     wmm_epoch: declination.epoch,
     confidence_q: entry.confidence_q,

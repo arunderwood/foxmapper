@@ -55,6 +55,20 @@ export interface ReportProperties {
    * and every string in a rendering module is one copy-paste from a screen.
    */
   strength?: number;
+  /** bearing only: both frames of the heading, verbatim from the payload, for the detail popup
+   *  (005 FR-010). Stored values, never recomputed — one report renders one way on every client. */
+  heading_true?: number;
+  heading_magnetic?: number;
+}
+
+/**
+ * The popup's heading line: both frames, each labeled, whole degrees (005 display contract §2 —
+ * sub-degree digits would out-precise a compass that is honest to maybe a degree). Rounding folds
+ * so 359.6 reads 0°, never 360°.
+ */
+export function bearingDetailLine(headingTrue: number, headingMagnetic: number): string {
+  const whole = (v: number): number => Math.round(v) % 360;
+  return `Bearing ${whole(headingTrue)}° true (${whole(headingMagnetic)}° on a magnetic compass)`;
 }
 
 export interface RenderedLog {
@@ -124,6 +138,12 @@ function propertiesOf(report: ObservationReport, ambiguous: ReadonlySet<string>)
     // reporter and the caveat this puts on their report have to mean the same thing forever.
     clock_suspect: isSkewed(offset),
     ...(report.kind === 'omni' ? { strength: report.payload.strength_s } : {}),
+    ...(report.kind === 'bearing'
+      ? {
+          heading_true: report.payload.heading_true,
+          heading_magnetic: report.payload.heading_magnetic,
+        }
+      : {}),
   };
 }
 
