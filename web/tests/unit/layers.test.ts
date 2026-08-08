@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { render } from '../../src/map/layers.js';
+import { bearingDetailLine, render } from '../../src/map/layers.js';
 import { fold } from '../../src/log/fold.js';
 import { toLog } from '../../src/log/gset.js';
 import { colourFor } from '../../src/log/colour.js';
@@ -290,5 +290,43 @@ describe('rendering is age-neutral', () => {
         expect(ids(one)).toEqual(ids(other));
       }),
     );
+  });
+});
+
+describe('the popup heading line (005 FR-010)', () => {
+  it('shows both frames, each labeled, whole degrees', () => {
+    expect(bearingDetailLine(235.4, 219.9)).toBe('Bearing 235° true (220° on a magnetic compass)');
+  });
+
+  it('folds rounding at north — 359.6 reads 0°, never 360°', () => {
+    expect(bearingDetailLine(359.6, 344.1)).toBe('Bearing 0° true (344° on a magnetic compass)');
+  });
+
+  it('carries the stored heading pair onto the wedge feature for the popup to read', () => {
+    // The popup renders the payload's numbers, not a recomputation — one report, one rendering,
+    // on every client (Principle IV).
+    const report = {
+      v: 1,
+      id: '11111111-1111-4111-8111-111111111111',
+      hunt_code: 'quiet-fox-8821-h7k2',
+      observer: { callsign: 'KI7XYZ' },
+      position: { lat: 48.7519, lon: -122.4787 },
+      position_source: 'measured',
+      observed_at: 1_784_092_800_000,
+      clock_offset_ms: null,
+      entered_by: { participant_id: '11111111-1111-4111-8111-111111111111', callsign: 'KI7XYZ' },
+      kind: 'bearing',
+      payload: {
+        heading_true: 235.5,
+        heading_magnetic: 220,
+        declination: 15.5,
+        wmm_epoch: 'WMM2025',
+        confidence_q: 4,
+        max_range_r: 3,
+      },
+    } as const;
+    const { wedges } = render(fold(toLog([report as never])));
+    expect(wedges.features[0]!.properties.heading_true).toBe(235.5);
+    expect(wedges.features[0]!.properties.heading_magnetic).toBe(220);
   });
 });

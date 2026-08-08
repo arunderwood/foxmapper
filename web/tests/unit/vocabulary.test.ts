@@ -25,6 +25,13 @@ const JARGON = [
   /\bconfidence_q\b/,
   /\bmax_range_r\b/,
   /\bstrength_s\b/,
+  // 005 (display contract §4): the magnetic-model vocabulary stays off participant surfaces —
+  // screens say "true"/"magnetic" and "the 2025 magnetic model", never the model's name or the
+  // geophysics term. The settings copy defines the difference without the word "declination";
+  // describeDeclination (src/sensors, where these strings actually live) is unit-tested to match.
+  /\bWMM\b/,
+  /\bgeomagnetic\b/i,
+  /\bdeclination\b/i,
 ];
 
 function sourceFiles(dir: string): string[] {
@@ -37,10 +44,14 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/** String literals only, with comments stripped — the code may name a digit; a screen may not. */
+/** String literals only, with comments stripped — the code may name a digit; a screen may not.
+ *  Relative import specifiers are code too, not screens: `'../sensors/declination.js'` names a
+ *  module, and no participant ever reads it. */
 function literals(source: string): string[] {
   const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  return [...withoutComments.matchAll(/(["`'])((?:(?!\1)[^\\]|\\.)*)\1/g)].map((m) => m[2]!);
+  return [...withoutComments.matchAll(/(["`'])((?:(?!\1)[^\\]|\\.)*)\1/g)]
+    .map((m) => m[2]!)
+    .filter((literal) => !/^\.{1,2}\/[\w/.-]+\.js$/.test(literal));
 }
 
 describe('the vocabulary firewall', () => {

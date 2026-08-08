@@ -1,6 +1,27 @@
 /** Shared E2E helpers. */
 import type { Page, BrowserContext } from '@playwright/test';
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
+import { createRequire } from 'node:module';
+
+interface Geomagnetism {
+  model(at: Date): { point(coords: [number, number]): { decl: number } };
+}
+
+/**
+ * The declination the app itself will compute — same package, same model, same date — so specs
+ * can assert exact displayed values instead of loose ranges. Defaults to the grantPosition spot.
+ * Loaded via `require`: geomagnetism is CJS with circular internal requires, and a static ESM
+ * import of it crashes Node's module loader under Playwright ("Unexpected module status 3").
+ */
+export function declinationDegrees(lat = 48.7519, lon = -122.4787): number {
+  const geomagnetism = createRequire(import.meta.url)('geomagnetism') as Geomagnetism;
+  return geomagnetism.model(new Date()).point([lat, lon]).decl;
+}
+
+/** The dial's own display rounding: one decimal, folded so 359.96 reads "0.0", never "360.0". */
+export function dialFormat(value: number): string {
+  return ((Math.round((((value % 360) + 360) % 360) * 10) / 10) % 360).toFixed(1);
+}
 
 export const RELAY = process.env['FOXMAPPER_RELAY'] ?? 'http://localhost:8080';
 
@@ -137,6 +158,34 @@ export async function tapReport(page: Page, index = 0): Promise<void> {
 export async function retractOwnReport(page: Page): Promise<void> {
   await tapReport(page);
   await page.getByTestId('retract').click();
+}
+
+export interface StoredBearingPayload {
+  heading_true: number;
+  heading_magnetic: number;
+  declination: number;
+  wmm_epoch: string;
+}
+
+/** The bearing payloads the device holds — for asserting what the log actually carries (005). */
+export async function localBearingPayloads(page: Page): Promise<StoredBearingPayload[]> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('foxmapper');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise((resolve) => {
+      const store = db.transaction('reports', 'readonly').objectStore('reports');
+      const all = store.getAll();
+      all.onsuccess = () =>
+        resolve(
+          (all.result as { kind: string; payload: StoredBearingPayload }[])
+            .filter((r) => r.kind === 'bearing')
+            .map((r) => r.payload),
+        );
+    });
+  });
 }
 
 /** Reports the device currently holds, read straight out of IndexedDB. */

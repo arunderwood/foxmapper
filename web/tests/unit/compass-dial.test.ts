@@ -12,6 +12,7 @@ import {
   pointerBearing,
   twistHeading,
 } from '../../src/ui/compass-dial.js';
+import { toTrueHeading } from '../../src/sensors/declination.js';
 
 // Angle folding is normalizeHeading (sensors/declination.ts), covered by declination.test.ts.
 
@@ -44,6 +45,16 @@ describe('createHeadingSmoother', () => {
     let v = 200;
     for (let i = 0; i < 50; i++) v = s.push(45, 50);
     expect(v).toBeCloseTo(45, 1);
+  });
+
+  it('smoothing pre-converted samples converges on the true heading, wrap included (005)', () => {
+    // The dial feeds the smoother toTrueHeading(sample, decl) — the screenshot case: a steady
+    // magnetic 344.5° under +15.5°E must settle at 0° true, through the wrap, converted once.
+    const s = createHeadingSmoother(100);
+    let v = s.push(toTrueHeading(344.5, 15.5), 0);
+    for (let i = 0; i < 50; i++) v = s.push(toTrueHeading(344.5, 15.5), 50);
+    const nearNorth = v > 359.99 || v < 0.01;
+    expect(nearNorth).toBe(true);
   });
 });
 

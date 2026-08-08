@@ -7,7 +7,13 @@
  * anywhere. T063 checks the compass on real hardware; none of the below needs a phone.
  */
 import { describe, expect, it } from 'vitest';
-import { declinationAt, normalizeHeading, toTrueHeading } from '../../src/sensors/declination.js';
+import {
+  declinationAt,
+  describeDeclination,
+  normalizeHeading,
+  toMagneticHeading,
+  toTrueHeading,
+} from '../../src/sensors/declination.js';
 
 /** The maintainer's home ground, and the number quickstart.md tells a human to look for. */
 const BELLINGHAM = { lat: 48.7519, lon: -122.4787 };
@@ -73,5 +79,51 @@ describe('magnetic to true', () => {
     expect(normalizeHeading(360)).toBe(0);
     expect(normalizeHeading(-1)).toBe(359);
     expect(normalizeHeading(720.5)).toBeCloseTo(0.5);
+  });
+});
+
+describe('true to magnetic (005)', () => {
+  it('subtracts the declination and wraps', () => {
+    expect(toMagneticHeading(15.2, 15.2)).toBeCloseTo(0);
+    expect(toMagneticHeading(10, 15)).toBeCloseTo(355);
+    expect(toMagneticHeading(350, -15)).toBeCloseTo(5);
+  });
+
+  it('round-trips with toTrueHeading', () => {
+    // The two conversions are inverses on the circle; a drifting pair would let the entry chip
+    // change a bearing by flipping the reference back and forth.
+    for (const heading of [0, 0.1, 90, 179.9, 256.2, 359.9]) {
+      for (const decl of [15.2, -10.4, 0, 179]) {
+        expect(toMagneticHeading(toTrueHeading(heading, decl), decl)).toBeCloseTo(heading, 10);
+      }
+    }
+  });
+});
+
+describe('describeDeclination (005 — the settings detail line)', () => {
+  const base = { epoch: 'WMM2025', stale: false };
+
+  it('says east for positive declination, whole degrees, no jargon', () => {
+    const text = describeDeclination({ degrees: 15.43, ...base });
+    expect(text).toBe(
+      'Magnetic north is about 15° east of true north here. Using the 2025 magnetic model.',
+    );
+    expect(text).not.toMatch(/WMM|declination/i);
+  });
+
+  it('says west for negative declination', () => {
+    expect(describeDeclination({ degrees: -10.6, ...base })).toContain('about 11° west');
+  });
+
+  it('says the two norths line up when the difference is under half a degree', () => {
+    expect(describeDeclination({ degrees: 0.3, ...base })).toContain('line up here');
+    expect(describeDeclination({ degrees: -0.49, ...base })).toContain('line up here');
+  });
+
+  it('declares a stale model plainly rather than hiding it (FR-009)', () => {
+    const text = describeDeclination({ degrees: 15.2, epoch: 'WMM2025', stale: true });
+    expect(text).toContain('out of date');
+    // Still gives the number — refusing would be the larger error.
+    expect(text).toContain('about 15° east');
   });
 });

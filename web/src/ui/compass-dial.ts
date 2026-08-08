@@ -8,12 +8,25 @@
  * set or correct the bearing. The always-visible numeric field is the accessible, keyboard path; the
  * SVG rose is decorative to assistive tech.
  *
- * The dial produces **only a magnetic heading**. It never records where the number came from — a
- * bearing is a bearing (FR-010) — and it commits nothing until the hunter freezes or twists
- * (FR-003a: no due-north default). The true-north conversion stays in composeBearing, invisible.
+ * The dial never records where the number came from — a bearing is a bearing (FR-010) — and it
+ * commits nothing until the hunter freezes or twists (FR-003a: no due-north default).
+ *
+ * **Since feature 005 the dial displays true north.** 004 kept the magnetic→true conversion
+ * invisible; field feedback showed the invisible conversion *was* the confusion — a bearing
+ * entered as 0° rendered ~15° east of map north and read as wrong. Now the surface has one
+ * active reference at a time (rose, field, twist, committed value all agree), the sensor's
+ * magnetic samples are converted on arrival, and a chip beside the field names the frame and
+ * previews the conversion. The sensor boundary is unchanged: heading.ts still emits magnetic,
+ * and this is the one place it is converted (005 research R6 — never twice).
  */
 import { watchHeading, needsPermission, requestPermission } from '../sensors/heading.js';
-import { normalizeHeading } from '../sensors/declination.js';
+import {
+  normalizeHeading,
+  toMagneticHeading,
+  toTrueHeading,
+  type Declination,
+  type NorthReference,
+} from '../sensors/declination.js';
 import { el } from './dom.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -37,7 +50,9 @@ export function createHeadingSmoother(tauMs = 200): HeadingSmoother {
   let x: number | undefined;
   let y: number | undefined;
   const read = (): number | undefined =>
-    x === undefined || y === undefined ? undefined : normalizeHeading((Math.atan2(y, x) * 180) / Math.PI);
+    x === undefined || y === undefined
+      ? undefined
+      : normalizeHeading((Math.atan2(y, x) * 180) / Math.PI);
   return {
     push(headingDeg, dtMs) {
       const rad = (headingDeg * Math.PI) / 180;
@@ -68,6 +83,59 @@ export function createHeadingSmoother(tauMs = 200): HeadingSmoother {
   };
 }
 
+/**
+ * The surface's north-reference rules (005, contracts/reference-entry.md §2–3), pure and exported
+ * for unit tests like the smoother above. One instance per dial; the component reads `reference()`
+ * and calls the transition that matches the event. The rules in one place:
+ *
+ * - the surface opens in its default (true for compass drafting, magnetic for relay);
+ * - going live forces true and forgets any explicit choice (it belonged to a dead value);
+ * - a fresh typed number lands magnetic unless a frame was explicitly chosen (empty-state rule);
+ * - the chip flips the frame and makes the choice explicit.
+ */
+export interface ReferenceState {
+  reference(): NorthReference;
+  /** The frame the chip would switch to. */
+  other(): NorthReference;
+  onGoLive(): void;
+  /** Typing while nothing is committed. Editing a committed value calls nothing — frames stick. */
+  onTypeFresh(): void;
+  onSwitch(): void;
+  /** The one conversion, frames spelled out so a double-correction cannot hide. */
+  convert(value: number, from: NorthReference, to: NorthReference): number;
+}
+
+export function createReferenceState(
+  declinationDegrees: number,
+  defaultReference: NorthReference,
+): ReferenceState {
+  let reference: NorthReference = defaultReference;
+  let explicit = false;
+  const other = (): NorthReference => (reference === 'true' ? 'magnetic' : 'true');
+  return {
+    reference: () => reference,
+    other,
+    onGoLive() {
+      reference = 'true';
+      explicit = false;
+    },
+    onTypeFresh() {
+      if (!explicit) reference = 'magnetic';
+    },
+    onSwitch() {
+      reference = other();
+      explicit = true;
+    },
+    convert(value, from, to) {
+      return from === to
+        ? normalizeHeading(value)
+        : to === 'true'
+          ? toTrueHeading(value, declinationDegrees)
+          : toMagneticHeading(value, declinationDegrees);
+    },
+  };
+}
+
 /** Compass bearing (clockwise from 12 o'clock) of a pointer at `(px,py)` about centre `(cx,cy)`. */
 export function pointerBearing(cx: number, cy: number, px: number, py: number): number {
   // Screen y grows downward; "up" (−y) is 0°, clockwise positive.
@@ -92,16 +160,30 @@ export type DialMode = 'auto' | 'by-hand';
 
 export type DialState = 'idle' | 'live' | 'frozen' | 'by-hand';
 
+/** What the dial commits: the number the reporter vouched for, and the frame it is expressed in. */
+export interface CommittedHeading {
+  heading: number;
+  reference: NorthReference;
+}
+
 export interface DialOptions {
   mode?: DialMode;
+  /**
+   * Declination at the report's origin position, computed once at sheet-open. Drives the live
+   * conversion, the chip preview, and — passed on by the sheet — the stored conversion, so all
+   * three are one number by construction.
+   */
+  declination: Declination;
+  /** `'true'` for compass-drafting sheets, `'magnetic'` for relay (contract §2). */
+  defaultReference?: NorthReference;
   /** Fires whenever the committed heading changes (including to `undefined`). */
-  onChange?: (heading: number | undefined) => void;
+  onChange?: (committed: CommittedHeading | undefined) => void;
 }
 
 export interface CompassDial {
   node: HTMLElement;
   /** The heading the report will carry, or `undefined` until the hunter freezes or twists. */
-  committedHeading(): number | undefined;
+  committedHeading(): CommittedHeading | undefined;
   destroy(): void;
 }
 
@@ -152,13 +234,21 @@ function buildRose(): SVGGElement {
   return g;
 }
 
-export function compassDial(options: DialOptions = {}): CompassDial {
+export function compassDial(options: DialOptions): CompassDial {
   const mode: DialMode = options.mode ?? 'auto';
+  const declination = options.declination;
 
   let state: DialState = 'idle';
+  /** The frame everything on this surface speaks: rose, field, twist, committed value (contract §1). */
+  const ref = createReferenceState(declination.degrees, options.defaultReference ?? 'true');
   let committed: number | undefined;
   /** What the rose currently shows: the live smoothed heading, or the committed value. */
   let displayed = 0;
+
+  const referenceName = (reference: NorthReference): string =>
+    reference === 'true' ? 'true north' : 'magnetic';
+  /** Same rounding as the field: one decimal, folded so 359.96 reads 0.0, never 360.0. */
+  const fmt = (value: number): string => ((Math.round(value * 10) / 10) % 360).toFixed(1);
   let stopWatching: (() => void) | undefined;
   let lastTs: number | undefined;
   /** True once the sensor has actually reported a heading this live session. A phone with no
@@ -189,6 +279,14 @@ export function compassDial(options: DialOptions = {}): CompassDial {
 
   const status = el('p', { class: 'small dim', 'data-testid': 'heading-status' }, '');
 
+  /** The reference chip: the field's unit on one face, the conversion preview on the other. */
+  const unit = el('span', { class: 'dial-ref-unit', 'data-testid': 'ref-unit' }, '');
+  const refSwitch = el(
+    'button',
+    { type: 'button', class: 'dial-ref-switch', 'data-testid': 'ref-switch' },
+    '',
+  );
+
   const startBtn = el(
     'button',
     { type: 'button', class: 'dial-start', 'data-testid': 'use-compass', hidden: true },
@@ -209,7 +307,14 @@ export function compassDial(options: DialOptions = {}): CompassDial {
     'div',
     { class: 'compass-dial', 'data-testid': 'compass-dial', 'data-state': state },
     face,
-    el('label', { class: 'dial-degrees-label' }, 'Degrees', input),
+    el(
+      'div',
+      { class: 'dial-degrees-row' },
+      // "Bearing", not "Degrees": the unit chip already says degrees, and a label that repeats
+      // the unit costs the word that says what the number *is*.
+      el('label', { class: 'dial-degrees-label' }, 'Bearing', input, unit),
+      refSwitch,
+    ),
     el('div', { class: 'dial-controls' }, startBtn, freezeBtn, retakeBtn),
     status,
   );
@@ -222,11 +327,35 @@ export function compassDial(options: DialOptions = {}): CompassDial {
     rose.style.transform = `rotate(${-displayed}deg)`;
     // The number reflects the *committed* bearing only. While live it stays empty — a moving stream
     // is not a value the reporter has claimed (FR-003a), and a due-north "0.0" would read as one.
-    // Round then re-fold so a value just shy of 360 shows "0.0", never an out-of-range "360.0".
     if (document.activeElement !== input) {
-      input.value =
-        committed === undefined ? '' : ((Math.round(committed * 10) / 10) % 360).toFixed(1);
+      input.value = committed === undefined ? '' : fmt(committed);
     }
+
+    // The chip: the field's unit names the active frame; the switch face shows the converted
+    // number it would switch to — never a bare toggle, so the consequence of switching is visible
+    // before the tap (005 FR-005). With nothing committed there is no number to convert, so the
+    // face offers only the frame; it must not invent a value (contract §4).
+    unit.textContent = `° ${ref.reference()}`;
+    input.setAttribute('aria-label', `Bearing in degrees, ${referenceName(ref.reference())}`);
+    if (committed === undefined) {
+      refSwitch.textContent = `enter as ${referenceName(ref.other())}`;
+      refSwitch.setAttribute('aria-label', `Enter the bearing as ${referenceName(ref.other())}`);
+    } else {
+      // Verb first: "= 195.2° true" reads as an annotation, and an annotation invites no tap.
+      // The face keeps the converted number (the clarified requirement) and gains the word that
+      // says a tap does something — labels keep their verb (the standing status-copy rule).
+      const converted = fmt(ref.convert(committed, ref.reference(), ref.other()));
+      refSwitch.textContent = `use ${converted}° ${ref.other()}`;
+      refSwitch.setAttribute(
+        'aria-label',
+        `Switch to ${converted} degrees ${referenceName(ref.other())}`,
+      );
+    }
+    // While live the display is the sensor's stream, converted to true — a frame the reporter may
+    // not re-choose until a value is theirs (freeze, twist, or type). Contract §3: live forces
+    // true; a live magnetic display would be a sensor-drafted number shown as magnetic.
+    refSwitch.toggleAttribute('disabled', state === 'live');
+
     startBtn.toggleAttribute('hidden', !(state === 'idle' && mode === 'auto' && needsPermission()));
     // Freeze appears only once the compass has actually reported — never on a phone that has none.
     freezeBtn.toggleAttribute('hidden', !(state === 'live' && receivedSample));
@@ -237,12 +366,32 @@ export function compassDial(options: DialOptions = {}): CompassDial {
     );
   }
 
+  function committedNow(): CommittedHeading | undefined {
+    return committed === undefined ? undefined : { heading: committed, reference: ref.reference() };
+  }
+
   function setCommitted(value: number | undefined): void {
     // Only notify on a real change. The initial auto-live sets `undefined` while the host is still
     // wiring its onChange handler; firing it then would touch not-yet-initialized host state (TDZ).
     if (value === committed) return;
     committed = value;
-    options.onChange?.(committed);
+    options.onChange?.(committedNow());
+  }
+
+  /**
+   * The chip tap. Switching converts the number; it never reinterprets it — the physical
+   * direction claimed is identical before and after (contract §3). With nothing committed it
+   * flips only the frame, and either way the choice is now explicitly the reporter's.
+   */
+  function switchReference(): void {
+    const previous = ref.reference();
+    ref.onSwitch();
+    if (committed !== undefined) {
+      displayed = ref.convert(committed, previous, ref.reference());
+      committed = displayed;
+      options.onChange?.(committedNow());
+    }
+    render();
   }
 
   function setStatus(message: string): void {
@@ -253,6 +402,9 @@ export function compassDial(options: DialOptions = {}): CompassDial {
 
   function goLive(): void {
     state = 'live';
+    // A sensor-drafted heading is displayed and committed as true, always (contract §3). The
+    // reporter's earlier chip choice belonged to a hand-entered value that no longer exists.
+    ref.onGoLive();
     setCommitted(undefined);
     smoother.reset();
     lastTs = undefined;
@@ -265,7 +417,9 @@ export function compassDial(options: DialOptions = {}): CompassDial {
       const now = performance.now();
       const dt = lastTs === undefined ? 0 : now - lastTs;
       lastTs = now;
-      displayed = smoother.push(heading.magnetic, dt);
+      // The sensor speaks magnetic (heading.ts); the surface speaks true. Converted here, on
+      // arrival, and nowhere else — one site, applied exactly once (005 FR-004, research R6).
+      displayed = smoother.push(toTrueHeading(heading.magnetic, declination.degrees), dt);
       receivedSample = true;
       render();
     });
@@ -308,6 +462,11 @@ export function compassDial(options: DialOptions = {}): CompassDial {
   freezeBtn.addEventListener('click', freeze);
   retakeBtn.addEventListener('click', goLive);
 
+  refSwitch.addEventListener('click', () => {
+    if (state === 'live') return;
+    switchReference();
+  });
+
   input.addEventListener('input', () => {
     const raw = input.value.trim();
     const typed = Number(raw);
@@ -316,8 +475,14 @@ export function compassDial(options: DialOptions = {}): CompassDial {
     // report whose bearing serializes to null.
     if (raw === '' || !Number.isFinite(typed)) {
       setCommitted(undefined);
+      render();
       return;
     }
+    // The empty-state rule (005 FR-005): a number typed while nothing is committed is hand entry —
+    // almost always a physical-compass reading — so it lands as magnetic, unless the reporter
+    // explicitly chose a frame with the chip first. Editing a committed value keeps its frame: a
+    // frozen compass heading stays true through a nudge.
+    if (committed === undefined) ref.onTypeFresh();
     detachToByHand(typed);
   });
 
@@ -368,7 +533,7 @@ export function compassDial(options: DialOptions = {}): CompassDial {
 
   return {
     node,
-    committedHeading: () => committed,
+    committedHeading: committedNow,
     destroy: () => stopWatching?.(),
   };
 }

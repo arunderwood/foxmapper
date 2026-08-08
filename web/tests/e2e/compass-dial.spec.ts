@@ -4,7 +4,17 @@
  * Chromium only — headless WebKit does not deliver `deviceorientationabsolute`.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { createHunt, grantPosition, joinAs, localReports } from './helpers.js';
+import {
+  createHunt,
+  declinationDegrees,
+  dialFormat,
+  grantPosition,
+  joinAs,
+  localReports,
+} from './helpers.js';
+
+/** What the dial displays for a sensor reading of magnetic `m` at the default position (005). */
+const trueDisplay = (m: number): string => dialFormat(m + declinationDegrees());
 
 /** Feed the app one absolute-orientation sample for magnetic heading `m` (Android-style path). */
 async function setHeading(page: Page, m: number): Promise<void> {
@@ -45,17 +55,19 @@ test.describe('compass dial', () => {
     await expect(page.getByTestId('send-bearing')).toBeDisabled();
   });
 
-  test('the dial is a magnetic instrument — no declination control (FR-016)', async ({
+  test('the dial speaks true north, labeled — and never says "declination" (005 FR-002/FR-012)', async ({
     page,
     context,
   }) => {
+    // 004 kept the dial magnetic-only and the conversion invisible; field feedback showed the
+    // invisible conversion was the confusion. The frame is now named; the jargon still is not.
     await grantPosition(context);
     await joinAs(page, await createHunt(), 'KI7DEC');
     await page.getByTestId('report-bearing').click();
     const dial = page.getByTestId('compass-dial');
     await expect(dial).toBeVisible();
+    await expect(dial.getByTestId('ref-unit')).toHaveText('° true');
     await expect(dial.getByText(/declinat/i)).toHaveCount(0);
-    await expect(dial.getByText(/true north/i)).toHaveCount(0);
   });
 
   test('auto-live, freeze, and the frozen value does not drift (SC-002)', async ({
@@ -71,14 +83,15 @@ test.describe('compass dial', () => {
     // Android-style auto-live: no start control needed.
     await expect(page.getByTestId('use-compass')).toBeHidden();
 
+    // The sensor reads magnetic; the field shows true — converted once, at the dial (005 FR-004).
     await setHeading(page, 90);
     await expect(page.getByTestId('freeze')).toBeVisible();
     await page.getByTestId('freeze').click();
-    await expect(page.getByTestId('heading-input')).toHaveValue('90.0');
+    await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(90));
 
     // A later reading must not move a frozen bearing.
     await setHeading(page, 200);
-    await expect(page.getByTestId('heading-input')).toHaveValue('90.0');
+    await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(90));
 
     await pickConfidenceRangeAndSend(page);
     await expect
@@ -107,7 +120,7 @@ test.describe('compass dial', () => {
     await page.getByTestId('use-compass').click();
     await setHeading(page, 45);
     await page.getByTestId('freeze').click();
-    await expect(page.getByTestId('heading-input')).toHaveValue('45.0');
+    await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(45));
   });
 
   test('twist corrects a frozen bearing and detaches from the sensor (SC-004, FR-009)', async ({
@@ -122,7 +135,7 @@ test.describe('compass dial', () => {
     await page.getByTestId('report-bearing').click();
     await setHeading(page, 90);
     await page.getByTestId('freeze').click();
-    await expect(page.getByTestId('heading-input')).toHaveValue('90.0');
+    await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(90));
 
     // Sweep the finger 90° clockwise about the dial centre (top → right). Grab-and-follow moves the
     // heading the other way: 90 → 0. Hover first so the sheet's enter animation has settled — raw
@@ -138,8 +151,11 @@ test.describe('compass dial', () => {
     await page.mouse.move(cx + box.width * 0.35, cy, { steps: 12 });
     await page.mouse.up();
 
+    // The frozen field showed true(90); a 90° clockwise finger sweep moves it back to true(0) —
+    // the twist happens in the displayed (true) frame, one frame for the whole surface.
+    const target = Number(trueDisplay(0));
     const after = Number(await page.getByTestId('heading-input').inputValue());
-    expect(Math.abs(((after - 0 + 540) % 360) - 180)).toBeLessThan(10); // ≈ 0°, within tolerance
+    expect(Math.abs(((after - target + 540) % 360) - 180)).toBeLessThan(10);
 
     // A subsequent sensor reading must not override the twisted value (FR-009).
     await setHeading(page, 250);

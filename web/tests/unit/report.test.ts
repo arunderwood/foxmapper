@@ -11,6 +11,7 @@ import { composeOmni, STRENGTH_CHOICES } from '../../src/report/omni.js';
 import { composeHeardNothing } from '../../src/report/heard_nothing.js';
 import { composeFix } from '../../src/report/fix.js';
 import { relayContext } from '../../src/report/relay.js';
+import { declinationAt, normalizeHeading } from '../../src/sensors/declination.js';
 import { canRetract, composeRetraction } from '../../src/report/retract.js';
 import { encodeBearing, encodeNull, encodeOmni } from '../../src/aprs/mapping.js';
 import { fold } from '../../src/log/fold.js';
@@ -32,7 +33,11 @@ const context: AuthorContext = {
   clock_offset_ms: null,
 };
 
-const draft = { heading_magnetic: 256.2 };
+/** Fixed date so the model (and so the expected declination, ~15.2°E) cannot drift under the test. */
+const declination = declinationAt(context.position.lat, context.position.lon, new Date('2026-07-15'));
+
+/** The 004-era default: a magnetic number, as the dial produced before 005 made reference explicit. */
+const draft = { heading: 256.2, reference: 'magnetic' as const };
 
 describe('the envelope', () => {
   it('gives every report a distinct random id', () => {
@@ -67,7 +72,7 @@ describe('the envelope', () => {
 describe('bearing entry', () => {
   it('records magnetic, true, the declination and the model epoch', () => {
     // A log storing only heading_true would assert a conversion it cannot show its work for.
-    const report = composeBearing({ ...context, draft, confidence_q: 4, max_range_r: 3 });
+    const report = composeBearing({ ...context, draft, declination, confidence_q: 4, max_range_r: 3 });
 
     expect(report.payload.heading_magnetic).toBeCloseTo(256.2);
     expect(report.payload.wmm_epoch).toBe('WMM2025');
@@ -81,7 +86,8 @@ describe('bearing entry', () => {
       fc.property(fc.double({ min: 0, max: 359.9, noNaN: true }), (magnetic) => {
         const report = composeBearing({
           ...context,
-          draft: { ...draft, heading_magnetic: magnetic },
+          draft: { heading: magnetic, reference: 'magnetic' },
+          declination,
           confidence_q: 4,
           max_range_r: 3,
         });
@@ -95,7 +101,8 @@ describe('bearing entry', () => {
   it('normalises a heading that wraps past north', () => {
     const report = composeBearing({
       ...context,
-      draft: { ...draft, heading_magnetic: 350 },
+      draft: { heading: 350, reference: 'magnetic' },
+      declination,
       confidence_q: 4,
       max_range_r: 3,
     });
@@ -103,9 +110,63 @@ describe('bearing entry', () => {
     expect(report.payload.heading_true).toBeLessThan(20);
   });
 
+  it('stores a magnetic-entered value verbatim and derives true (005 FR-003)', () => {
+    // What the reporter vouched for is the number the log carries — exactly, not via round-trip.
+    const report = composeBearing({
+      ...context,
+      draft: { heading: 220, reference: 'magnetic' },
+      declination,
+      confidence_q: 4,
+      max_range_r: 3,
+    });
+    expect(report.payload.heading_magnetic).toBe(220);
+    expect(report.payload.heading_true).toBeCloseTo(
+      normalizeHeading(220 + declination.degrees),
+      10,
+    );
+  });
+
+  it('stores a true-entered value verbatim and derives magnetic (005 FR-003)', () => {
+    const report = composeBearing({
+      ...context,
+      draft: { heading: 0, reference: 'true' },
+      declination,
+      confidence_q: 4,
+      max_range_r: 3,
+    });
+    // The screenshot case: a bearing entered as due-north true IS due north, exactly.
+    expect(report.payload.heading_true).toBe(0);
+    expect(report.payload.heading_magnetic).toBeCloseTo(
+      normalizeHeading(0 - declination.degrees),
+      10,
+    );
+  });
+
+  it('holds the invariant true = magnetic + declination from either entry side', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 359.9, noNaN: true }),
+        fc.constantFrom('true' as const, 'magnetic' as const),
+        (heading, reference) => {
+          const { payload } = composeBearing({
+            ...context,
+            draft: { heading, reference },
+            declination,
+            confidence_q: 4,
+            max_range_r: 3,
+          });
+          const rebuilt = normalizeHeading(payload.heading_magnetic + payload.declination);
+          // Compare on the circle: 0 and 360-epsilon are the same direction.
+          const gap = Math.abs(rebuilt - payload.heading_true);
+          expect(Math.min(gap, 360 - gap)).toBeLessThan(1e-9);
+        },
+      ),
+    );
+  });
+
   it('records a bearing, never where the number came from (003 FR-010)', () => {
     // A bearing is a bearing: a compass freeze, a dial twist and a typed figure are the same fact.
-    const report = composeBearing({ ...context, draft, confidence_q: 4, max_range_r: 3 });
+    const report = composeBearing({ ...context, draft, declination, confidence_q: 4, max_range_r: 3 });
     expect(Object.keys(report.payload).sort()).toEqual(
       ['confidence_q', 'declination', 'heading_magnetic', 'heading_true', 'max_range_r', 'wmm_epoch'].sort(),
     );
@@ -116,9 +177,9 @@ describe('bearing entry', () => {
   });
 
   it('produces the same payload however the heading was set (SC-006/SC-008)', () => {
-    // Frozen, twisted, typed — only heading_magnetic differs; no field names the source.
-    const frozen = composeBearing({ ...context, draft: { heading_magnetic: 256.2 }, confidence_q: 4, max_range_r: 3 });
-    const typed = composeBearing({ ...context, draft: { heading_magnetic: 100.0 }, confidence_q: 4, max_range_r: 3 });
+    // Frozen, twisted, typed — only the heading differs; no field names the source or reference.
+    const frozen = composeBearing({ ...context, draft: { heading: 256.2, reference: 'true' }, declination, confidence_q: 4, max_range_r: 3 });
+    const typed = composeBearing({ ...context, draft: { heading: 100.0, reference: 'magnetic' }, declination, confidence_q: 4, max_range_r: 3 });
     const { heading_true: _ft, heading_magnetic: _fm, declination: _fd, ...frozenRest } = frozen.payload;
     const { heading_true: _tt, heading_magnetic: _tm, declination: _td, ...typedRest } = typed.payload;
     expect(frozenRest).toEqual(typedRest);
@@ -127,7 +188,7 @@ describe('bearing entry', () => {
   it('still accepts a legacy payload that carries the removed fields (back-compat)', () => {
     // Readers MUST ignore heading_source/compass_accuracy_deg, not choke on them.
     const legacy: BearingReport = {
-      ...composeBearing({ ...context, draft, confidence_q: 4, max_range_r: 3 }),
+      ...composeBearing({ ...context, draft, declination, confidence_q: 4, max_range_r: 3 }),
     };
     const withOldFields = {
       ...legacy,
@@ -153,7 +214,7 @@ describe('bearing entry', () => {
   it('emits only Q in {3,4,5} and R in {1,3,5}, whatever the buttons offer', () => {
     fc.assert(
       fc.property(confidenceQArb, maxRangeRArb, (q, r) => {
-        const report = composeBearing({ ...context, draft, confidence_q: q, max_range_r: r });
+        const report = composeBearing({ ...context, draft, declination, confidence_q: q, max_range_r: r });
         const wire = encodeBearing(report.payload);
         expect([3, 4, 5]).toContain(wire.q);
         expect([1, 3, 5]).toContain(wire.r);
@@ -226,7 +287,7 @@ describe('relayed entry — SC-011', () => {
 
   it('attributes the observation to the observer, never to who typed it', () => {
     // 0 relayed reports attributed to the operator who typed them.
-    const report = composeBearing({ ...relayed, draft, confidence_q: 4, max_range_r: 3 });
+    const report = composeBearing({ ...relayed, draft, declination, confidence_q: 4, max_range_r: 3 });
     expect(report.observer.callsign).toBe('W7ABC');
     expect(report.entered_by.callsign).toBe('KI7XYZ');
     expect(isRelayed(report)).toBe(true);

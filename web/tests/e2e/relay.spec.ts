@@ -58,6 +58,9 @@ async function armRelay(
 async function relayBearing(page: Page, observer: string, at = OBSERVER_AT): Promise<void> {
   await armRelay(page, observer, at);
   await page.getByTestId('report-bearing').click();
+  // A dictated bearing enters as magnetic by default (005 FR-005) — the frame a physical compass
+  // speaks — so net control types what they heard and touches nothing else.
+  await expect(page.getByTestId('ref-unit')).toHaveText('° magnetic');
   await page.getByTestId('heading-input').fill('270');
   await page.getByTestId('confidence-0').click();
   await page.getByTestId('range-1').click();
