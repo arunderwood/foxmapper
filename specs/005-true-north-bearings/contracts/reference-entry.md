@@ -49,10 +49,12 @@ everything else preserves.
 
 - Sits adjacent to the numeric field; minimum 56 px touch target.
 - Shows the active reference as the field's unit: `220.0 ° magnetic` / `235.0 ° true`.
-- The switch face shows **the converted number it would switch to**, not a bare reference name:
-  e.g. active magnetic 220.0 → switch reads `= 235.0° true` (clarification 2026-08-07 Q3).
-  Empty field (nothing committed) → switch shows just the other reference name, disabled or
-  enabled-but-only-flipping-the-frame (implementation's choice; it must not invent a number).
+- The switch face shows **the converted number it would switch to**, not a bare reference name,
+  and **leads with a verb** so it reads as a control rather than an annotation: active magnetic
+  220.0 → switch reads `use 235.0° true` (clarification 2026-08-07 Q3; a bare `= 235.0° true`
+  reads as math and invites no tap — labels keep their verb, per the standing status-copy rule).
+  Empty field (nothing committed) → switch shows just the other reference name, verb-led
+  (`enter as true north`), enabled-but-only-flipping-the-frame; it must not invent a number.
 - Precision: same as the field (0.1°), both values rounded independently from exact values (R9).
 - Wording: exactly "true" and "magnetic" (lowercase in running text, per current UI voice). The
   word "declination" does not appear on this surface (FR-012).

@@ -141,7 +141,7 @@ test.describe('entry and map agree (US1, SC-001)', () => {
 
     // The switch face shows the number it would switch to, before the tap (FR-005).
     await expect(page.getByTestId('ref-switch')).toHaveText(
-      `= ${dialFormat(magneticNorthward)}° magnetic`,
+      `use ${dialFormat(magneticNorthward)}° magnetic`,
     );
 
     // Flip: same direction, magnetic clothing.
@@ -212,7 +212,7 @@ test.describe('net control relays a magnetic bearing (US2, SC-002)', () => {
     // exactly the declination at the HUNTER's position (FR-006), visible before anything is filed.
     const observerDecl = declinationDegrees(OBSERVER_AT.lat, OBSERVER_AT.lon);
     await expect(page.getByTestId('ref-switch')).toHaveText(
-      `= ${dialFormat(220 + observerDecl)}° true`,
+      `use ${dialFormat(220 + observerDecl)}° true`,
     );
 
     await page.getByTestId('confidence-0').click();
@@ -305,7 +305,7 @@ test.describe('offline is the normal case (FR-007)', () => {
     await page.getByTestId('heading-input').fill('220');
     await expect(page.getByTestId('ref-unit')).toHaveText('° magnetic');
     await expect(page.getByTestId('ref-switch')).toHaveText(
-      `= ${dialFormat(220 + declinationDegrees())}° true`,
+      `use ${dialFormat(220 + declinationDegrees())}° true`,
     );
 
     await page.getByTestId('confidence-1').click();

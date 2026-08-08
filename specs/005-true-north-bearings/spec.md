@@ -113,8 +113,9 @@ wedge agrees with the hunter's own device-drafted bearings from the same spot.
 
 1. **Given** manual bearing entry, **When** the user enters a number, **Then** the active north
    reference (true or magnetic) is unmistakable at the point of entry and can be switched in one
-   action — and the switch control itself shows the converted number it would switch to (entering
-   220° magnetic where declination is +15°, the switch reads "235° true").
+   action — and the switch control itself shows the converted number it would switch to, phrased
+   as an action (entering 220° magnetic where declination is +15°, the switch reads "use 235°
+   true").
 2. **Given** a bearing entered as 220° magnetic at a position where declination is +15°, **When**
    it is submitted, **Then** the wedge centerline renders at 235° true and the stored report
    carries both values.

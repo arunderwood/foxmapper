@@ -310,7 +310,9 @@ export function compassDial(options: DialOptions): CompassDial {
     el(
       'div',
       { class: 'dial-degrees-row' },
-      el('label', { class: 'dial-degrees-label' }, 'Degrees', input, unit),
+      // "Bearing", not "Degrees": the unit chip already says degrees, and a label that repeats
+      // the unit costs the word that says what the number *is*.
+      el('label', { class: 'dial-degrees-label' }, 'Bearing', input, unit),
       refSwitch,
     ),
     el('div', { class: 'dial-controls' }, startBtn, freezeBtn, retakeBtn),
@@ -339,8 +341,11 @@ export function compassDial(options: DialOptions): CompassDial {
       refSwitch.textContent = `enter as ${referenceName(ref.other())}`;
       refSwitch.setAttribute('aria-label', `Enter the bearing as ${referenceName(ref.other())}`);
     } else {
+      // Verb first: "= 195.2° true" reads as an annotation, and an annotation invites no tap.
+      // The face keeps the converted number (the clarified requirement) and gains the word that
+      // says a tap does something — labels keep their verb (the standing status-copy rule).
       const converted = fmt(ref.convert(committed, ref.reference(), ref.other()));
-      refSwitch.textContent = `= ${converted}° ${ref.other()}`;
+      refSwitch.textContent = `use ${converted}° ${ref.other()}`;
       refSwitch.setAttribute(
         'aria-label',
         `Switch to ${converted} degrees ${referenceName(ref.other())}`,
