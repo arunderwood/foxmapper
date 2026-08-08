@@ -1,5 +1,6 @@
 /** Shared E2E helpers. */
 import type { Page, BrowserContext } from '@playwright/test';
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 
 export const RELAY = process.env['FOXMAPPER_RELAY'] ?? 'http://localhost:8080';
 
@@ -104,15 +105,15 @@ export async function tapReport(page: Page, index = 0): Promise<void> {
   // The camera eases to the first fix. Projecting mid-ease gives a point the marker has already
   // left by the time the click lands.
   await page.waitForFunction(() => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map;
     return Boolean(map) && !map!.isMoving() && !map!.isZooming();
   });
 
   const point = await page.evaluate(async (i) => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map;
     if (!map) return null;
     for (const id of ['reports-markers', 'reports-wedges']) {
-      const source = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
+      const source = map.getSource(id) as GeoJSONSource | undefined;
       const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
       const feature = data?.features?.[i];
       if (!feature) continue;
@@ -176,11 +177,11 @@ export interface RenderedFeature {
  */
 export async function renderedFeatures(page: Page): Promise<RenderedFeature[]> {
   return page.evaluate(() => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map;
     if (!map) return [];
 
     const collect = (id: string): RenderedFeature[] => {
-      const source = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
+      const source = map.getSource(id) as GeoJSONSource | undefined;
       if (!source) return [];
       const serialized = source.serialize() as { data?: GeoJSON.FeatureCollection };
       return (serialized.data?.features ?? []).map((f) => ({
@@ -200,8 +201,8 @@ export async function renderedFeatures(page: Page): Promise<RenderedFeature[]> {
 /** How many features a named map source currently holds — used for the self-position pins. */
 export async function sourceFeatureCount(page: Page, sourceId: string): Promise<number> {
   return page.evaluate((id) => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
-    const source = map?.getSource(id) as maplibregl.GeoJSONSource | undefined;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map;
+    const source = map?.getSource(id) as GeoJSONSource | undefined;
     if (!source) return 0;
     const serialized = source.serialize() as { data?: GeoJSON.FeatureCollection };
     return serialized.data?.features?.length ?? 0;

@@ -11,6 +11,7 @@
  */
 import { test, expect, type Locator } from '@playwright/test';
 import { createHunt, grantPosition, joinAs, reportHeardNothing, tapOpenMap } from './helpers.js';
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 
 interface ChipLook {
   iconPath: string;
@@ -124,8 +125,8 @@ test('GPS states carry the triple too', async ({ page, context }) => {
   // the source rather than the DOM.
   const placedPinCount = (): Promise<number> =>
     page.evaluate(() => {
-      const map = (window as unknown as { __map?: maplibregl.Map }).__map;
-      const source = map?.getSource('placed-position') as maplibregl.GeoJSONSource | undefined;
+      const map = (window as unknown as { __map?: MapLibreMap }).__map;
+      const source = map?.getSource('placed-position') as GeoJSONSource | undefined;
       const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
       return data?.features?.length ?? 0;
     });

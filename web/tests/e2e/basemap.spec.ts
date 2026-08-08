@@ -9,6 +9,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { createHunt, grantPosition, joinAs, reportHeardNothing } from './helpers.js';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 
 const AT = { latitude: 48.7519, longitude: -122.4787 };
 
@@ -61,7 +62,7 @@ test('a callsign is drawn even with the glyph host unreachable — FR-002b', asy
     .poll(
       async () =>
         page.evaluate(() => {
-          const map = (window as unknown as { __map?: maplibregl.Map }).__map;
+          const map = (window as unknown as { __map?: MapLibreMap }).__map;
           return (map?.queryRenderedFeatures({ layers: ['marker-label'] }) ?? []).map(
             (f) => f.properties?.['map_label'],
           );
