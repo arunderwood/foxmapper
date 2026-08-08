@@ -48,8 +48,12 @@ services:
     image: node:26-alpine
     working_dir: /app
     environment:
-      # Vite proxies /api to the relay, so the browser sees one origin and SSE needs no CORS.
-      VITE_API_ORIGIN: http://localhost:8080
+      # Vite proxies /api to the relay, so the browser sees one origin and SSE needs no CORS —
+      # matching production, where the relay serves the bundle itself and no CORS exists anywhere.
+      # This is the PROXY TARGET (vite.config.ts), reached from inside the web container, so it
+      # names the compose service. Setting VITE_API_ORIGIN here instead would bake a cross-origin
+      # API base into the bundle and every sync request would die on the server's absent CORS.
+      FOXMAPPER_RELAY: http://server:8080
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
       - '5173:5173'
