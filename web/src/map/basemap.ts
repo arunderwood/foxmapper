@@ -12,8 +12,28 @@
  * never. Booting from a remote style would mean a failed fetch leaves the map with no layers and
  * no reports — which is what a hunt out of coverage looks like, i.e. the normal case.
  */
-import maplibregl, { type Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl';
+import {
+  AttributionControl,
+  Map as MapLibreMap,
+  setWorkerUrl,
+  type StyleSpecification,
+} from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { cssToken } from '../ui/dom.js';
+
+/**
+ * MapLibre parses every tile — vector and our own GeoJSON — off the main thread, and from v6 it
+ * locates that worker by resolving `import.meta.url`. Under a bundler that resolves to the app
+ * chunk, so the default guess (`/assets/maplibre-gl-worker.mjs`) is a file Vite never emitted.
+ *
+ * The failure is quiet and total: the worker 404s, no source ever finishes parsing, and the map
+ * paints an empty canvas with no error on the console. Every layer is present in `getStyle()` and
+ * `queryRenderedFeatures` returns nothing, which is a hunt with no reports on it.
+ *
+ * `?worker&url` rather than `?url`: the shipped worker imports a sibling chunk, and plain `?url`
+ * emits the one file without it. Vite's worker pipeline emits a self-contained bundle instead.
+ */
+setWorkerUrl(workerUrl);
 
 /** No API key, no registration, no cookies, and no open-core — self-hosting stays available. */
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -61,7 +81,7 @@ export interface BasemapOptions {
 }
 
 export function createBasemap(options: BasemapOptions): MapLibreMap {
-  const map = new maplibregl.Map({
+  const map = new MapLibreMap({
     container: options.container,
     style: blankStyle(),
     center: options.center,
@@ -75,7 +95,7 @@ export function createBasemap(options: BasemapOptions): MapLibreMap {
 
   // The style's own sources carry the required attribution once they load. Until then ours stands
   // in, so the licence is honoured even on a map that never fetches a tile.
-  const standIn = new maplibregl.AttributionControl({
+  const standIn = new AttributionControl({
     compact: true,
     customAttribution: ATTRIBUTION,
   });
@@ -86,7 +106,7 @@ export function createBasemap(options: BasemapOptions): MapLibreMap {
     // printed the same sentence twice, side by side, across most of the width of a phone — the one
     // piece of furniture already competing with the map for room.
     map.removeControl(standIn);
-    map.addControl(new maplibregl.AttributionControl({ compact: true }));
+    map.addControl(new AttributionControl({ compact: true }));
   });
   return map;
 }

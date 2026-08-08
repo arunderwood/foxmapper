@@ -22,6 +22,7 @@ import {
   reportHeardNothing,
   sourceFeatureCount,
 } from './helpers.js';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 
 /** Joins with no geolocation at all — the app must not pretend it knows where this phone is. */
 async function joinWithNoPosition(page: import('@playwright/test').Page, code: string) {
@@ -102,7 +103,7 @@ test('a placement tap inside a wedge places — it does not open the wedge popup
   // where the tap would actually reach the canvas — a fixed offset lands on status chips or
   // the attribution on a phone viewport, which is this helper-shaped trap all over again.
   const point = await page.evaluate(() => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map!;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map!;
     const projected = map.project([-122.4787, 48.7519]);
     for (let dy = 40; dy <= 260; dy += 20) {
       const candidate = document.elementFromPoint(projected.x, projected.y + dy);

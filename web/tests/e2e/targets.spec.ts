@@ -12,6 +12,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { createHunt, grantPosition, reportHeardNothing, tapReport } from './helpers.js';
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 
 const FLOOR = 56;
 
@@ -93,8 +94,8 @@ async function walk(page: Page, surface: string): Promise<void> {
   // filing is durable-first and the render follows a beat later.
   await reportHeardNothing(page);
   await page.waitForFunction(() => {
-    const map = (window as unknown as { __map?: maplibregl.Map }).__map;
-    const source = map?.getSource('reports-markers') as maplibregl.GeoJSONSource | undefined;
+    const map = (window as unknown as { __map?: MapLibreMap }).__map;
+    const source = map?.getSource('reports-markers') as GeoJSONSource | undefined;
     const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
     return (data?.features?.length ?? 0) > 0;
   });

@@ -5,8 +5,14 @@
  * whether you are seeing everyone's reports or only what this phone holds (FR-018), the unsynced
  * queue depth, and the clock warning. **Never a footer, a tooltip, or a dismissible modal.**
  */
-import type { Map as MapLibreMap, SymbolLayerSpecification } from 'maplibre-gl';
-import maplibregl from 'maplibre-gl';
+import {
+  Marker,
+  Popup,
+  type GeoJSONSource,
+  type LngLat,
+  type Map as MapLibreMap,
+  type SymbolLayerSpecification,
+} from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import { createBasemap } from '../map/basemap.js';
 import { render, type RenderedLog } from '../map/layers.js';
@@ -133,7 +139,7 @@ export class MapView {
   /** The device fix, held for the same re-application. Cleared while a hand-placed position wins. */
   #devicePosition: { lat: number; lon: number } | undefined;
   /** Marks the armed relay target's position while a relayed report is being filed. */
-  #relayPin: maplibregl.Marker | undefined;
+  #relayPin: Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
   #syncedUntil = 0;
   #syncedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -456,7 +462,7 @@ export class MapView {
     this.#banner = undefined;
   }
 
-  #showDetail(lngLat: maplibregl.LngLat, properties: Record<string, unknown>): void {
+  #showDetail(lngLat: LngLat, properties: Record<string, unknown>): void {
     const kind = String(properties['kind']) as ReportKind;
 
     const content = el('div', { class: 'popup', 'data-testid': 'report-detail' });
@@ -490,7 +496,7 @@ export class MapView {
     // FR-010, and only for a report this phone entered. There is no moderator and no appeal: a
     // report is a fact about what someone said, and only the person who said it may withdraw it.
     const id = String(properties['report_id']);
-    const popup = new maplibregl.Popup({ closeButton: true });
+    const popup = new Popup({ closeButton: true });
     if (this.#retract?.can(id)) {
       const button = el(
         'button',
@@ -559,7 +565,7 @@ export class MapView {
         { class: 'relay-pin', 'data-testid': 'relay-pin', 'aria-hidden': 'true' },
         icon('record_voice_over', { label: target.callsign }),
       );
-      this.#relayPin = new maplibregl.Marker({ element: pin, anchor: 'center' })
+      this.#relayPin = new Marker({ element: pin, anchor: 'center' })
         .setLngLat([target.position.lon, target.position.lat])
         .addTo(map);
     } else {
@@ -582,7 +588,7 @@ export class MapView {
 
   /** Writes the placed position into its source — re-run after style swaps recreate it. */
   #applyPlacedPin(): void {
-    const source = this.#map?.getSource(PLACED_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    const source = this.#map?.getSource(PLACED_SOURCE) as GeoJSONSource | undefined;
     // Not yet: #addLayers re-applies once the source exists again.
     if (!source) return;
 
@@ -615,7 +621,7 @@ export class MapView {
 
   /** Writes the device fix into its source — re-run after style swaps recreate it. */
   #applyDevicePin(): void {
-    const source = this.#map?.getSource(DEVICE_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    const source = this.#map?.getSource(DEVICE_SOURCE) as GeoJSONSource | undefined;
     if (!source) return;
 
     const device = this.#devicePosition;
@@ -639,8 +645,8 @@ export class MapView {
     const rendered = this.#pending;
     if (!map || !rendered) return;
 
-    const wedges = map.getSource(WEDGE_SOURCE) as maplibregl.GeoJSONSource | undefined;
-    const markers = map.getSource(MARKER_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    const wedges = map.getSource(WEDGE_SOURCE) as GeoJSONSource | undefined;
+    const markers = map.getSource(MARKER_SOURCE) as GeoJSONSource | undefined;
     // Not yet — the sources arrive with the style. `#pending` holds the fold until `load` fires.
     if (!wedges || !markers) return;
 
