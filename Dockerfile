@@ -19,7 +19,7 @@ ENV VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY
 ENV VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
 RUN npm run build
 
-FROM rust:1.97-slim AS server
+FROM rust:1.98-slim AS server
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
