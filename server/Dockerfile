@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.97-slim AS base
+FROM rust:1.98-slim AS base
 WORKDIR /app
 # Before any cargo call, so dev's cargo-watch and the builder's dependency layer resolve the same
 # compiler. rust-toolchain.toml is the source of truth; the tag above is only the base layer. When
