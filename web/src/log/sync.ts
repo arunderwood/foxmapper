@@ -10,6 +10,7 @@ import {
   cursorKey,
   getMeta,
   getReports,
+  outboxDepth,
   outboxIds,
   putAuthored,
   putRemote,
@@ -48,6 +49,20 @@ const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 60_000;
 const POLL_INTERVAL_MS = 15_000;
 
+/**
+ * Reports per POST.
+ *
+ * The server charges its rate limiter one token per report in the batch against a bucket that
+ * holds 600 and is capped there. A batch larger than the bucket can therefore never be accepted
+ * at any refill rate: it 429s, the queue is left intact by design, the next flush rebuilds the
+ * same oversized batch, and the device is stuck forever with reports nobody else can see. Two
+ * hours offline is enough to build one, and offline is the normal case (Principle III).
+ *
+ * 200 sits well under that ceiling so the deadlock is unreachable by construction, and matches the
+ * batch cap the server is due to enforce. The two numbers have to agree.
+ */
+const FLUSH_BATCH_SIZE = 200;
+
 export class Sync {
   #options: SyncOptions;
   #source: EventSource | undefined;
@@ -79,10 +94,15 @@ export class Sync {
   }
 
   /**
-   * Sends everything queued. **The queue drains only on a 2xx.**
+   * Sends everything queued, in batches of `FLUSH_BATCH_SIZE`. **A batch drains only on a 2xx.**
    *
    * A 429 is retryable and never drops a report — a dropped report is the one unacceptable
    * outcome, and the rate limit exists to stop a script, not to reject a hunter.
+   *
+   * Each batch is cleared on its own 2xx, so a failure partway through keeps the ground already
+   * gained; the batches that did land stay drained. The first non-2xx ends the whole flush rather
+   * than trying the rest: after a 429 the later batches would fail too, and retrying them only
+   * pushes the bucket further down.
    */
   async flush(): Promise<void> {
     if (this.#flushing || this.#stopped) return;
@@ -90,36 +110,41 @@ export class Sync {
     try {
       const { db, huntCode, apiOrigin } = this.#options;
       const ids = await outboxIds(db, huntCode);
-      if (ids.length === 0) return;
 
-      const reports = await getReports(db, ids);
-      if (reports.length === 0) return;
+      for (let from = 0; from < ids.length; from += FLUSH_BATCH_SIZE) {
+        const batch = ids.slice(from, from + FLUSH_BATCH_SIZE);
+        const reports = await getReports(db, batch);
+        if (reports.length === 0) continue;
 
-      const response = await fetch(`${apiOrigin}/api/hunts/${huntCode}/reports`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(reports),
-      });
+        const response = await fetch(`${apiOrigin}/api/hunts/${huntCode}/reports`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(reports),
+        });
 
-      if (response.ok) {
-        // The server is idempotent by id, so re-sending a report it already has is harmless. That
-        // is what lets this queue be dumb and retry blindly forever.
-        await clearOutbox(
-          db,
-          reports.map((r) => r.id),
-        );
-        this.#options.onQueueDepth?.(await outboxIds(db, huntCode).then((r) => r.length));
+        if (response.ok) {
+          // The server is idempotent by id, so re-sending a report it already has is harmless.
+          // That is what lets this queue be dumb and retry blindly forever.
+          await clearOutbox(
+            db,
+            reports.map((r) => r.id),
+          );
+          // Reported per batch, not once at the end: a queue of thousands that only updated after
+          // the last batch would sit at its full depth for minutes and read as frozen.
+          this.#options.onQueueDepth?.(await outboxDepth(db, huntCode));
+          continue;
+        }
+
+        if (response.status === 404) {
+          // Purged or unknown. Keep the reports locally rather than discarding them.
+          this.#options.onHuntGone?.();
+          return;
+        }
+        // 429 and 5xx both land here: what is left is untouched and the next flush retries.
         return;
       }
-
-      if (response.status === 404) {
-        // Purged or unknown. Keep the reports locally rather than discarding them.
-        this.#options.onHuntGone?.();
-        return;
-      }
-      // 429 and 5xx both land here: the queue is untouched and the next flush retries.
     } catch {
-      // Offline. The queue is untouched.
+      // Offline. What is left is untouched.
     } finally {
       this.#flushing = false;
     }

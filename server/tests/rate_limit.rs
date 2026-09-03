@@ -114,3 +114,26 @@ fn eviction_spares_a_bucket_still_in_use() {
         "a bucket touched just now is not idle and must survive the sweep"
     );
 }
+
+#[test]
+fn a_batch_larger_than_the_bucket_can_never_be_accepted() {
+    // The bucket is capped at its capacity, so `tokens >= cost` is false forever once the cost
+    // exceeds it — no amount of waiting helps. A client that sends its whole queue in one POST is
+    // therefore permanently stuck the moment that queue passes 600, with its reports invisible to
+    // everyone else. The client batches well under this; the invariant is what makes that a fix
+    // rather than a coincidence.
+    let limiter = RateLimiter::default();
+    let start = Instant::now();
+    assert!(
+        !limiter.allow_at(ip(9), 601, start),
+        "a batch of 601 was accepted, so this test no longer guards the deadlock"
+    );
+    assert!(
+        !limiter.allow_at(ip(9), 601, start + Duration::from_secs(60 * 60)),
+        "an hour of refill cannot lift a full bucket above its own capacity"
+    );
+    assert!(
+        limiter.allow_at(ip(9), 600, start),
+        "a batch at exactly the capacity must still fit a fresh bucket"
+    );
+}
