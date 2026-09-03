@@ -16,10 +16,9 @@ const EVICT_IDLE_AFTER: Duration = Duration::from_secs(60 * 60);
 
 /// Names the header the proxy in front of the relay writes the caller's address into.
 ///
-/// Unset — the default, and what every deployment does until an operator has watched real traffic
-/// arrive — means the peer address, which behind a proxy is the proxy. See `ClientIpSource`: a
-/// forwarded header is attacker-supplied unless something upstream overwrites it, so which header
-/// is trustworthy is a fact about the deployment and cannot be guessed here.
+/// Unset means the peer address, which behind a proxy is the proxy. Which header is trustworthy is
+/// a fact about the deployment rather than about this code — see `ClientIpSource`, and `render.yaml`
+/// for the one production runs behind.
 const TRUSTED_CLIENT_IP_HEADER: &str = "TRUSTED_CLIENT_IP_HEADER";
 
 #[tokio::main]

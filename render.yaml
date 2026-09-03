@@ -41,33 +41,36 @@ projects:
                 sync: false
               - key: VITE_PUBLIC_POSTHOG_HOST
                 value: https://us.i.posthog.com
-              # TRUSTED_CLIENT_IP_HEADER: not set until it has been confirmed on real traffic.
+              # Which address the append rate limit keys on.
               #
               # Cloudflare fronts Render, so the relay's peer address is a proxy and every visitor
-              # shares one rate-limit bucket — a single script can 429 an entire hunt. Naming a
-              # header here splits those buckets apart. That is collateral damage reduction, not
-              # robustness: the byte and batch caps in server/src/routes/reports.rs are what
-              # actually bound consumption, and they hold whatever the key is.
+              # would otherwise share one rate-limit bucket — a single script could 429 an entire
+              # hunt. Naming a header splits those buckets apart. That is collateral damage
+              # reduction, not robustness: the byte and batch caps in server/src/routes/reports.rs
+              # are what actually bound consumption, and they hold whatever the key is.
               #
-              # CF-Connecting-IP is the header to confirm. Cloudflare generates it from the
-              # connection it terminates, so a caller cannot inject one, and Render states that all
-              # inbound traffic to its web services passes through Cloudflare — so there is no
-              # origin-bypass path to inject one through either. Not True-Client-IP: Cloudflare
-              # documents it as identical but Enterprise-plan only, which makes it contingent on
-              # Render's billing rather than on anything here.
+              # CF-Connecting-IP because Cloudflare generates it from the connection it terminates,
+              # so a caller cannot inject one, and Render states that all inbound traffic to its web
+              # services passes through Cloudflare — so there is no origin-bypass path to inject one
+              # through either. Not True-Client-IP: Cloudflare documents it as identical but
+              # Enterprise-plan only, which makes it contingent on Render's billing rather than on
+              # anything here.
               #
               # NOT X-Forwarded-For, which is what Render's own DDoS article recommends. Cloudflare
               # documents that it *appends* to an existing X-Forwarded-For, so a caller who sends
               # one is the leftmost entry the app reads. Keying the limiter on a value the caller
               # chooses does not weaken it, it deletes it — rotate the header, mint unlimited
-              # buckets — which is worse than today's shared bucket, where an attacker at least
-              # drains the one they are in. The relay refuses this header for that reason: setting
-              # it here logs a warning and falls back to the peer address.
+              # buckets — which is worse than a shared bucket, where an attacker at least drains the
+              # one they are in. The relay refuses this header for that reason: setting it here
+              # would log a warning and fall back to the peer address.
               #
-              # To confirm: set it in the dashboard and redeploy. The relay logs `keying the rate
-              # limit on a forwarded header` at startup, and warns once with `no usable address in
-              # the trusted header` if it never arrives. No warning across real traffic means it
-              # arrives; then record it here as a value with a comment.
+              # Unconfirmed on real traffic, and safe to ship that way: a header that never arrives
+              # falls back to the peer address, which is what the relay did before this existed. The
+              # deploy log settles it — `keying the rate limit on a forwarded header` at startup,
+              # then a single `no usable address in the trusted header` warning if it is absent. A
+              # warning there means this line is wrong, not that the relay is broken.
+              - key: TRUSTED_CLIENT_IP_HEADER
+                value: CF-Connecting-IP
             # Render's proxy terminates HTTP/2 and does not buffer proxied responses, which is what SSE
             # needs. The relay sets `X-Accel-Buffering: no` and `Cache-Control: no-transform` on the
             # stream itself as well, because that header is what any nginx in the path reads — and the
