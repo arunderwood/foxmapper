@@ -12,6 +12,7 @@
 pub mod model;
 pub mod rate_limit;
 pub mod routes;
+pub mod security;
 pub mod store;
 
 use axum::{
@@ -55,10 +56,14 @@ pub fn router(state: AppState) -> Router {
 ///
 /// Unknown paths fall back to `index.html` so a hunt link (`/h/quiet-fox-8821-h7k2`) opens the
 /// app — the link is the whole of joining, and a 404 there is the product not working.
+///
+/// The security headers go on here rather than in [`router`] because this is where a *document*
+/// starts being served, and a Content-Security-Policy governs a document. They land on the API
+/// responses too, which costs nothing — see [`security::layer`].
 pub fn with_static(router: Router, dir: &str) -> Router {
     use tower_http::services::{ServeDir, ServeFile};
     let index = ServeFile::new(format!("{dir}/index.html"));
-    router.fallback_service(ServeDir::new(dir).fallback(index))
+    security::layer(router.fallback_service(ServeDir::new(dir).fallback(index)))
 }
 
 /// Liveness, and the clock reference the client measures its own skew against.

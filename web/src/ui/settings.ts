@@ -70,11 +70,11 @@ function northSection(position: { lat: number; lon: number } | undefined): HTMLE
   const declination = declinationAt(position.lat, position.lon);
   return el(
     'div',
-    { 'data-testid': 'north-note' },
-    el('p', { style: 'margin:0' }, describeDeclination(declination)),
+    { class: 'north-note', 'data-testid': 'north-note' },
+    el('p', {}, describeDeclination(declination)),
     el(
       'p',
-      { class: 'small dim', style: 'margin:.25rem 0 0' },
+      { class: 'small dim' },
       'Bearings on the map are true north; a handheld compass reads magnetic.',
     ),
   );
