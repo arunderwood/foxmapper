@@ -13,7 +13,7 @@
 
 use std::{
     collections::HashMap,
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -120,4 +120,121 @@ pub fn spawn_eviction(limiter: Arc<RateLimiter>, interval: Duration, older_than:
             limiter.evict_idle(older_than);
         }
     });
+}
+
+/// Where the client's address is read from.
+///
+/// Behind a proxy the peer address is the proxy, so every caller shares one bucket and one script
+/// can 429 an entire hunt. Reading a forwarded header instead gives real hunters their own bucket
+/// back.
+///
+/// It does **not** make the limit robust. A forwarded header is written by whoever is upstream of
+/// the header-stripping proxy, so an attacker who can reach the relay directly, or who is trusted
+/// by that proxy, rotates the value and evades the limit entirely — the same concession the module
+/// header already makes. What this buys is collateral damage reduction, nothing more. The byte and
+/// batch caps in `routes::reports` are what actually bound resource consumption, and they hold
+/// whatever the key turns out to be.
+///
+/// Which header is safe depends on the deployment, so there is no default: unset means the peer
+/// address, exactly as before there was a proxy. A header only ever narrows buckets when the
+/// operator has confirmed the proxy in front overwrites it on every inbound request.
+pub struct ClientIpSource {
+    header: Option<axum::http::HeaderName>,
+    /// One warning per process when the configured header never arrives — a silent fallback to the
+    /// peer address looks identical to a working config, and the whole point of the setting is that
+    /// it was chosen by observation rather than from documentation.
+    warned: std::sync::atomic::AtomicBool,
+}
+
+impl Default for ClientIpSource {
+    /// The peer address. Identical in every respect to having no forwarded-header support at all.
+    fn default() -> Self {
+        Self {
+            header: None,
+            warned: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+
+impl ClientIpSource {
+    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, or unparseable as a
+    /// header name all mean the peer address.
+    ///
+    /// A single-value header (`CF-Connecting-IP`, `True-Client-IP`) is what this is for. Naming a
+    /// list-valued one such as `X-Forwarded-For` is accepted but a poor choice: a proxy that
+    /// *appends* leaves the leftmost entry client-written, so the key would be attacker-chosen by
+    /// design rather than only when someone bypasses the proxy.
+    #[must_use]
+    pub fn from_env(var: &str) -> Self {
+        let Ok(name) = std::env::var(var) else {
+            return Self::default();
+        };
+        let name = name.trim();
+        if name.is_empty() {
+            return Self::default();
+        }
+        let Ok(header) = axum::http::HeaderName::try_from(name) else {
+            tracing::warn!(%name, "{var} is not a valid header name; using the peer address");
+            return Self::default();
+        };
+        tracing::info!(%header, "keying the rate limit on a forwarded header");
+        Self::trusting(header)
+    }
+
+    /// Trusts `header`. `from_env` is how the relay builds one; this is for callers that already
+    /// know the name, including tests, which must not race each other over a process-wide variable.
+    #[must_use]
+    pub fn trusting(header: axum::http::HeaderName) -> Self {
+        Self {
+            header: Some(header),
+            warned: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// The name of the trusted header, if one is configured.
+    #[must_use]
+    pub fn header(&self) -> Option<&axum::http::HeaderName> {
+        self.header.as_ref()
+    }
+
+    /// The address to key a bucket on.
+    ///
+    /// Falls back to `peer` whenever the header is absent or does not hold an address: a request
+    /// that cannot be attributed still has to be limited, and attributing it to nothing would make
+    /// omitting the header the way to skip the limit.
+    #[must_use]
+    pub fn resolve(&self, headers: &axum::http::HeaderMap, peer: SocketAddr) -> IpAddr {
+        let Some(name) = &self.header else {
+            return peer.ip();
+        };
+        if let Some(ip) = headers.get(name).and_then(parse_forwarded_ip) {
+            return ip;
+        }
+        if !self.warned.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            tracing::warn!(
+                header = %name,
+                "no usable address in the trusted header; falling back to the peer address"
+            );
+        }
+        peer.ip()
+    }
+}
+
+/// The leftmost address in a possibly comma-separated header value.
+///
+/// `[2001:db8::1]:443` and `203.0.113.7:9000` both appear in the wild, so a port is stripped rather
+/// than treated as a parse failure.
+fn parse_forwarded_ip(value: &axum::http::HeaderValue) -> Option<IpAddr> {
+    let first = value.to_str().ok()?.split(',').next()?.trim();
+    if let Ok(ip) = first.parse::<IpAddr>() {
+        return Some(ip);
+    }
+    if let Ok(addr) = first.parse::<SocketAddr>() {
+        return Some(addr.ip());
+    }
+    first
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse()
+        .ok()
 }

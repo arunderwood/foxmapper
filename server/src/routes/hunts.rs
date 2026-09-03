@@ -1,12 +1,13 @@
 //! Hunt creation, lookup, and the code generator.
 
 use axum::{
-    extract::{Path, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Path, State},
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 use crate::{model::Target, now_ms, store, AppState};
 
@@ -71,6 +72,23 @@ pub fn generate_code() -> String {
     format!("{adjective}-{noun}-{number:04}-{suffix}")
 }
 
+/// Length caps on the target, in characters.
+///
+/// Generous on purpose: "the 440 machine" and "Bellingham Saturday fox hunt" both have to fit with
+/// room to spare. These exist so a script cannot store a megabyte per row, not to police what
+/// hunters type. The frequency stays an opaque string — see the column comment in
+/// `migrations/0001_initial.sql`; validating it as a number would reject "two meters" to enable a
+/// computation that does not exist.
+pub const MAX_FREQUENCY_CHARS: usize = 64;
+pub const MAX_LABEL_CHARS: usize = 128;
+
+/// Tokens a hunt costs, against the same 600-token bucket a report draws from.
+///
+/// Creating a hunt was free until now, which made it a cheaper way to fill the database than the
+/// amplification a report batch offers. Five is a discouragement, not a quota: a club starting a
+/// dozen hunts in an afternoon never notices, and a script writing rows in a loop stops.
+const CREATE_HUNT_COST: usize = 5;
+
 #[derive(Debug, Deserialize)]
 pub struct CreateHuntRequest {
     pub target: Target,
@@ -86,8 +104,25 @@ pub struct CreateHuntResponse {
 /// `POST /api/hunts`. No account, no install, no payment.
 pub async fn create_hunt(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<CreateHuntRequest>,
 ) -> Result<(StatusCode, Json<CreateHuntResponse>), StatusCode> {
+    // The string caps do the real work; the token cost only discourages row-spam. The caps run
+    // before the limiter so a request that stores nothing costs nothing.
+    if request.target.frequency.chars().count() > MAX_FREQUENCY_CHARS
+        || request.target.label.chars().count() > MAX_LABEL_CHARS
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    if !state
+        .rate_limiter
+        .allow(state.client_ip.resolve(&headers, peer), CREATE_HUNT_COST)
+    {
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
     let created_at = now_ms();
 
     // Generate-insert-retry, never check-then-insert: the check-then-insert race is exactly what

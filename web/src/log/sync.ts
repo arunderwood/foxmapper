@@ -58,8 +58,10 @@ const POLL_INTERVAL_MS = 15_000;
  * same oversized batch, and the device is stuck forever with reports nobody else can see. Two
  * hours offline is enough to build one, and offline is the normal case (Principle III).
  *
- * 200 sits well under that ceiling so the deadlock is unreachable by construction, and matches the
- * batch cap the server is due to enforce. The two numbers have to agree.
+ * 200 sits well under that ceiling so the deadlock is unreachable by construction, and equals
+ * `MAX_BATCH` in server/src/routes/reports.rs, which 413s anything larger. The two numbers have to
+ * agree: above the server's cap every flush is refused, below it a device can be left holding
+ * reports it is allowed to send but never does.
  */
 const FLUSH_BATCH_SIZE = 200;
 

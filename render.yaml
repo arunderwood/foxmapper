@@ -41,6 +41,26 @@ projects:
                 sync: false
               - key: VITE_PUBLIC_POSTHOG_HOST
                 value: https://us.i.posthog.com
+              # TRUSTED_CLIENT_IP_HEADER is deliberately not set.
+              #
+              # Cloudflare fronts Render here, so the relay's peer address is a proxy and every
+              # visitor shares one rate-limit bucket: a single script can 429 an entire hunt. Naming
+              # a forwarded header here splits that bucket back apart. It does not make the limit
+              # robust — whoever can write the header picks their own bucket — and the byte and
+              # batch caps in server/src/routes/reports.rs are what actually bound consumption.
+              #
+              # It stays unset until someone has watched real traffic, because a forwarded header
+              # is attacker-supplied unless a proxy overwrites it, and no authoritative Render
+              # documentation says which header that proxy writes. Community reports say Render
+              # *appends* to X-Forwarded-For, which would leave its leftmost entry client-written;
+              # they point at Cloudflare's CF-Connecting-IP or True-Client-IP instead. That is a
+              # lead, not a fact.
+              #
+              # To confirm: set the variable in the dashboard to one candidate and redeploy. The
+              # relay logs `keying the rate limit on a forwarded header` at startup, and warns once
+              # with `no usable address in the trusted header` if that header never arrives. No
+              # warning across real traffic means it arrives; a warning means try the next one.
+              # Record the answer here as a value with a comment naming why that header.
             # Render's proxy terminates HTTP/2 and does not buffer proxied responses, which is what SSE
             # needs. The relay sets `X-Accel-Buffering: no` and `Cache-Control: no-transform` on the
             # stream itself as well, because that header is what any nginx in the path reads — and the

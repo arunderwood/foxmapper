@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,27 @@ use crate::{
     model::{IncomingReport, ReportEnvelope},
     now_ms, store, AppState,
 };
+
+/// Reports per request.
+///
+/// **This must stay equal to `FLUSH_BATCH_SIZE` in `web/src/log/sync.ts`.** The limiter charges one
+/// token per report against a bucket that holds 600 and is capped there, so a batch larger than the
+/// bucket can never be accepted at any refill rate: it 429s, the client keeps the queue by design,
+/// the next flush rebuilds the same batch, and the device is stuck forever with reports nobody else
+/// can see. A cap here above the client's would leave room for a future client to build exactly
+/// that batch; a cap below it would 413 a flush the deployed client considers normal.
+pub const MAX_BATCH: usize = 200;
+
+/// Bytes per report, measured on the envelope and nothing inside it.
+///
+/// A bearing report is ~505 bytes, ~655 signed, and ~1 KB in the worst case the format allows — a
+/// signature plus a raw APRS frame. Eight times that is a bound on storage that cannot fire in the
+/// field, which is the same doctrine the rate limit is held to: a limit that fires during a real
+/// hunt is a bug.
+///
+/// Size is a property of the envelope. It is not a foot in the door for reading the body — `kind`,
+/// headings and confidence values remain none of the server's business (Principle IV).
+pub const MAX_REPORT_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Serialize)]
 pub struct AppendResponse {
@@ -31,16 +52,40 @@ fn bodies_of(request: Value) -> Vec<Value> {
     }
 }
 
+fn serialized_len(body: &Value) -> usize {
+    serde_json::to_vec(body).map_or(usize::MAX, |bytes| bytes.len())
+}
+
 /// `POST /api/hunts/{code}/reports`. Idempotent by report `id`.
 pub async fn append(
     State(state): State<AppState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(code): Path<String>,
     Json(request): Json<Value>,
 ) -> Result<(StatusCode, Json<AppendResponse>), StatusCode> {
     let bodies = bodies_of(request);
 
-    if !state.rate_limiter.allow(peer.ip(), bodies.len()) {
+    // Size is checked before any token is spent, so the token cost stays proportional to what gets
+    // stored. Charging for an oversized request first would let one caller who never stores a byte
+    // drain the bucket shared by everyone the limiter cannot tell apart from them.
+    if bodies.len() > MAX_BATCH {
+        tracing::debug!(count = bodies.len(), "rejecting an oversized batch");
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+    if let Some(bytes) = bodies
+        .iter()
+        .map(serialized_len)
+        .find(|n| *n > MAX_REPORT_BYTES)
+    {
+        tracing::debug!(bytes, "rejecting an oversized report");
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    if !state
+        .rate_limiter
+        .allow(state.client_ip.resolve(&headers, peer), bodies.len())
+    {
         // The client must treat this as retryable and keep the report queued. A dropped report is
         // the one unacceptable outcome.
         return Err(StatusCode::TOO_MANY_REQUESTS);
