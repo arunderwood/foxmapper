@@ -1,9 +1,7 @@
 //! The bounds on the write path, over real HTTP.
 //!
-//! Two properties are asserted together throughout: an oversized request is refused, **and** it
-//! costs no rate-limit tokens. The second is what keeps the refusal from being an attack of its
-//! own — a caller who stores nothing must not be able to drain a bucket shared with hunters the
-//! limiter cannot tell apart from them.
+//! Every rejection is asserted twice: that it happens, and that it costs no tokens. Otherwise the
+//! refusal is an attack of its own — a caller who stores nothing draining a shared bucket.
 
 mod common;
 
@@ -34,8 +32,7 @@ async fn serve(state: AppState) -> String {
     format!("http://{addr}")
 }
 
-/// A report whose serialized envelope is far past the cap, built by padding a field the server
-/// never reads — the point being that size is bounded without anyone looking inside.
+/// Padded in a field the server never reads: size is bounded without anyone looking inside.
 fn bloated_report(id: Uuid, bytes: usize) -> serde_json::Value {
     let mut body = report_body(id, "bearing");
     body["payload"]["note"] = serde_json::Value::String("x".repeat(bytes));
@@ -56,8 +53,8 @@ async fn an_oversized_report_is_refused_and_costs_nothing() {
     let base = serve(state).await;
     let http = reqwest::Client::new();
 
-    // A megabyte: 128 times the cap and comfortably inside axum's own 2 MB body limit, so the
-    // rejection is provably this cap rather than the framework's.
+    // A megabyte: 128 times the cap, and inside axum's own 2 MB limit so the rejection is provably
+    // this cap rather than the framework's.
     for _ in 0..8 {
         let r = http
             .post(format!("{base}/api/hunts/{code}/reports"))
@@ -92,8 +89,7 @@ async fn a_report_just_under_the_cap_is_accepted() {
     let base = serve(db.state()).await;
     let http = reqwest::Client::new();
 
-    // The cap must have real headroom over the format, not sit on top of it: a report roughly
-    // seven times the largest one the log format can produce still has to go through.
+    // The cap must have headroom over the format, not sit on top of it.
     let r = http
         .post(format!("{base}/api/hunts/{code}/reports"))
         .json(&bloated_report(Uuid::new_v4(), MAX_REPORT_BYTES - 1024))
@@ -113,9 +109,8 @@ async fn a_full_flush_is_accepted_and_one_report_more_is_refused() {
     let base = serve(db.state()).await;
     let http = reqwest::Client::new();
 
-    // The deployed client flushes in batches of exactly this size after a long offline stretch,
-    // which is the normal case rather than an attack. If this ever 413s, every phone that spent an
-    // afternoon out of coverage is stuck with reports nobody else can see.
+    // The deployed client flushes exactly this many after a long offline stretch — the normal case,
+    // not an attack. A 413 here strands every phone that spent an afternoon out of coverage.
     let batch: Vec<_> = (0..MAX_BATCH)
         .map(|_| report_body(Uuid::new_v4(), "bearing"))
         .collect();
@@ -156,8 +151,8 @@ async fn an_oversized_batch_is_refused_before_the_hunt_is_looked_up() {
     let base = serve(db.state()).await;
     let http = reqwest::Client::new();
 
-    // No hunt was seeded. A 413 rather than a 404 says the request was turned away on its shape,
-    // before it reached the database — which is the only way the bound is worth having.
+    // No hunt was seeded: a 413 rather than a 404 says the request was turned away on its shape,
+    // before it reached the database.
     let batch: Vec<_> = (0..=MAX_BATCH)
         .map(|_| report_body(Uuid::new_v4(), "bearing"))
         .collect();
@@ -201,8 +196,7 @@ async fn the_targets_hunters_actually_type_still_fit() {
     let base = serve(db.state()).await;
     let http = reqwest::Client::new();
 
-    // The caps are a bound on storage, not a vocabulary. Everything below is a real thing someone
-    // would name a hunt, and the frequency stays an opaque string.
+    // A bound on storage, not a vocabulary. Every line below is a real hunt someone would name.
     for (frequency, label) in [
         ("146.52", "Bellingham Saturday fox hunt"),
         (
@@ -257,8 +251,7 @@ async fn the_caps_are_inclusive() {
         assert_eq!(r.status(), 400, "one character over the cap was accepted");
     }
 
-    // Characters, not bytes: an accented club name must not cost double, and an emoji must not
-    // cost four.
+    // Characters, not bytes: an accented club name must not cost double.
     let r = create("146.52".to_string(), "é".repeat(MAX_LABEL_CHARS))
         .await
         .expect("create");
@@ -275,7 +268,7 @@ async fn the_caps_are_inclusive() {
 async fn hunt_creation_is_rate_limited() {
     let db = TestDb::new().await;
     // Ten tokens against a cost of five: two hunts, then the door shuts. The real bucket holds 600
-    // and refills, so a club starting a dozen hunts in an afternoon never reaches this.
+    // and refills.
     let state = db.state_with(strict_limiter(10.0), ClientIpSource::default());
     let base = serve(state).await;
     let http = reqwest::Client::new();
@@ -338,8 +331,7 @@ async fn without_a_trusted_header_every_caller_shares_the_peer_bucket() {
     let db = TestDb::new().await;
     let code = "quiet-fox-8821-h7k2";
     db.seed_hunt(code).await;
-    // The default, and what the relay does unless an operator has set the variable. Both requests
-    // arrive from 127.0.0.1, so a header nobody was told to trust changes nothing.
+    // Both requests arrive from 127.0.0.1, so a header nobody was told to trust changes nothing.
     let state = db.state_with(strict_limiter(1.0), ClientIpSource::default());
     let base = serve(state).await;
     let http = reqwest::Client::new();
@@ -380,8 +372,8 @@ async fn a_trusted_header_gives_each_caller_its_own_bucket() {
             .send()
     };
 
-    // What the change actually buys: one flooder no longer 429s everyone else behind the same
-    // proxy. It does not stop the flooder, who can rotate the header at will.
+    // What this buys: one flooder no longer 429s everyone behind the same proxy. It does not stop
+    // the flooder, who can rotate the header at will.
     assert_eq!(post("198.51.100.1").await.expect("post").status(), 202);
     assert_eq!(post("198.51.100.1").await.expect("post").status(), 429);
     assert_eq!(
@@ -405,8 +397,7 @@ async fn a_missing_trusted_header_falls_back_to_the_peer_address() {
     let base = serve(state).await;
     let http = reqwest::Client::new();
 
-    // Omitting the header must not be a way to skip the limit: a request that cannot be attributed
-    // still lands in the peer's bucket.
+    // Omitting the header must not be a way to skip the limit.
     let post = || {
         http.post(format!("{base}/api/hunts/{code}/reports"))
             .json(&report_body(Uuid::new_v4(), "bearing"))
@@ -420,8 +411,8 @@ async fn a_missing_trusted_header_falls_back_to_the_peer_address() {
 
 #[tokio::test]
 async fn live_delivery_survives_the_bounds() {
-    // A guard against fixing the write path by breaking the thing it feeds: SC-002 is the whole
-    // product, and a 200-report flush has to reach an open stream.
+    // A guard against bounding the write path by breaking the thing it feeds: a full flush still
+    // has to reach an open stream (SC-002).
     let db = TestDb::new().await;
     let code = "quiet-fox-8821-h7k2";
     db.seed_hunt(code).await;

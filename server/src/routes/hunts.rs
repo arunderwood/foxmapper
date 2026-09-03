@@ -72,21 +72,15 @@ pub fn generate_code() -> String {
     format!("{adjective}-{noun}-{number:04}-{suffix}")
 }
 
-/// Length caps on the target, in characters.
-///
-/// Generous on purpose: "the 440 machine" and "Bellingham Saturday fox hunt" both have to fit with
-/// room to spare. These exist so a script cannot store a megabyte per row, not to police what
-/// hunters type. The frequency stays an opaque string — see the column comment in
-/// `migrations/0001_initial.sql`; validating it as a number would reject "two meters" to enable a
-/// computation that does not exist.
+/// Length caps on the target, in characters. Generous on purpose — "the 440 machine" and a club's
+/// full name both fit with room to spare. They bound what one row can store; they are not a
+/// vocabulary, and the frequency stays an opaque string (see `migrations/0001_initial.sql`).
 pub const MAX_FREQUENCY_CHARS: usize = 64;
 pub const MAX_LABEL_CHARS: usize = 128;
 
-/// Tokens a hunt costs, against the same 600-token bucket a report draws from.
-///
-/// Creating a hunt was free until now, which made it a cheaper way to fill the database than the
-/// amplification a report batch offers. Five is a discouragement, not a quota: a club starting a
-/// dozen hunts in an afternoon never notices, and a script writing rows in a loop stops.
+/// Tokens a hunt costs, against the same 600-token bucket a report draws from. A discouragement,
+/// not a quota: a club starting a dozen hunts in an afternoon never notices, a script writing rows
+/// in a loop stops.
 const CREATE_HUNT_COST: usize = 5;
 
 #[derive(Debug, Deserialize)]
@@ -108,8 +102,8 @@ pub async fn create_hunt(
     headers: HeaderMap,
     Json(request): Json<CreateHuntRequest>,
 ) -> Result<(StatusCode, Json<CreateHuntResponse>), StatusCode> {
-    // The string caps do the real work; the token cost only discourages row-spam. The caps run
-    // before the limiter so a request that stores nothing costs nothing.
+    // The caps do the real work; the token cost only discourages row-spam. Caps first, so a request
+    // that stores nothing costs nothing.
     if request.target.frequency.chars().count() > MAX_FREQUENCY_CHARS
         || request.target.label.chars().count() > MAX_LABEL_CHARS
     {

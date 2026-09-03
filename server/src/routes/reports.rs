@@ -14,25 +14,18 @@ use crate::{
     now_ms, store, AppState,
 };
 
-/// Reports per request.
+/// Reports per request. **Must equal `FLUSH_BATCH_SIZE` in `web/src/log/sync.ts`.**
 ///
-/// **This must stay equal to `FLUSH_BATCH_SIZE` in `web/src/log/sync.ts`.** The limiter charges one
-/// token per report against a bucket that holds 600 and is capped there, so a batch larger than the
-/// bucket can never be accepted at any refill rate: it 429s, the client keeps the queue by design,
-/// the next flush rebuilds the same batch, and the device is stuck forever with reports nobody else
-/// can see. A cap here above the client's would leave room for a future client to build exactly
-/// that batch; a cap below it would 413 a flush the deployed client considers normal.
+/// One token per report against a bucket capped at 600, so a batch above that capacity is
+/// undeliverable at any refill rate: it 429s, the client keeps the queue, the next flush rebuilds
+/// the same batch, and the device is stuck with reports nobody else can see.
 pub const MAX_BATCH: usize = 200;
 
 /// Bytes per report, measured on the envelope and nothing inside it.
 ///
-/// A bearing report is ~505 bytes, ~655 signed, and ~1 KB in the worst case the format allows — a
-/// signature plus a raw APRS frame. Eight times that is a bound on storage that cannot fire in the
-/// field, which is the same doctrine the rate limit is held to: a limit that fires during a real
-/// hunt is a bug.
-///
-/// Size is a property of the envelope. It is not a foot in the door for reading the body — `kind`,
-/// headings and confidence values remain none of the server's business (Principle IV).
+/// Eight times the worst case the format allows (~1 KB: signed, with a raw APRS frame), so it
+/// bounds storage without firing in the field — the doctrine the rate limit is held to. Size is a
+/// property of the envelope, not a foot in the door for reading the body (Principle IV).
 pub const MAX_REPORT_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Serialize)]
@@ -66,9 +59,8 @@ pub async fn append(
 ) -> Result<(StatusCode, Json<AppendResponse>), StatusCode> {
     let bodies = bodies_of(request);
 
-    // Size is checked before any token is spent, so the token cost stays proportional to what gets
-    // stored. Charging for an oversized request first would let one caller who never stores a byte
-    // drain the bucket shared by everyone the limiter cannot tell apart from them.
+    // Before any token is spent, so the cost stays proportional to what gets stored: a caller who
+    // stores nothing must not be able to drain the bucket others are sharing with them.
     if bodies.len() > MAX_BATCH {
         tracing::debug!(count = bodies.len(), "rejecting an oversized batch");
         return Err(StatusCode::PAYLOAD_TOO_LARGE);

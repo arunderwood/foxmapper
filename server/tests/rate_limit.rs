@@ -139,12 +139,9 @@ fn a_batch_larger_than_the_bucket_can_never_be_accepted() {
 }
 
 mod client_ip {
-    //! Which address a bucket is keyed on.
-    //!
-    //! None of this makes the limit robust: whoever can write the trusted header chooses their own
-    //! key, and the module header already concedes that the limit is defeated by anyone who cares.
-    //! It buys one thing — a flooder behind a shared proxy no longer empties the bucket every real
-    //! hunter is drawing from.
+    //! Which address a bucket is keyed on. None of it makes the limit robust — whoever writes the
+    //! header chooses their own key. It buys one thing: a flooder behind a shared proxy no longer
+    //! empties the bucket every real hunter is drawing from.
 
     use axum::http::{HeaderMap, HeaderName, HeaderValue};
     use foxmapper_server::rate_limit::ClientIpSource;
@@ -193,7 +190,7 @@ mod client_ip {
     #[test]
     fn a_port_is_stripped_rather_than_treated_as_a_failure() {
         // Both forms appear in the wild, and dropping to the peer address on a value that plainly
-        // names a client would quietly undo the whole point of configuring the header.
+        // names a client would quietly undo the point of configuring the header.
         let source = ClientIpSource::trusting(HEADER);
         assert_eq!(
             source.resolve(&headers("203.0.113.7:9000"), peer()),
@@ -207,8 +204,7 @@ mod client_ip {
 
     #[test]
     fn a_list_valued_header_uses_the_leftmost_entry() {
-        // `X-Forwarded-For` is a poor choice for this setting for exactly the reason this test
-        // documents: with an appending proxy the leftmost entry is written by the caller.
+        // Correct for a proxy-generated header; the reason `from_env` refuses an appended one.
         let source = ClientIpSource::trusting(HEADER);
         assert_eq!(
             source.resolve(&headers("198.51.100.7, 172.16.0.1, 10.0.0.1"), peer()),
@@ -233,8 +229,7 @@ mod client_ip {
 
     #[test]
     fn a_proxy_generated_header_is_trusted() {
-        // `CF-Connecting-IP` is written by Cloudflare from the connection it terminates, and all
-        // inbound traffic reaches this relay through Cloudflare, so a caller cannot inject it.
+        // Written by Cloudflare from the connection it terminates, so a caller cannot inject it.
         let source = ClientIpSource::from_header_name("CF-Connecting-IP");
         assert_eq!(
             source.header().map(HeaderName::as_str),
@@ -245,9 +240,7 @@ mod client_ip {
     #[test]
     fn a_caller_writable_header_is_refused() {
         // Cloudflare *appends* to an existing `X-Forwarded-For`, so its leftmost entry — the one
-        // `resolve` reads — is whatever the caller sent. Keying on that would not weaken the limit,
-        // it would delete it: rotate the value, mint unlimited buckets. Falling back to the peer
-        // address keeps today's behaviour, which is worse for hunters but not free for an attacker.
+        // `resolve` reads — is whatever the caller sent. Rotate it, mint unlimited buckets.
         for name in ["X-Forwarded-For", "x-forwarded-for", "Forwarded"] {
             let source = ClientIpSource::from_header_name(name);
             assert_eq!(source.header(), None, "{name} was trusted");

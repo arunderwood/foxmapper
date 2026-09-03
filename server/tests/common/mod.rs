@@ -63,8 +63,8 @@ impl TestDb {
         self.state_with(RateLimiter::default(), ClientIpSource::default())
     }
 
-    /// For tests that need the limit to actually fire, or need two callers to land in different
-    /// buckets. The defaults are sized so neither happens.
+    /// For tests that need the limit to fire, or two callers in different buckets. The defaults are
+    /// sized so neither happens.
     pub fn state_with(&self, limiter: RateLimiter, client_ip: ClientIpSource) -> AppState {
         let (notify_tx, _) = broadcast::channel(256);
         AppState {

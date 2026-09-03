@@ -270,9 +270,8 @@ class App {
   #renderStart(): void {
     clear(this.#root);
 
-    // The relay caps these and 400s past them. Without a bound here the first a hunter learns of
-    // the limit is a failed hunt creation on a hilltop, with nothing on screen saying why. The
-    // numbers match `MAX_LABEL_CHARS` and `MAX_FREQUENCY_CHARS` in server/src/routes/hunts.rs.
+    // The relay caps these and 400s past them; without a bound here the first a hunter learns of
+    // the limit is a failed hunt creation. Matches the caps in server/src/routes/hunts.rs.
     const label = el('input', {
       id: 'new-label',
       type: 'text',

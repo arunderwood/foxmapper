@@ -14,11 +14,8 @@ const EVICT_INTERVAL: Duration = Duration::from_secs(60 * 60);
 /// nothing less and stops the map growing for the life of the process.
 const EVICT_IDLE_AFTER: Duration = Duration::from_secs(60 * 60);
 
-/// Names the header the proxy in front of the relay writes the caller's address into.
-///
-/// Unset means the peer address, which behind a proxy is the proxy. Which header is trustworthy is
-/// a fact about the deployment rather than about this code — see `ClientIpSource`, and `render.yaml`
-/// for the one production runs behind.
+/// Names the header the proxy in front of the relay writes the caller's address into. Unset means
+/// the peer address, which behind a proxy is the proxy. See `ClientIpSource` and `render.yaml`.
 const TRUSTED_CLIENT_IP_HEADER: &str = "TRUSTED_CLIENT_IP_HEADER";
 
 #[tokio::main]
@@ -71,8 +68,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     tracing::info!(%bind_addr, "relay listening");
 
-    // into_make_service_with_connect_info: the rate limit needs the peer address, which is both the
-    // key when no trusted header is configured and the fallback when one is but does not arrive.
+    // into_make_service_with_connect_info: the rate limit needs the peer address, as its key when
+    // no trusted header is configured and as its fallback when one is but does not arrive.
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

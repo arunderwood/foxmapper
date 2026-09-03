@@ -122,36 +122,28 @@ pub fn spawn_eviction(limiter: Arc<RateLimiter>, interval: Duration, older_than:
     });
 }
 
-/// The one header name `from_env` refuses. `HeaderName` has no const constructor for it.
+/// `HeaderName` has no const constructor for this one.
 static FORWARDED_FOR: axum::http::HeaderName =
     axum::http::HeaderName::from_static("x-forwarded-for");
 
 /// Where the client's address is read from.
 ///
 /// Behind a proxy the peer address is the proxy, so every caller shares one bucket and one script
-/// can 429 an entire hunt. Reading a forwarded header instead gives real hunters their own bucket
-/// back.
+/// can 429 an entire hunt. A forwarded header gives real hunters their own bucket back.
 ///
-/// It does **not** make the limit robust. A forwarded header is written by whoever is upstream of
-/// the header-stripping proxy, so an attacker who can reach the relay directly, or who is trusted
-/// by that proxy, rotates the value and evades the limit entirely — the same concession the module
-/// header already makes. What this buys is collateral damage reduction, nothing more. The byte and
-/// batch caps in `routes::reports` are what actually bound resource consumption, and they hold
-/// whatever the key turns out to be.
-///
-/// Which header is safe depends on the deployment, so there is no default: unset means the peer
-/// address, exactly as before there was a proxy. A header only ever narrows buckets when the
-/// operator has confirmed the proxy in front overwrites it on every inbound request.
+/// It does **not** make the limit robust: whoever writes the header picks their own bucket, which
+/// is the concession the module header already makes. The byte and batch caps in `routes::reports`
+/// are what bound consumption. There is no default — unset means the peer address, and a header is
+/// safe only once the proxy in front is known to overwrite it.
 pub struct ClientIpSource {
     header: Option<axum::http::HeaderName>,
-    /// One warning per process when the configured header never arrives — a silent fallback to the
-    /// peer address looks identical to a working config, and the whole point of the setting is that
-    /// it was chosen by observation rather than from documentation.
+    /// One warning per process when the configured header never arrives: a silent fallback looks
+    /// identical to a working config.
     warned: std::sync::atomic::AtomicBool,
 }
 
 impl Default for ClientIpSource {
-    /// The peer address. Identical in every respect to having no forwarded-header support at all.
+    /// The peer address. Identical to having no forwarded-header support at all.
     fn default() -> Self {
         Self {
             header: None,
@@ -161,13 +153,12 @@ impl Default for ClientIpSource {
 }
 
 impl ClientIpSource {
-    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, unparseable as a header
-    /// name, or `X-Forwarded-For` all mean the peer address.
+    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, unparseable, or
+    /// `X-Forwarded-For` all mean the peer address.
     ///
     /// This is for a header a proxy *generates* from the connection it terminates, so a caller
-    /// cannot write it — `CF-Connecting-IP` behind Cloudflare. (`True-Client-IP` is byte-identical
-    /// but Enterprise-plan only, which makes it a property of someone else's billing rather than of
-    /// this deployment.)
+    /// cannot write it — `CF-Connecting-IP` behind Cloudflare. Not `True-Client-IP`: identical, but
+    /// Enterprise-plan only.
     #[must_use]
     pub fn from_env(var: &str) -> Self {
         let Ok(name) = std::env::var(var) else {
@@ -176,8 +167,7 @@ impl ClientIpSource {
         Self::from_header_name(name.trim())
     }
 
-    /// The decision `from_env` makes, without the environment: which names are trusted, and which
-    /// fall back to the peer address.
+    /// The decision `from_env` makes, without the environment.
     #[must_use]
     pub fn from_header_name(name: &str) -> Self {
         if name.is_empty() {
@@ -188,17 +178,11 @@ impl ClientIpSource {
             return Self::default();
         };
         if header == axum::http::header::FORWARDED || header == FORWARDED_FOR {
-            // Refused rather than warned about, because trusting it is worse than the problem it
-            // was reached for. Cloudflare *appends* to an existing `X-Forwarded-For`, so a caller
-            // who sends one produces `<anything they like>, <their real address>, <cloudflare>` —
-            // and the leftmost entry, the one every client-IP helper returns and the one `resolve`
-            // reads, is theirs to choose. Keying on that does not weaken the limit, it deletes it:
-            // an attacker rotates the value and mints unlimited fresh buckets, where today they at
-            // least drain the bucket they are in.
-            //
-            // Reading it safely means counting from the right at a fixed number of trusted hops
-            // (Cloudflare plus Render's balancer is two), which breaks silently the day a hop is
-            // added. That is not implemented, so the header is not accepted.
+            // Refused, not warned about: trusting it is worse than the problem it was reached for.
+            // Cloudflare *appends* to an existing `X-Forwarded-For`, so the leftmost entry — the one
+            // `resolve` reads — is the caller's to choose. Rotate it, mint unlimited buckets.
+            // Reading it safely means counting from the right at a fixed hop count, which breaks
+            // silently the day a hop is added; not implemented, so not accepted.
             tracing::warn!(
                 %header,
                 "a caller-writable header was named; using the peer address instead"
@@ -210,7 +194,7 @@ impl ClientIpSource {
     }
 
     /// Trusts `header`. `from_env` is how the relay builds one; this is for callers that already
-    /// know the name, including tests, which must not race each other over a process-wide variable.
+    /// know the name, including tests.
     #[must_use]
     pub fn trusting(header: axum::http::HeaderName) -> Self {
         Self {
@@ -225,11 +209,8 @@ impl ClientIpSource {
         self.header.as_ref()
     }
 
-    /// The address to key a bucket on.
-    ///
-    /// Falls back to `peer` whenever the header is absent or does not hold an address: a request
-    /// that cannot be attributed still has to be limited, and attributing it to nothing would make
-    /// omitting the header the way to skip the limit.
+    /// The address to key a bucket on. Falls back to `peer` when the header is absent or unusable:
+    /// omitting it must not be a way to skip the limit.
     #[must_use]
     pub fn resolve(&self, headers: &axum::http::HeaderMap, peer: SocketAddr) -> IpAddr {
         let Some(name) = &self.header else {
@@ -250,12 +231,9 @@ impl ClientIpSource {
 
 /// The leftmost address in a possibly comma-separated header value.
 ///
-/// Leftmost is right for a proxy-generated header, which carries one address. It is wrong for an
-/// appended list, where the leftmost entry is whatever the caller sent — which is why `from_env`
-/// refuses `X-Forwarded-For` rather than leaving that trap set.
-///
-/// `[2001:db8::1]:443` and `203.0.113.7:9000` both appear in the wild, so a port is stripped rather
-/// than treated as a parse failure.
+/// Right for a proxy-generated header, which carries one address; wrong for an appended list, which
+/// is why `from_env` refuses `X-Forwarded-For`. A port is stripped rather than treated as a parse
+/// failure — `[2001:db8::1]:443` and `203.0.113.7:9000` both appear in the wild.
 fn parse_forwarded_ip(value: &axum::http::HeaderValue) -> Option<IpAddr> {
     let first = value.to_str().ok()?.split(',').next()?.trim();
     if let Ok(ip) = first.parse::<IpAddr>() {

@@ -60,8 +60,7 @@ const POLL_INTERVAL_MS = 15_000;
  *
  * 200 sits well under that ceiling so the deadlock is unreachable by construction, and equals
  * `MAX_BATCH` in server/src/routes/reports.rs, which 413s anything larger. The two numbers have to
- * agree: above the server's cap every flush is refused, below it a device can be left holding
- * reports it is allowed to send but never does.
+ * agree.
  */
 const FLUSH_BATCH_SIZE = 200;
 
