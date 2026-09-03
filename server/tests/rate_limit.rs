@@ -232,6 +232,44 @@ mod client_ip {
     }
 
     #[test]
+    fn a_proxy_generated_header_is_trusted() {
+        // `CF-Connecting-IP` is written by Cloudflare from the connection it terminates, and all
+        // inbound traffic reaches this relay through Cloudflare, so a caller cannot inject it.
+        let source = ClientIpSource::from_header_name("CF-Connecting-IP");
+        assert_eq!(
+            source.header().map(HeaderName::as_str),
+            Some("cf-connecting-ip")
+        );
+    }
+
+    #[test]
+    fn a_caller_writable_header_is_refused() {
+        // Cloudflare *appends* to an existing `X-Forwarded-For`, so its leftmost entry — the one
+        // `resolve` reads — is whatever the caller sent. Keying on that would not weaken the limit,
+        // it would delete it: rotate the value, mint unlimited buckets. Falling back to the peer
+        // address keeps today's behaviour, which is worse for hunters but not free for an attacker.
+        for name in ["X-Forwarded-For", "x-forwarded-for", "Forwarded"] {
+            let source = ClientIpSource::from_header_name(name);
+            assert_eq!(source.header(), None, "{name} was trusted");
+            assert_eq!(
+                source.resolve(&headers("198.51.100.7"), peer()),
+                expect_ip("10.1.2.3")
+            );
+        }
+    }
+
+    #[test]
+    fn an_unusable_name_is_the_peer_address() {
+        for name in ["", "   ", "not a header name"] {
+            assert_eq!(
+                ClientIpSource::from_header_name(name.trim()).header(),
+                None,
+                "{name:?} was trusted"
+            );
+        }
+    }
+
+    #[test]
     fn each_header_value_gets_its_own_bucket() {
         use super::RateLimiter;
         let source = ClientIpSource::trusting(HEADER);

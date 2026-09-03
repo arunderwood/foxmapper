@@ -122,6 +122,10 @@ pub fn spawn_eviction(limiter: Arc<RateLimiter>, interval: Duration, older_than:
     });
 }
 
+/// The one header name `from_env` refuses. `HeaderName` has no const constructor for it.
+static FORWARDED_FOR: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("x-forwarded-for");
+
 /// Where the client's address is read from.
 ///
 /// Behind a proxy the peer address is the proxy, so every caller shares one bucket and one script
@@ -157,26 +161,50 @@ impl Default for ClientIpSource {
 }
 
 impl ClientIpSource {
-    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, or unparseable as a
-    /// header name all mean the peer address.
+    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, unparseable as a header
+    /// name, or `X-Forwarded-For` all mean the peer address.
     ///
-    /// A single-value header (`CF-Connecting-IP`, `True-Client-IP`) is what this is for. Naming a
-    /// list-valued one such as `X-Forwarded-For` is accepted but a poor choice: a proxy that
-    /// *appends* leaves the leftmost entry client-written, so the key would be attacker-chosen by
-    /// design rather than only when someone bypasses the proxy.
+    /// This is for a header a proxy *generates* from the connection it terminates, so a caller
+    /// cannot write it — `CF-Connecting-IP` behind Cloudflare. (`True-Client-IP` is byte-identical
+    /// but Enterprise-plan only, which makes it a property of someone else's billing rather than of
+    /// this deployment.)
     #[must_use]
     pub fn from_env(var: &str) -> Self {
         let Ok(name) = std::env::var(var) else {
             return Self::default();
         };
-        let name = name.trim();
+        Self::from_header_name(name.trim())
+    }
+
+    /// The decision `from_env` makes, without the environment: which names are trusted, and which
+    /// fall back to the peer address.
+    #[must_use]
+    pub fn from_header_name(name: &str) -> Self {
         if name.is_empty() {
             return Self::default();
         }
         let Ok(header) = axum::http::HeaderName::try_from(name) else {
-            tracing::warn!(%name, "{var} is not a valid header name; using the peer address");
+            tracing::warn!(%name, "not a valid header name; using the peer address");
             return Self::default();
         };
+        if header == axum::http::header::FORWARDED || header == FORWARDED_FOR {
+            // Refused rather than warned about, because trusting it is worse than the problem it
+            // was reached for. Cloudflare *appends* to an existing `X-Forwarded-For`, so a caller
+            // who sends one produces `<anything they like>, <their real address>, <cloudflare>` —
+            // and the leftmost entry, the one every client-IP helper returns and the one `resolve`
+            // reads, is theirs to choose. Keying on that does not weaken the limit, it deletes it:
+            // an attacker rotates the value and mints unlimited fresh buckets, where today they at
+            // least drain the bucket they are in.
+            //
+            // Reading it safely means counting from the right at a fixed number of trusted hops
+            // (Cloudflare plus Render's balancer is two), which breaks silently the day a hop is
+            // added. That is not implemented, so the header is not accepted.
+            tracing::warn!(
+                %header,
+                "a caller-writable header was named; using the peer address instead"
+            );
+            return Self::default();
+        }
         tracing::info!(%header, "keying the rate limit on a forwarded header");
         Self::trusting(header)
     }
@@ -221,6 +249,10 @@ impl ClientIpSource {
 }
 
 /// The leftmost address in a possibly comma-separated header value.
+///
+/// Leftmost is right for a proxy-generated header, which carries one address. It is wrong for an
+/// appended list, where the leftmost entry is whatever the caller sent — which is why `from_env`
+/// refuses `X-Forwarded-For` rather than leaving that trap set.
 ///
 /// `[2001:db8::1]:443` and `203.0.113.7:9000` both appear in the wild, so a port is stripped rather
 /// than treated as a parse failure.
