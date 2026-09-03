@@ -876,6 +876,15 @@ label {
   gap: 0.5rem;
 }
 
+/* The declination note: two lines that read as one paragraph and its footnote. */
+.north-note p {
+  margin: 0;
+}
+
+.north-note p + p {
+  margin-top: 0.25rem;
+}
+
 /* Leaving the hunt sits below the device switches, set apart by a rule: a different kind of act,
    not one more toggle. */
 .sheet-leave {
@@ -1097,6 +1106,12 @@ label {
   font-size: var(--md-sys-typescale-label-size);
   line-height: 1.45;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+/* A notice is prose plus, sometimes, a button; paragraphs carry their own spacing so the markup
+   holds no `style` attribute — `style-src-attr` is closed, and an attribute here would be dropped. */
+.notice p {
+  margin: 0 0 0.5rem;
 }
 
 .swatch {

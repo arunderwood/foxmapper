@@ -64,6 +64,27 @@ vendor, the feedback affordance is hidden whenever analytics is off — it honou
 To wire it up in PostHog: create a survey, set its display condition to activate when the event
 `feedback_opened` is received, and publish it.
 
+## Analytics under the Content-Security-Policy
+
+The app is served with a restrictive CSP (`server/src/security.rs`), and PostHog's default
+behaviour does not fit inside it: the SDK lazy-loads error tracking and surveys as `<script>` tags
+from `us-assets.i.posthog.com` at runtime, and `script-src` names no origin but our own. PostHog's
+own answer is to bundle them, which is what [`web/src/analytics/posthog.ts`](../web/src/analytics/posthog.ts)
+does — `posthog-js/dist/module.no-external` plus explicit imports of the two extensions in use.
+
+Three consequences worth knowing before changing anything here:
+
+- **A new PostHog feature usually needs a new import.** Session replay, the toolbar and dead-click
+  autocapture each arrive as their own remote script. Enabling one in the config without importing
+  it fails silently in production and in no test — analytics is off in dev and CI.
+- **The policy names the US hosts.** `connect-src` allows `us.i.posthog.com` (events, feature flags)
+  and `us-assets.i.posthog.com` (project config, fetched as JSON). Pointing
+  `VITE_PUBLIC_POSTHOG_HOST` at the EU region means editing the policy in `server/src/security.rs`
+  **and** `web/vite.config.ts` to match, or every analytics request is blocked.
+- **A survey renders unstyled.** PostHog builds its survey UI with a `<style>` element, which
+  `style-src 'self'` blocks; the survey still works, but arrives without its CSS. Fixing it properly
+  needs a per-response nonce, which a static `index.html` served straight off disk cannot mint.
+
 ## Configuration
 
 Two build-time Vite variables (see [`web/.env.example`](../web/.env.example)):

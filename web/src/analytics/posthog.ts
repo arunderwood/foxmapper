@@ -15,15 +15,23 @@
  *   `/h/:code` before anything is sent — see {@link redactHuntCode}, which the unit tests pin.
  *
  * **The SDK is loaded lazily** — a dynamic `import()` inside {@link initAnalytics}, which only runs
- * when every gate is open. So the ~60 KB of PostHog is fetched only by a consenting device on a
- * keyed build; an opted-out hunter, and every keyless dev/CI build, never downloads it at all. That
- * matters for a PWA whose whole point is working with no coverage: the lean path stays lean.
+ * when every gate is open. So PostHog is fetched only by a consenting device on a keyed build; an
+ * opted-out hunter, and every keyless dev/CI build, never downloads it at all. That matters for a
+ * PWA whose whole point is working with no coverage: the lean path stays lean.
+ *
+ * **Every extension is bundled, none are fetched.** The default build lazy-loads error tracking and
+ * surveys as `<script>` tags from `us-assets.i.posthog.com` at runtime, which the app's
+ * Content-Security-Policy refuses — `script-src` is `'self'` and nothing else. PostHog's own answer
+ * is the `no-external` entry point plus explicit imports of the extensions in use, which is what
+ * {@link initAnalytics} loads; the policy then needs no third-party script origin at all. Anything
+ * added to the PostHog config that pulls a *new* extension (session replay, the toolbar, dead-click
+ * autocapture) must be imported here too, or it will fail silently in production and nowhere else.
  *
  * Every exported call is a no-op until the gate is open, so callers never have to guard. The app
  * depends on this silence: nothing here may block startup, a report, or the map — analytics is a
  * bystander to the local-first path, never a step in it.
  */
-import type { PostHog } from 'posthog-js';
+import type { PostHog } from 'posthog-js/dist/module.no-external';
 
 import { redactHuntCode } from './redact.js';
 
@@ -121,8 +129,15 @@ export function initAnalytics(): void {
   if (intended || analyticsForcedOff() || !userPreferenceOn()) return;
   intended = true;
 
-  void import('posthog-js')
-    .then(({ default: posthog }) => {
+  void Promise.all([
+    import('posthog-js/dist/module.no-external'),
+    // Side-effect imports: each registers itself on `window.__PosthogExtensions__`, where the SDK
+    // looks before it would otherwise fetch a script. `capture_exceptions` below needs the first;
+    // the feedback survey needs the second.
+    import('posthog-js/dist/exception-autocapture'),
+    import('posthog-js/dist/surveys'),
+  ])
+    .then(([{ default: posthog }]) => {
       // The switch may have been flipped off while the chunk was in flight — honour that, and load
       // nothing into a device that just said no.
       if (!intended) return;

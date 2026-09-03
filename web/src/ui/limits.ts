@@ -20,6 +20,6 @@ export function limitsNotice(): HTMLElement {
   return el(
     'div',
     { class: 'notice', 'data-testid': 'limits' },
-    ...LIMITS.map((text) => el('p', { style: 'margin:0 0 .5rem' }, text)),
+    ...LIMITS.map((text) => el('p', {}, text)),
   );
 }

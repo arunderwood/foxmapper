@@ -53,7 +53,7 @@ export function addToHomeScreenOffer(onDismiss: () => void): HTMLElement | undef
     { class: 'notice', 'data-testid': 'a2hs-offer' },
     el(
       'p',
-      { style: 'margin:0 0 .5rem' },
+      {},
       'Tip: add FoxMapper to your Home Screen (Share → Add to Home Screen). ' +
         'iPhones clear a website’s saved data after about a week unused, which could drop reports ' +
         'you entered with no signal. Everything works without this.',
@@ -98,16 +98,11 @@ export function queueChip(
   );
 
   if (draining) {
-    chip.append(
-      el(
-        'span',
-        { class: 'chip-track', 'aria-hidden': 'true' },
-        el('span', {
-          class: 'chip-track-fill',
-          style: `width: ${Math.round(Math.max(0, Math.min(1, drainedFraction)) * 100)}%`,
-        }),
-      ),
-    );
+    const fill = el('span', { class: 'chip-track-fill' });
+    // Set through the CSSOM rather than a `style` attribute: the app is served under a CSP with
+    // no `style-src-attr 'unsafe-inline'`, which would drop the attribute and leave the bar empty.
+    fill.style.width = `${Math.round(Math.max(0, Math.min(1, drainedFraction)) * 100)}%`;
+    chip.append(el('span', { class: 'chip-track', 'aria-hidden': 'true' }, fill));
   }
 
   return chip;
