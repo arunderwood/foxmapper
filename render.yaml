@@ -41,6 +41,20 @@ projects:
                 sync: false
               - key: VITE_PUBLIC_POSTHOG_HOST
                 value: https://us.i.posthog.com
+              # What the rate limit keys on. Without it the key is the peer address, which behind
+              # Cloudflare is the proxy: one bucket for every visitor, so one script could 429 a
+              # whole hunt. It narrows blast radius and nothing more — the byte and batch caps in
+              # server/src/routes/reports.rs are what bound consumption.
+              #
+              # Cloudflare generates this from the connection it terminates, so a caller cannot
+              # inject one. Not True-Client-IP (Enterprise-plan only). Not X-Forwarded-For, which
+              # Render recommends and Cloudflare *appends* to — its leftmost entry is the caller's
+              # to choose, and the relay refuses it for that reason.
+              #
+              # Unconfirmed on real traffic. An absent header logs one warning and falls back to the
+              # peer address, so a wrong guess here costs nothing.
+              - key: TRUSTED_CLIENT_IP_HEADER
+                value: CF-Connecting-IP
             # Render's proxy terminates HTTP/2 and does not buffer proxied responses, which is what SSE
             # needs. The relay sets `X-Accel-Buffering: no` and `Cache-Control: no-transform` on the
             # stream itself as well, because that header is what any nginx in the path reads — and the

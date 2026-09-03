@@ -137,3 +137,141 @@ fn a_batch_larger_than_the_bucket_can_never_be_accepted() {
         "a batch at exactly the capacity must still fit a fresh bucket"
     );
 }
+
+mod client_ip {
+    //! Which address a bucket is keyed on. None of it makes the limit robust — whoever writes the
+    //! header chooses their own key. It buys one thing: a flooder behind a shared proxy no longer
+    //! empties the bucket every real hunter is drawing from.
+
+    use axum::http::{HeaderMap, HeaderName, HeaderValue};
+    use foxmapper_server::rate_limit::ClientIpSource;
+    use std::net::{IpAddr, SocketAddr};
+
+    const HEADER: HeaderName = HeaderName::from_static("x-client-ip");
+
+    fn peer() -> SocketAddr {
+        "10.1.2.3:52344".parse().expect("peer")
+    }
+
+    fn headers(value: &str) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        map.insert(HEADER, HeaderValue::from_str(value).expect("header value"));
+        map
+    }
+
+    fn expect_ip(literal: &str) -> IpAddr {
+        literal.parse().expect("address")
+    }
+
+    #[test]
+    fn unconfigured_is_the_peer_address_and_no_header_changes_that() {
+        let source = ClientIpSource::default();
+        assert_eq!(source.header(), None);
+        assert_eq!(
+            source.resolve(&headers("198.51.100.7"), peer()),
+            expect_ip("10.1.2.3"),
+            "an unconfigured relay read a header anyway, so anyone can mint a fresh bucket"
+        );
+    }
+
+    #[test]
+    fn a_trusted_header_is_the_key() {
+        let source = ClientIpSource::trusting(HEADER);
+        assert_eq!(
+            source.resolve(&headers("198.51.100.7"), peer()),
+            expect_ip("198.51.100.7")
+        );
+        assert_eq!(
+            source.resolve(&headers("2001:db8::1"), peer()),
+            expect_ip("2001:db8::1")
+        );
+    }
+
+    #[test]
+    fn a_port_is_stripped_rather_than_treated_as_a_failure() {
+        // Both forms appear in the wild, and dropping to the peer address on a value that plainly
+        // names a client would quietly undo the point of configuring the header.
+        let source = ClientIpSource::trusting(HEADER);
+        assert_eq!(
+            source.resolve(&headers("203.0.113.7:9000"), peer()),
+            expect_ip("203.0.113.7")
+        );
+        assert_eq!(
+            source.resolve(&headers("[2001:db8::1]:443"), peer()),
+            expect_ip("2001:db8::1")
+        );
+    }
+
+    #[test]
+    fn a_list_valued_header_uses_the_leftmost_entry() {
+        // Correct for a proxy-generated header; the reason `from_env` refuses an appended one.
+        let source = ClientIpSource::trusting(HEADER);
+        assert_eq!(
+            source.resolve(&headers("198.51.100.7, 172.16.0.1, 10.0.0.1"), peer()),
+            expect_ip("198.51.100.7")
+        );
+    }
+
+    #[test]
+    fn an_absent_or_unusable_header_falls_back_to_the_peer() {
+        // Omitting the header must not be a way to skip the limit.
+        let source = ClientIpSource::trusting(HEADER);
+        assert_eq!(
+            source.resolve(&HeaderMap::new(), peer()),
+            expect_ip("10.1.2.3")
+        );
+        assert_eq!(
+            source.resolve(&headers("not-an-address"), peer()),
+            expect_ip("10.1.2.3")
+        );
+        assert_eq!(source.resolve(&headers(""), peer()), expect_ip("10.1.2.3"));
+    }
+
+    #[test]
+    fn a_proxy_generated_header_is_trusted() {
+        // Written by Cloudflare from the connection it terminates, so a caller cannot inject it.
+        let source = ClientIpSource::from_header_name("CF-Connecting-IP");
+        assert_eq!(
+            source.header().map(HeaderName::as_str),
+            Some("cf-connecting-ip")
+        );
+    }
+
+    #[test]
+    fn a_caller_writable_header_is_refused() {
+        // Cloudflare *appends* to an existing `X-Forwarded-For`, so its leftmost entry — the one
+        // `resolve` reads — is whatever the caller sent. Rotate it, mint unlimited buckets.
+        for name in ["X-Forwarded-For", "x-forwarded-for", "Forwarded"] {
+            let source = ClientIpSource::from_header_name(name);
+            assert_eq!(source.header(), None, "{name} was trusted");
+            assert_eq!(
+                source.resolve(&headers("198.51.100.7"), peer()),
+                expect_ip("10.1.2.3")
+            );
+        }
+    }
+
+    #[test]
+    fn an_unusable_name_is_the_peer_address() {
+        for name in ["", "   ", "not a header name"] {
+            assert_eq!(
+                ClientIpSource::from_header_name(name.trim()).header(),
+                None,
+                "{name:?} was trusted"
+            );
+        }
+    }
+
+    #[test]
+    fn each_header_value_gets_its_own_bucket() {
+        use super::RateLimiter;
+        let source = ClientIpSource::trusting(HEADER);
+        let limiter = RateLimiter::new(1.0, 0.0);
+        assert!(limiter.allow(source.resolve(&headers("198.51.100.1"), peer()), 1));
+        assert!(!limiter.allow(source.resolve(&headers("198.51.100.1"), peer()), 1));
+        assert!(
+            limiter.allow(source.resolve(&headers("198.51.100.2"), peer()), 1),
+            "one flooder starved everyone else sharing the proxy"
+        );
+    }
+}

@@ -12,7 +12,11 @@ use sqlx::{AssertSqlSafe, Connection, Executor, PgConnection, PgPool};
 use std::sync::atomic::{AtomicU32, Ordering};
 use uuid::Uuid;
 
-use foxmapper_server::{model::Target, rate_limit::RateLimiter, store, AppState};
+use foxmapper_server::{
+    model::Target,
+    rate_limit::{ClientIpSource, RateLimiter},
+    store, AppState,
+};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -56,11 +60,18 @@ impl TestDb {
     }
 
     pub fn state(&self) -> AppState {
+        self.state_with(RateLimiter::default(), ClientIpSource::default())
+    }
+
+    /// For tests that need the limit to fire, or two callers in different buckets. The defaults are
+    /// sized so neither happens.
+    pub fn state_with(&self, limiter: RateLimiter, client_ip: ClientIpSource) -> AppState {
         let (notify_tx, _) = broadcast::channel(256);
         AppState {
             pool: self.pool.clone(),
             notify_tx,
-            rate_limiter: Arc::new(RateLimiter::default()),
+            rate_limiter: Arc::new(limiter),
+            client_ip: Arc::new(client_ip),
         }
     }
 

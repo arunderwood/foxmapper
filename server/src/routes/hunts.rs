@@ -1,12 +1,13 @@
 //! Hunt creation, lookup, and the code generator.
 
 use axum::{
-    extract::{Path, State},
-    http::StatusCode,
+    extract::{ConnectInfo, Path, State},
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 
 use crate::{model::Target, now_ms, store, AppState};
 
@@ -71,6 +72,17 @@ pub fn generate_code() -> String {
     format!("{adjective}-{noun}-{number:04}-{suffix}")
 }
 
+/// Length caps on the target, in characters. Generous on purpose — "the 440 machine" and a club's
+/// full name both fit with room to spare. They bound what one row can store; they are not a
+/// vocabulary, and the frequency stays an opaque string (see `migrations/0001_initial.sql`).
+pub const MAX_FREQUENCY_CHARS: usize = 64;
+pub const MAX_LABEL_CHARS: usize = 128;
+
+/// Tokens a hunt costs, against the same 600-token bucket a report draws from. A discouragement,
+/// not a quota: a club starting a dozen hunts in an afternoon never notices, a script writing rows
+/// in a loop stops.
+const CREATE_HUNT_COST: usize = 5;
+
 #[derive(Debug, Deserialize)]
 pub struct CreateHuntRequest {
     pub target: Target,
@@ -86,8 +98,25 @@ pub struct CreateHuntResponse {
 /// `POST /api/hunts`. No account, no install, no payment.
 pub async fn create_hunt(
     State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(request): Json<CreateHuntRequest>,
 ) -> Result<(StatusCode, Json<CreateHuntResponse>), StatusCode> {
+    // The caps do the real work; the token cost only discourages row-spam. Caps first, so a request
+    // that stores nothing costs nothing.
+    if request.target.frequency.chars().count() > MAX_FREQUENCY_CHARS
+        || request.target.label.chars().count() > MAX_LABEL_CHARS
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    if !state
+        .rate_limiter
+        .allow(state.client_ip.resolve(&headers, peer), CREATE_HUNT_COST)
+    {
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
     let created_at = now_ms();
 
     // Generate-insert-retry, never check-then-insert: the check-then-insert race is exactly what

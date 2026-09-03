@@ -28,6 +28,8 @@ pub struct AppState {
     /// Fan-out of hunt codes with new reports, fed by one `PgListener` per process.
     pub notify_tx: broadcast::Sender<String>,
     pub rate_limiter: Arc<rate_limit::RateLimiter>,
+    /// Which address the rate limit keys on. Defaults to the peer address.
+    pub client_ip: Arc<rate_limit::ClientIpSource>,
 }
 
 /// There is deliberately no join endpoint: joining is a purely local act. The device mints its own

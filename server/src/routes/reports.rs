@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{ConnectInfo, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,20 @@ use crate::{
     model::{IncomingReport, ReportEnvelope},
     now_ms, store, AppState,
 };
+
+/// Reports per request. **Must equal `FLUSH_BATCH_SIZE` in `web/src/log/sync.ts`.**
+///
+/// One token per report against a bucket capped at 600, so a batch above that capacity is
+/// undeliverable at any refill rate: it 429s, the client keeps the queue, the next flush rebuilds
+/// the same batch, and the device is stuck with reports nobody else can see.
+pub const MAX_BATCH: usize = 200;
+
+/// Bytes per report, measured on the envelope and nothing inside it.
+///
+/// Eight times the worst case the format allows (~1 KB: signed, with a raw APRS frame), so it
+/// bounds storage without firing in the field — the doctrine the rate limit is held to. Size is a
+/// property of the envelope, not a foot in the door for reading the body (Principle IV).
+pub const MAX_REPORT_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Serialize)]
 pub struct AppendResponse {
@@ -31,16 +45,39 @@ fn bodies_of(request: Value) -> Vec<Value> {
     }
 }
 
+fn serialized_len(body: &Value) -> usize {
+    serde_json::to_vec(body).map_or(usize::MAX, |bytes| bytes.len())
+}
+
 /// `POST /api/hunts/{code}/reports`. Idempotent by report `id`.
 pub async fn append(
     State(state): State<AppState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Path(code): Path<String>,
     Json(request): Json<Value>,
 ) -> Result<(StatusCode, Json<AppendResponse>), StatusCode> {
     let bodies = bodies_of(request);
 
-    if !state.rate_limiter.allow(peer.ip(), bodies.len()) {
+    // Before any token is spent, so the cost stays proportional to what gets stored: a caller who
+    // stores nothing must not be able to drain the bucket others are sharing with them.
+    if bodies.len() > MAX_BATCH {
+        tracing::debug!(count = bodies.len(), "rejecting an oversized batch");
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+    if let Some(bytes) = bodies
+        .iter()
+        .map(serialized_len)
+        .find(|n| *n > MAX_REPORT_BYTES)
+    {
+        tracing::debug!(bytes, "rejecting an oversized report");
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    if !state
+        .rate_limiter
+        .allow(state.client_ip.resolve(&headers, peer), bodies.len())
+    {
         // The client must treat this as retryable and keep the report queued. A dropped report is
         // the one unacceptable outcome.
         return Err(StatusCode::TOO_MANY_REQUESTS);

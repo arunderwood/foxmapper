@@ -1,7 +1,8 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use foxmapper_server::{
-    rate_limit, rate_limit::RateLimiter, router, spawn_listener, store, AppState,
+    rate_limit, rate_limit::ClientIpSource, rate_limit::RateLimiter, router, spawn_listener, store,
+    AppState,
 };
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
@@ -12,6 +13,10 @@ const EVICT_INTERVAL: Duration = Duration::from_secs(60 * 60);
 /// An IP that has not appended for an hour has a full bucket anyway, so forgetting it enforces
 /// nothing less and stops the map growing for the life of the process.
 const EVICT_IDLE_AFTER: Duration = Duration::from_secs(60 * 60);
+
+/// Names the header the proxy in front of the relay writes the caller's address into. Unset means
+/// the peer address, which behind a proxy is the proxy. See `ClientIpSource` and `render.yaml`.
+const TRUSTED_CLIENT_IP_HEADER: &str = "TRUSTED_CLIENT_IP_HEADER";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,6 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool,
         notify_tx,
         rate_limiter,
+        client_ip: Arc::new(ClientIpSource::from_env(TRUSTED_CLIENT_IP_HEADER)),
     };
 
     // Serve the PWA alongside the API when a build is present. In development the two run apart
@@ -62,8 +68,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     tracing::info!(%bind_addr, "relay listening");
 
-    // into_make_service_with_connect_info: the append rate limit keys on the peer IP, and there is
-    // nothing else to key on — there are no accounts.
+    // into_make_service_with_connect_info: the rate limit needs the peer address, as its key when
+    // no trusted header is configured and as its fallback when one is but does not arrive.
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

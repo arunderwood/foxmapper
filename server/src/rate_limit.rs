@@ -13,7 +13,7 @@
 
 use std::{
     collections::HashMap,
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -120,4 +120,131 @@ pub fn spawn_eviction(limiter: Arc<RateLimiter>, interval: Duration, older_than:
             limiter.evict_idle(older_than);
         }
     });
+}
+
+/// `HeaderName` has no const constructor for this one.
+static FORWARDED_FOR: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("x-forwarded-for");
+
+/// Where the client's address is read from.
+///
+/// Behind a proxy the peer address is the proxy, so every caller shares one bucket and one script
+/// can 429 an entire hunt. A forwarded header gives real hunters their own bucket back.
+///
+/// It does **not** make the limit robust: whoever writes the header picks their own bucket, which
+/// is the concession the module header already makes. The byte and batch caps in `routes::reports`
+/// are what bound consumption. There is no default — unset means the peer address, and a header is
+/// safe only once the proxy in front is known to overwrite it.
+pub struct ClientIpSource {
+    header: Option<axum::http::HeaderName>,
+    /// One warning per process when the configured header never arrives: a silent fallback looks
+    /// identical to a working config.
+    warned: std::sync::atomic::AtomicBool,
+}
+
+impl Default for ClientIpSource {
+    /// The peer address. Identical to having no forwarded-header support at all.
+    fn default() -> Self {
+        Self {
+            header: None,
+            warned: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+
+impl ClientIpSource {
+    /// Reads the header name from `TRUSTED_CLIENT_IP_HEADER`. Unset, empty, unparseable, or
+    /// `X-Forwarded-For` all mean the peer address.
+    ///
+    /// This is for a header a proxy *generates* from the connection it terminates, so a caller
+    /// cannot write it — `CF-Connecting-IP` behind Cloudflare. Not `True-Client-IP`: identical, but
+    /// Enterprise-plan only.
+    #[must_use]
+    pub fn from_env(var: &str) -> Self {
+        let Ok(name) = std::env::var(var) else {
+            return Self::default();
+        };
+        Self::from_header_name(name.trim())
+    }
+
+    /// The decision `from_env` makes, without the environment.
+    #[must_use]
+    pub fn from_header_name(name: &str) -> Self {
+        if name.is_empty() {
+            return Self::default();
+        }
+        let Ok(header) = axum::http::HeaderName::try_from(name) else {
+            tracing::warn!(%name, "not a valid header name; using the peer address");
+            return Self::default();
+        };
+        if header == axum::http::header::FORWARDED || header == FORWARDED_FOR {
+            // Refused, not warned about: trusting it is worse than the problem it was reached for.
+            // Cloudflare *appends* to an existing `X-Forwarded-For`, so the leftmost entry — the one
+            // `resolve` reads — is the caller's to choose. Rotate it, mint unlimited buckets.
+            // Reading it safely means counting from the right at a fixed hop count, which breaks
+            // silently the day a hop is added; not implemented, so not accepted.
+            tracing::warn!(
+                %header,
+                "a caller-writable header was named; using the peer address instead"
+            );
+            return Self::default();
+        }
+        tracing::info!(%header, "keying the rate limit on a forwarded header");
+        Self::trusting(header)
+    }
+
+    /// Trusts `header`. `from_env` is how the relay builds one; this is for callers that already
+    /// know the name, including tests.
+    #[must_use]
+    pub fn trusting(header: axum::http::HeaderName) -> Self {
+        Self {
+            header: Some(header),
+            warned: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// The name of the trusted header, if one is configured.
+    #[must_use]
+    pub fn header(&self) -> Option<&axum::http::HeaderName> {
+        self.header.as_ref()
+    }
+
+    /// The address to key a bucket on. Falls back to `peer` when the header is absent or unusable:
+    /// omitting it must not be a way to skip the limit.
+    #[must_use]
+    pub fn resolve(&self, headers: &axum::http::HeaderMap, peer: SocketAddr) -> IpAddr {
+        let Some(name) = &self.header else {
+            return peer.ip();
+        };
+        if let Some(ip) = headers.get(name).and_then(parse_forwarded_ip) {
+            return ip;
+        }
+        if !self.warned.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            tracing::warn!(
+                header = %name,
+                "no usable address in the trusted header; falling back to the peer address"
+            );
+        }
+        peer.ip()
+    }
+}
+
+/// The leftmost address in a possibly comma-separated header value.
+///
+/// Right for a proxy-generated header, which carries one address; wrong for an appended list, which
+/// is why `from_env` refuses `X-Forwarded-For`. A port is stripped rather than treated as a parse
+/// failure — `[2001:db8::1]:443` and `203.0.113.7:9000` both appear in the wild.
+fn parse_forwarded_ip(value: &axum::http::HeaderValue) -> Option<IpAddr> {
+    let first = value.to_str().ok()?.split(',').next()?.trim();
+    if let Ok(ip) = first.parse::<IpAddr>() {
+        return Some(ip);
+    }
+    if let Ok(addr) = first.parse::<SocketAddr>() {
+        return Some(addr.ip());
+    }
+    first
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse()
+        .ok()
 }

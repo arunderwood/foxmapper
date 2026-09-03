@@ -270,16 +270,20 @@ class App {
   #renderStart(): void {
     clear(this.#root);
 
+    // The relay caps these and 400s past them; without a bound here the first a hunter learns of
+    // the limit is a failed hunt creation. Matches the caps in server/src/routes/hunts.rs.
     const label = el('input', {
       id: 'new-label',
       type: 'text',
       placeholder: 'Saturday fox',
+      maxlength: '128',
       'data-testid': 'new-label',
     });
     const frequency = el('input', {
       id: 'new-frequency',
       type: 'text',
       placeholder: '146.52',
+      maxlength: '64',
       'data-testid': 'new-frequency',
     });
     const create = el(
