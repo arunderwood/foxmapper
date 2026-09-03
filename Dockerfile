@@ -19,11 +19,8 @@ ENV VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY
 ENV VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
 RUN npm run build
 
-FROM rust:1.97-slim AS server
+FROM rust:1.98-slim AS server
 WORKDIR /app
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
 # rust-toolchain.toml rides along with the manifests: it must be here before the stub build below,
 # or the dependency layer compiles with the base image's toolchain instead of the pinned one.
 COPY server/Cargo.toml server/Cargo.lock server/rust-toolchain.toml ./
@@ -36,20 +33,22 @@ RUN mkdir src \
 COPY server/ ./
 RUN touch src/main.rs src/lib.rs && cargo build --release
 
-FROM debian:bookworm-slim AS runtime
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/*
+# Distroless: no shell, no package manager, no apt, and a non-root default user. `cc` rather than
+# `base` because the binary links libgcc_s.so.1, which `base` does not carry. CA certificates ship
+# in the image already. The tag is pinned by index digest — see .github/dependabot.yml for why.
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:c31ff9abcb1910f3ab25c7957bdaf0bfe12a01eb546e8df2282f1c8f682b606c AS runtime
 WORKDIR /app
 COPY --from=server /app/target/release/foxmapper-server /usr/local/bin/foxmapper-server
-COPY --from=server /app/migrations /app/migrations
+# Deliberately not `--chown`: the bundle lands root-owned and world-readable while the process runs
+# as uid 65532, so the app can serve its own static files but cannot rewrite them.
 COPY --from=web /web/dist /app/web
 
 ENV BIND_ADDR=0.0.0.0:8080
 ENV WEB_DIR=/app/web
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD curl -fsS http://localhost:8080/health || exit 1
+# No HEALTHCHECK: there is no shell and no curl here to run one. The real probe is Render's, over
+# HTTP against `healthCheckPath: /health` in render.yaml.
 
-CMD ["foxmapper-server"]
+# Absolute path, not a bare name: with no shell in the image there is nothing to resolve PATH.
+ENTRYPOINT ["/usr/local/bin/foxmapper-server"]

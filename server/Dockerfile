@@ -1,39 +1,26 @@
 # syntax=docker/dockerfile:1
+#
+# The compose dev build, and nothing else. The production image is built from the root ./Dockerfile;
+# there is no second runtime stage here, because an untested copy of one only drifts.
 
-FROM rust:1.97-slim AS base
+FROM rust:1.98-slim AS base
 WORKDIR /app
-# Before any cargo call, so dev's cargo-watch and the builder's dependency layer resolve the same
-# compiler. rust-toolchain.toml is the source of truth; the tag above is only the base layer. When
-# they agree this costs nothing, and when Dependabot bumps one first rustup fetches the pinned
-# toolchain rather than quietly building with the other one.
+# Before any cargo call, so dev's cargo-watch resolves the same compiler. rust-toolchain.toml is the
+# source of truth; the tag above is only the base layer. When they agree this costs nothing, and when
+# Dependabot bumps one first rustup fetches the pinned toolchain rather than quietly building with
+# the other one.
 COPY rust-toolchain.toml ./
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends pkg-config libssl-dev curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Live-reload development. Sources are bind-mounted by compose.
+#
+# Runs as root on purpose. compose bind-mounts ./server over /app and writes build output to
+# /app/target, so a uid that does not match the host's fails on the mount. Production is non-root
+# (uid 65532) — see the runtime stage in the root ./Dockerfile.
 FROM base AS dev
 RUN cargo install cargo-watch --locked
 ENV CARGO_TARGET_DIR=/app/target
 EXPOSE 8080
 CMD ["cargo", "watch", "-x", "run"]
-
-FROM base AS builder
-COPY Cargo.toml Cargo.lock ./
-# Cache the dependency build against a stub main, so a source edit does not rebuild the world.
-RUN mkdir src && echo 'fn main() {}' > src/main.rs \
-    && cargo build --release \
-    && rm -rf src
-COPY . .
-RUN touch src/main.rs && cargo build --release
-
-FROM debian:bookworm-slim AS runtime
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY --from=builder /app/target/release/foxmapper-server /usr/local/bin/foxmapper-server
-COPY --from=builder /app/migrations /app/migrations
-ENV BIND_ADDR=0.0.0.0:8080
-EXPOSE 8080
-CMD ["foxmapper-server"]

@@ -36,6 +36,13 @@ updates:
       interval: weekly
 
   # Root Dockerfile builds the single deploy image; server/Dockerfile is the compose dev build.
+  #
+  # Ungrouped on purpose, so each image moves in a PR of its own. That matters most for the
+  # distroless runtime base, which is pinned by digest: `:nonroot` is a rolling tag with no semver
+  # component, so without the digest the base would change underneath a build with no PR and no
+  # record of what actually shipped. The digest makes that change a reviewable event; keeping it
+  # out of a batch keeps it a legible one. (One entry, not two: Dependabot rejects a second
+  # `docker` block for a directory already covered here.)
   - package-ecosystem: docker
     directories:
       - /
