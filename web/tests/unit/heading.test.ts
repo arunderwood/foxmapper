@@ -16,7 +16,7 @@
  * `screen.orientation.angle` and nothing else, so a real DOM would add a dependency and prove no
  * more.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { watchHeading, needsPermission, type Heading } from '../../src/sensors/heading.js';
 
 type Listener = (event: unknown) => void;
@@ -172,13 +172,51 @@ describe('what must never reach the log', () => {
 });
 
 describe('the iOS permission gate', () => {
-  it('is needed only where requestPermission exists', () => {
-    fakeWindow({ absolute: false });
-    expect(needsPermission()).toBe(false);
-
+  const withRequestPermission = () => {
     (globalThis as Record<string, unknown>)['DeviceOrientationEvent'] = {
       requestPermission: () => Promise.resolve('granted'),
     };
-    expect(needsPermission()).toBe(true);
+  };
+  const sensorStates = (states: Record<string, PermissionState>) =>
+    vi.stubGlobal('navigator', {
+      permissions: {
+        query: ({ name }: { name: string }) => Promise.resolve({ state: states[name] ?? 'prompt' }),
+      },
+    });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is not needed where requestPermission does not exist', async () => {
+    fakeWindow({ absolute: true });
+    await expect(needsPermission()).resolves.toBe(false);
+  });
+
+  it('is needed on WebKit, whose Permissions API refuses the sensor names', async () => {
+    fakeWindow({ absolute: false });
+    withRequestPermission();
+    vi.stubGlobal('navigator', {
+      permissions: {
+        query: () => Promise.reject(new DOMException('unsupported', 'NotSupportedError')),
+      },
+    });
+    await expect(needsPermission()).resolves.toBe(true);
+  });
+
+  it('is not needed on Chromium once every orientation sensor is granted', async () => {
+    // Chromium implements requestPermission too, but it gates nothing behind a tap: Android ships
+    // the sensors allowed, and a dial that waited for a tap there would never auto-go-live.
+    fakeWindow({ absolute: true });
+    withRequestPermission();
+    sensorStates({ accelerometer: 'granted', gyroscope: 'granted', magnetometer: 'granted' });
+    await expect(needsPermission()).resolves.toBe(false);
+  });
+
+  it('is needed on Chromium while any orientation sensor is not granted', async () => {
+    fakeWindow({ absolute: true });
+    withRequestPermission();
+    sensorStates({ accelerometer: 'granted', gyroscope: 'granted', magnetometer: 'prompt' });
+    await expect(needsPermission()).resolves.toBe(true);
   });
 });

@@ -255,6 +255,9 @@ export function compassDial(options: DialOptions): CompassDial {
    *  compass goes live but never gets one, so Freeze stays hidden and it falls to twist alone —
    *  no dead affordance, without the code having to detect the sensor's absence (FR-011). */
   let receivedSample = false;
+  /** Resolved once at open (heading.ts): whether the compass sits behind a tap on this platform. */
+  let gestureRequired = false;
+  let destroyed = false;
   const smoother = createHeadingSmoother();
 
   const rose = buildRose();
@@ -356,7 +359,7 @@ export function compassDial(options: DialOptions): CompassDial {
     // true; a live magnetic display would be a sensor-drafted number shown as magnetic.
     refSwitch.toggleAttribute('disabled', state === 'live');
 
-    startBtn.toggleAttribute('hidden', !(state === 'idle' && mode === 'auto' && needsPermission()));
+    startBtn.toggleAttribute('hidden', !(state === 'idle' && mode === 'auto' && gestureRequired));
     // Freeze appears only once the compass has actually reported — never on a phone that has none.
     freezeBtn.toggleAttribute('hidden', !(state === 'live' && receivedSample));
     // Retake only exists in auto mode, and only after a value is captured.
@@ -427,9 +430,10 @@ export function compassDial(options: DialOptions): CompassDial {
   }
 
   function startCompass(): void {
-    // Must be called inside the tap on iOS, or requestPermission rejects.
+    // Must be called inside the tap on iOS, or requestPermission rejects — so nothing may be
+    // awaited before it.
     void (async () => {
-      if (needsPermission() && !(await requestPermission())) {
+      if (!(await requestPermission())) {
         setStatus('No compass access — twist the dial to set the bearing');
         return;
       }
@@ -521,11 +525,19 @@ export function compassDial(options: DialOptions): CompassDial {
 
   // -- start -------------------------------------------------------------
 
-  if (mode === 'auto' && !needsPermission()) {
-    goLive();
-  } else if (mode === 'auto') {
-    setStatus('Start the compass, or twist the dial to set the bearing');
+  if (mode === 'auto') {
     render();
+    void needsPermission().then((gated) => {
+      // A twist, a typed value, or a close while the gate was resolving is the reporter's answer.
+      if (destroyed || state !== 'idle') return;
+      if (gated) {
+        gestureRequired = true;
+        setStatus('Start the compass, or twist the dial to set the bearing');
+        render();
+      } else {
+        goLive();
+      }
+    });
   } else {
     setStatus('Twist the dial to set the bearing');
     render();
@@ -534,6 +546,9 @@ export function compassDial(options: DialOptions): CompassDial {
   return {
     node,
     committedHeading: committedNow,
-    destroy: () => stopWatching?.(),
+    destroy: () => {
+      destroyed = true;
+      stopWatching?.();
+    },
   };
 }
