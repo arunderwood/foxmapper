@@ -4,7 +4,7 @@
  * | | iOS Safari | Android Chrome |
  * |---|---|---|
  * | Event | `deviceorientation` + `webkitCompassHeading` | `deviceorientationabsolute` |
- * | Permission | gesture-triggered `requestPermission()` | none |
+ * | Permission | gesture-triggered `requestPermission()` | motion-sensor setting, allowed by default; no tap |
  * | Value | already a compass heading | `360 - alpha`, plus screen orientation |
  * | Accuracy | `webkitCompassAccuracy` | **nothing — no equivalent exists** |
  *
@@ -38,11 +38,32 @@ interface IosDeviceOrientation {
 // offered (FR-008c), so a phone with no compass takes the same path as a phone next to a car whose
 // compass is lying. Asking the question would imply the answer changes something.
 
-/** True when a user gesture must precede any reading (iOS 13+). */
-export function needsPermission(): boolean {
+/** The sensors Chromium checks before it delivers `deviceorientationabsolute`. */
+const ORIENTATION_SENSORS = ['accelerometer', 'gyroscope', 'magnetometer'];
+
+/**
+ * True when a user gesture must precede any reading (iOS 13+).
+ *
+ * `requestPermission` existing does not settle it: Chromium implements it too, but there it only
+ * reports the motion-sensor setting and never needs a tap — and on Android that setting defaults to
+ * allowed. The Permissions API reads the setting without ever prompting, so sensors already granted
+ * mean no gesture. WebKit's `permissions.query` rejects the sensor names, which keeps iOS — the
+ * platform that does gate on a tap — on the gesture path.
+ */
+export async function needsPermission(): Promise<boolean> {
   const ctor = (globalThis as { DeviceOrientationEvent?: IosDeviceOrientation })
     .DeviceOrientationEvent;
-  return typeof ctor?.requestPermission === 'function';
+  if (typeof ctor?.requestPermission !== 'function') return false;
+  try {
+    const states = await Promise.all(
+      ORIENTATION_SENSORS.map((name) =>
+        navigator.permissions.query({ name: name as PermissionName }),
+      ),
+    );
+    return states.some((status) => status.state !== 'granted');
+  } catch {
+    return true;
+  }
 }
 
 /**

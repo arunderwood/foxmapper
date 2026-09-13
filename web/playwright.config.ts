@@ -19,7 +19,15 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Headless Chromium leaves motion sensors at "ask"; Android Chrome, which this project
+        // stands in for, ships them allowed — and the dial goes live without a tap only then.
+        permissions: ['accelerometer', 'gyroscope', 'magnetometer'],
+      },
+    },
     { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
   webServer: process.env['FOXMAPPER_URL']

@@ -101,6 +101,7 @@ test.describe('entry and map agree (US1, SC-001)', () => {
     await page.getByTestId('report-bearing').click();
     await expect(page.getByTestId('ref-unit')).toHaveText('° true');
 
+    await expect(page.getByTestId('compass-dial')).toHaveAttribute('data-state', 'live');
     await setHeading(page, magneticNorthward);
     await page.getByTestId('freeze').click();
     // The screenshot case, fixed: pointing at true north reads as due north — not 15° off.
@@ -132,6 +133,7 @@ test.describe('entry and map agree (US1, SC-001)', () => {
     const magneticNorthward = (360 - decl) % 360;
 
     await page.getByTestId('report-bearing').click();
+    await expect(page.getByTestId('compass-dial')).toHaveAttribute('data-state', 'live');
     await setHeading(page, magneticNorthward);
 
     // While live the frame is not the reporter's to choose — the stream is true, full stop.

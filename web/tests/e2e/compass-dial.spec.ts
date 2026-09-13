@@ -80,7 +80,9 @@ test.describe('compass dial', () => {
     await joinAs(page, await createHunt(), 'KI7BBB');
 
     await page.getByTestId('report-bearing').click();
-    // Android-style auto-live: no start control needed.
+    // Android-style auto-live: no start control needed. Live only once the dial's permission gate
+    // resolves, and a sample sent before then has no listener to hear it.
+    await expect(page.getByTestId('compass-dial')).toHaveAttribute('data-state', 'live');
     await expect(page.getByTestId('use-compass')).toBeHidden();
 
     // The sensor reads magnetic; the field shows true — converted once, at the dial (005 FR-004).
@@ -105,11 +107,19 @@ test.describe('compass dial', () => {
     browserName,
   }) => {
     test.skip(browserName !== 'chromium', 'orientation emulation is Chromium-only');
-    // Make the platform look like iOS: a gesture-gated requestPermission that grants.
+    // Make the platform look like iOS: a gesture-gated requestPermission that grants, and WebKit's
+    // Permissions API, which refuses the motion-sensor names rather than reporting their state.
     await page.addInitScript(() => {
       (
         window.DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }
       ).requestPermission = () => Promise.resolve('granted');
+      const query = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = (descriptor) =>
+        ['accelerometer', 'gyroscope', 'magnetometer'].includes(descriptor.name)
+          ? Promise.reject(
+              new DOMException('Permissions::query does not support this API', 'NotSupportedError'),
+            )
+          : query(descriptor);
     });
     await grantPosition(context);
     await joinAs(page, await createHunt(), 'KI7IOS');
@@ -118,6 +128,7 @@ test.describe('compass dial', () => {
     // No auto-live here — the start control must be offered.
     await expect(page.getByTestId('use-compass')).toBeVisible();
     await page.getByTestId('use-compass').click();
+    await expect(page.getByTestId('compass-dial')).toHaveAttribute('data-state', 'live');
     await setHeading(page, 45);
     await page.getByTestId('freeze').click();
     await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(45));
@@ -133,6 +144,7 @@ test.describe('compass dial', () => {
     await joinAs(page, await createHunt(), 'KI7CCC');
 
     await page.getByTestId('report-bearing').click();
+    await expect(page.getByTestId('compass-dial')).toHaveAttribute('data-state', 'live');
     await setHeading(page, 90);
     await page.getByTestId('freeze').click();
     await expect(page.getByTestId('heading-input')).toHaveValue(trueDisplay(90));
@@ -171,7 +183,7 @@ test.describe('compass dial', () => {
     await joinAs(page, await createHunt(), 'KI7DDD');
 
     await page.getByTestId('report-bearing').click();
-    // No compass ever reports: no start control (no permission model here) and no Freeze appears.
+    // No compass ever reports: no start control (no tap gate here) and no Freeze appears.
     await expect(page.getByTestId('use-compass')).toBeHidden();
     await expect(page.getByTestId('freeze')).toBeHidden();
 
