@@ -138,6 +138,9 @@ jobs:
         background: true
         env:
           BIND_ADDR: 127.0.0.1:8080
+          # Every request with its path and status, and each created hunt's code, so a 404 on a
+          # hunt the suite just made can be traced to whether its create reached this relay.
+          RUST_LOG: foxmapper_server=debug,tower_http=debug
         run: ./server/target/debug/foxmapper-server
       - name: Wait for relay health
         run: |
