@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,6 +35,8 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/rust
       - uses: Swatinem/rust-cache@v2
         with:
@@ -55,6 +58,8 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -83,6 +88,8 @@ jobs:
       DATABASE_URL: postgres://foxmapper:foxmapper@localhost:5432/foxmapper
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/rust
       - uses: Swatinem/rust-cache@v2
         with:
@@ -122,12 +129,20 @@ jobs:
       # The E2E suite drives the real relay, not a mock: the sync cursor, the SSE stream and the
       # idempotent append are the things most likely to break, and a mock would assert our
       # assumptions back at us.
-      - name: Start the relay
+      - name: Build the relay
+        run: cargo build --manifest-path server/Cargo.toml
+      # A step of its own, so everything the relay logs during the suite has a step log to land in,
+      # and a relay crash fails a named step instead of surfacing only as Playwright timeouts.
+      - name: Relay
+        id: relay
+        background: true
+        env:
+          BIND_ADDR: 127.0.0.1:8080
+        run: ./server/target/debug/foxmapper-server
+      - name: Wait for relay health
         run: |
-          cargo build --manifest-path server/Cargo.toml
-          BIND_ADDR=127.0.0.1:8080 ./server/target/debug/foxmapper-server &
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:8080/health >/dev/null; then
+            if curl -sf --max-time 2 http://localhost:8080/health >/dev/null; then
               echo "relay healthy after $((i * 2))s"
               exit 0
             fi
@@ -137,3 +152,15 @@ jobs:
           exit 1
       - run: npm run test:e2e -- --project=chromium
         working-directory: web
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+      # Skipped when the suite fails; the runner reaps the process at job end, and the relay holds
+      # nothing outside the runner that needs releasing.
+      - name: Stop the relay
+        cancel: relay
