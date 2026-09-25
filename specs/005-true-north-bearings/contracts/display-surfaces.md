@@ -8,8 +8,8 @@ labeling rule for any surface that shows a heading number
 Anywhere a heading number is rendered, its reference is visible adjacent to it, in the words
 "true" / "magnetic" — never a lone number, never an abbreviation (°T/°M are CalTopo's idiom, not
 this app's voice), never protocol vocabulary. Default (non-entry) surfaces display **true only**;
-magnetic appears exactly twice in the whole app outside entry: the report popup's paired value and
-nowhere else. Current audit of number-rendering surfaces: the dial field (entry contract), the
+a magnetic number appears in exactly one place outside entry: the report popup's paired value. The
+settings line uses the word "magnetic" but shows no magnetic number. Current audit of number-rendering surfaces: the dial field (entry contract), the
 report popup (below), the settings line (below). The tour and landing demo render wedges without
 numerals and need no change; any future numeral inherits this rule.
 

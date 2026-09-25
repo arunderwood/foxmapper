@@ -28,10 +28,11 @@ reference. In the reported screenshot, a bearing entered as "0" was rendered rou
 north — correct conversion, invisible reasoning. The user experienced it as "I said north and the
 app drew not-north."
 
-CalTopo, cited by users as the model to follow, resolves the same tension by three habits: the map
-is always true-north based, every displayed bearing carries its reference label, and declination is
-computed automatically from location so the user chooses a reference only at the moments where the
-choice affects accuracy. This spec adopts the same posture.
+CalTopo, cited by users as the model to follow, keeps the map true-north based, computes
+declination automatically from location, labels live measurements with both references (TN/MN), and
+asks for a reference on each bearing line a user enters (research R10). This spec adopts that
+posture and goes further in two places CalTopo does not: every displayed heading carries its label,
+including on saved reports, and the choice appears only where it affects accuracy.
 
 ## Clarifications
 
@@ -123,8 +124,8 @@ wedge agrees with the hunter's own device-drafted bearings from the same spot.
    bearing's origin is set to the hunter's position, **Then** the conversion uses declination at
    the hunter's position, not the device operator's.
 4. **Given** a bearing entered with the wrong reference and then noticed, **When** the user
-   corrects it, **Then** the correction is a new fact superseding the old report, consistent with
-   the append-only log.
+   corrects it, **Then** they retract the report and enter it again. Both are new facts, and the
+   original report is never changed, consistent with the append-only log.
 
 ---
 
@@ -179,8 +180,8 @@ they agree. The observation that proves it: an experienced ham stops distrusting
   drafted heading and can adjust before submitting. Reference normalization neither hides nor
   worsens sensor error.
 - **Wrong reference chosen at entry**: the mistake is visible before submitting (both values and a
-  live preview of where the bearing points), and after submitting it is correctable only by
-  supersession, never by mutating the logged report.
+  live preview of where the bearing points). After submitting, it is corrected by retracting it and
+  entering it again, never by changing the logged report.
 
 ## Requirements *(mandatory)*
 
@@ -197,14 +198,18 @@ they agree. The observation that proves it: an experienced ham stops distrusting
   describe the same physical direction; no silent reference change may occur between entry and
   display.
 - **FR-004**: Headings drafted from the device compass MUST be normalized to true north
-  automatically, accounting for whichever reference the device reports in, and MUST NOT apply a
-  correction twice when the device already reports true headings. The reporter performs no
+  automatically, and the correction MUST be applied exactly once. The sensor layer always delivers
+  magnetic headings. A platform that reports true headings is normalized to magnetic inside that
+  layer, so the dial never needs to detect which reference a device uses. The reporter performs no
   conversion step.
 - **FR-005**: Manual bearing entry MUST let the user state which reference their number is in,
   switchable in a single action, with the active reference unmistakable at the point of entry. The
   same physical direction MUST result regardless of which reference is used to express it.
-  Typed/relayed entry MUST default to **magnetic** (a dictated bearing almost always comes from a
-  physical compass); the default is fixed, not remembered per session. This applies to any number
+  Typed/relayed entry MUST default to **magnetic**, matching the radio SAR convention that field
+  teams report magnetic and net control converts (research R10). Some callers still give true
+  bearings unannounced (GPS-heading Doppler DF, a GPS set to true, a compass with declination set),
+  so the reference must stay visible and one tap from changing. The default is fixed, not
+  remembered per session. This applies to any number
   typed while no bearing value is committed — including in the compass-drafting sheet — while
   adjusting an already-drafted value keeps that value's reference (a compass-drafted heading stays
   true through edits). The reference switch itself
@@ -265,8 +270,7 @@ they agree. The observation that proves it: an experienced ham stops distrusting
 ## Assumptions
 
 - The map is rendered north-up with map-north = true north; this feature adds no magnetic-north
-  map orientation mode. (CalTopo's own community reports the magnetic map-reference mode as its
-  confusing corner; FoxMapper omits it.)
+  map orientation mode. CalTopo has none either (research R10).
 - Web platform compasses today report magnetic headings; FR-004's "whichever reference the device
   reports" is stated so behavior stays correct if a platform ever supplies true headings.
 - A heading set by adjusting the dial follows the surface's active reference: in compass-drafting
