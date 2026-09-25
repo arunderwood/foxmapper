@@ -34,6 +34,27 @@ const JARGON = [
   /\bdeclination\b/i,
 ];
 
+/**
+ * 006 (research R13, SC-007): the estimate speaks of "probably" and "about 9 in 10", never of the
+ * statistics behind them. Checked on every surface the estimate adds words to.
+ */
+const ESTIMATE_JARGON = [
+  /\bprobability\b/i,
+  /\bcredible\b/i,
+  /\bconfidence interval\b/i,
+  /\bposterior\b/i,
+  /\blikelihood\b/i,
+  /\bBayesian\b/i,
+  /\bsigma\b/i,
+  /\bpercent\b/i,
+  /%/,
+  /\bHPD\b/,
+  /\bgrid\b/i,
+  /\bkernel\b/i,
+];
+
+const ESTIMATE_SURFACES = ['src/estimate/copy.ts', 'src/ui/tour/steps.ts', 'src/ui/settings.ts'];
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -71,6 +92,8 @@ describe('the vocabulary firewall', () => {
     ...sourceFiles('src/report'),
     ...sourceFiles('src/map'),
     'src/main.ts',
+    // The one estimate module a participant reads: every other file there is arithmetic.
+    'src/estimate/copy.ts',
   ];
 
   it('covers every module that can reach a screen', () => {
@@ -116,6 +139,22 @@ describe('the vocabulary firewall', () => {
       .toLowerCase();
     for (const phrase of ['bearing', 'signal', 'hear nothing here', 'how sure are you']) {
       expect(spoken).toContain(phrase);
+    }
+  });
+});
+
+describe('the estimate speaks plain language (SC-007)', () => {
+  it.each(ESTIMATE_SURFACES)('%s names no statistic', (file) => {
+    const offenders = literals(readFileSync(file, 'utf8')).filter((text) =>
+      ESTIMATE_JARGON.some((pattern) => pattern.test(text)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('says how sure it is in words a hunter uses', () => {
+    const copy = readFileSync('src/estimate/copy.ts', 'utf8').toLowerCase();
+    for (const phrase of ['probably', 'about 9 in 10', 'reports disagree']) {
+      expect(copy).toContain(phrase);
     }
   });
 });

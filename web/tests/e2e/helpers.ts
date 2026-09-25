@@ -29,15 +29,26 @@ export interface Hunt {
   code: string;
 }
 
-/** Creates a hunt directly against the relay — the fixture, not the thing under test. */
+/**
+ * Creates a hunt directly against the relay — the fixture, not the thing under test.
+ *
+ * Every test in a run shares the relay's per-address rate-limit bucket, and creating a hunt draws
+ * from it, so a 429 here means "wait", not "fail": it is retried as the app retries its own sends.
+ */
 export async function createHunt(label = 'Saturday fox'): Promise<string> {
-  const response = await fetch(`${RELAY}/api/hunts`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ target: { frequency: '146.52', label } }),
-  });
-  const hunt = (await response.json()) as Hunt;
-  return hunt.code;
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`${RELAY}/api/hunts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ target: { frequency: '146.52', label } }),
+    });
+    if (response.status === 429 && attempt < 20) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      continue;
+    }
+    const hunt = (await response.json()) as Hunt;
+    return hunt.code;
+  }
 }
 
 /**
