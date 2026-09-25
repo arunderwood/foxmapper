@@ -76,17 +76,37 @@ pub async fn hunt_detail(pool: &PgPool, code: &str) -> Result<Option<HuntDetail>
 /// seq 4 is still in flight, advance past 4, and never see it. Not for throughput — at tens of
 /// participants this costs nothing measurable, and it removes the failure mode rather than
 /// narrowing it.
+///
+/// The transaction runs on its own task, so dropping this future does not cancel it. A browser
+/// that closes mid-flush drops the handler at whatever `.await` it had reached, and sqlx 0.9's
+/// `begin()` is not cancel-safe: dropped after `BEGIN` is sent but before its reply, it hands the
+/// connection back to the pool inside a transaction it has no record of. Every autocommit write
+/// that connection serves afterwards is never committed — a hunt is created, and then 404s. An
+/// append the caller stopped waiting for still commits, which idempotency makes harmless.
 pub async fn append_reports(
     pool: &PgPool,
     code: &str,
     reports: &[IncomingReport],
     received_at: i64,
 ) -> Result<Vec<Uuid>, StoreError> {
+    let pool = pool.clone();
     let code = code.to_lowercase();
+    let reports = reports.to_vec();
+    tokio::spawn(async move { append_in_transaction(&pool, &code, &reports, received_at).await })
+        .await
+        .unwrap_or_else(|join_error| std::panic::resume_unwind(join_error.into_panic()))
+}
+
+async fn append_in_transaction(
+    pool: &PgPool,
+    code: &str,
+    reports: &[IncomingReport],
+    received_at: i64,
+) -> Result<Vec<Uuid>, StoreError> {
     let mut tx = pool.begin().await?;
 
     let exists: Option<(String,)> = sqlx::query_as("SELECT code FROM hunts WHERE code = $1")
-        .bind(&code)
+        .bind(code)
         .fetch_optional(&mut *tx)
         .await?;
     if exists.is_none() {
@@ -94,7 +114,7 @@ pub async fn append_reports(
     }
 
     sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)")
-        .bind(&code)
+        .bind(code)
         .execute(&mut *tx)
         .await?;
 
@@ -109,7 +129,7 @@ pub async fn append_reports(
              ON CONFLICT (id) DO NOTHING",
         )
         .bind(report.id)
-        .bind(&code)
+        .bind(code)
         .bind(received_at)
         .bind(&report.body)
         .execute(&mut *tx)
@@ -121,7 +141,7 @@ pub async fn append_reports(
     // readable — the same guarantee the advisory lock gives the sequence itself.
     sqlx::query("SELECT pg_notify($1, $2)")
         .bind(NOTIFY_CHANNEL)
-        .bind(&code)
+        .bind(code)
         .execute(&mut *tx)
         .await?;
 
