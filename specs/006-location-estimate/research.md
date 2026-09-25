@@ -172,7 +172,7 @@ threshold.
 | Too few reports (FR-010) | Count of active positive reports: `bearing`, `omni`, `fix` | `TOO_FEW_REPORTS` | 3 (fewer triggers) |
 | All point the same way (FR-011) | Angular span of positive observers as seen from the probability-weighted centre of the largest region: 360° minus the largest gap between their directions | `NARROW_SPREAD_DEG` | 30 (less triggers) |
 | More than one place (FR-012) | Share of total probability held by the second-largest region | `SECOND_PLACE_SHARE` | 0.15 (at least triggers) |
-| One report conflicts (FR-012a) | Lowest normalized agreement over all active reports, where agreement = (E[kernel under the posterior] − floor) / (1 − floor), so 0 means the report rejects the whole estimate and 1 means it fully supports it | `CONFLICT_AGREEMENT` | 0.1 (less triggers) |
+| One report conflicts (FR-012a) | Lowest normalized agreement over all active reports, where agreement = (E[kernel under the posterior] − floor) / (1 − floor), so 0 means the report rejects the whole estimate and 1 means it fully supports it | `CONFLICT_AGREEMENT`, divided by the number of active reports | 0.1 (less triggers) |
 
 Observers within `SPREAD_NEAR_KM` (0.5) of the centre are left out of the span, and when one is
 present the spread warning does not apply. A station standing at the fox, or a find, is the best
@@ -192,6 +192,11 @@ distance.
 - *Conflict*: normalizing by the floor puts all four kinds on one scale, so a "heard nothing" at the
   centre of the region counts as a conflict just as a bearing pointing away does. The measure is an
   aggregate minimum, and no per-report value leaves the module, so FR-026 holds by construction.
+  The level is divided by the number of active reports (a Bonferroni split): compared against the
+  level itself, the lowest of several honest reports falls short by luck. Implementation measured
+  the undivided level raising the warning on about 10% of simulated honest hunts of 2–14 reports,
+  and the divided level on about 1%. A confidently wrong bearing among 16 honest reports still
+  raises it, because its agreement is close to 0.
 
 **Alternatives considered**:
 - *Geometric dilution of precision from bearing crossing angles*: bearings only, so Principle II

@@ -37,6 +37,7 @@ Anonymous counts, hand-authored one event at a time, with a fixed and reviewed p
 | `report_retracted` | — | A report was withdrawn. |
 | `position_placed` | — | A hunter set their position by hand (that they did, never where). |
 | `relay_mode_toggled` | `enabled` | Net-control relay mode switched. |
+| `estimate_toggled` | `enabled` | The estimate was switched on or off on this device. |
 | `tiles_unavailable` | — | The basemap could not load (a degradation signal). |
 | `tour_offered` / `tour_accepted` / `tour_declined` / `tour_completed` / `tour_exited` | `from_offer` (on exit) | First-visit tour funnel. |
 | `feedback_opened` | — | The feedback affordance was used (see below). |

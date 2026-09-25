@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-25
 
-**Status**: Draft
+**Status**: Implemented (field validation deferred)
 
 **Input**: User description: "Location estimate: from the shared reports, show where the fox probably
 is as a credible region, with every report kind contributing"
