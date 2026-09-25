@@ -86,16 +86,14 @@ pub async fn append(
     // The only validation the server performs: the JSON parses and `id` is a UUID. It does not
     // check `kind`, does not validate a heading, and does not reject a confidence of 9. Enforcing
     // domain rules here would put direction-finding logic in the server.
-    let mut reports = Vec::with_capacity(bodies.len());
-    for body in bodies {
-        match IncomingReport::from_value(body) {
-            Ok(report) => reports.push(report),
-            Err(error) => {
-                tracing::debug!(%error, "rejecting malformed report");
-                return Err(StatusCode::BAD_REQUEST);
-            }
-        }
-    }
+    let reports = bodies
+        .into_iter()
+        .map(IncomingReport::from_value)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| {
+            tracing::debug!(%error, "rejecting malformed report");
+            StatusCode::BAD_REQUEST
+        })?;
 
     match store::append_reports(&state.pool, &code, &reports, now_ms()).await {
         Ok(accepted) => Ok((
