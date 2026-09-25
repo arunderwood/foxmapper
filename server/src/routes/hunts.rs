@@ -126,6 +126,9 @@ pub async fn create_hunt(
         let code = generate_code();
         match store::create_hunt(&state.pool, &code, &request.target, created_at).await {
             Ok(hunt) => {
+                // Debug only: a code grants full read and write, so it stays out of production
+                // logs. It is the one link between a create and the lookups that follow it.
+                tracing::debug!(code = %hunt.code, %peer, "hunt created");
                 return Ok((
                     StatusCode::CREATED,
                     Json(CreateHuntResponse {
@@ -133,7 +136,7 @@ pub async fn create_hunt(
                         created_at: hunt.created_at,
                         target: hunt.target,
                     }),
-                ))
+                ));
             }
             // The collision retry. Codes are never reused, including after purge.
             Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {}
