@@ -175,3 +175,69 @@ reducing it here would be scope creep. Rounding for display never feeds back int
 **Alternatives considered**:
 - *Whole degrees everywhere including entry* — a behavior change to 004's field outside this
   feature's motivation.
+
+## R10 — External evidence for R6, FR-005, and the CalTopo model
+
+Gathered 2026-09-25 from primary sources where they exist. Each entry states what it confirms or
+corrects.
+
+**Web compass APIs report magnetic north (confirms R6).**
+- iOS: WebKit fills `webkitCompassHeading` from `CLHeading.magneticHeading` with no condition
+  (`Source/WebCore/platform/ios/WebCoreMotionManager.mm`). `trueHeading` is never read, so neither
+  Location Services nor the Compass app's "Use True North" setting changes it. Apple's reference
+  says "relative to magnetic north".
+- Android: Chromium backs `deviceorientationabsolute` with `Sensor.TYPE_ROTATION_VECTOR`
+  (`PlatformSensorProvider.java`). Android documents that frame's Y axis as pointing "towards
+  magnetic north". The true-north `Sensor.TYPE_HEADING` is not used.
+
+**The WMM library is accurate (confirms R2's declination source).** `geomagnetism@0.2.0` bundles
+WMM2025, valid 2024-11-13 to 2029-11-13. It matches NOAA's published WMM2025 test values
+(<https://www.ncei.noaa.gov/sites/default/files/2025-02/WMM2025testvalues.pdf>) to within 0.005°.
+`declination.test.ts` pins three of those values.
+
+**Relayed bearings are conventionally magnetic, but not reliably (refines FR-005).**
+- Ham RF search-and-rescue procedure: "all bearings should be given in Magnetic North readings. It
+  is up to the NCS to make the corrections when plotting."
+  (<http://lagrangeradioclub.org/LARC_Coordinated_SAR_Procedures.pdf>)
+- Civil Air Patrol ground-team training recommends magnetic bearings from field teams with
+  conversion at mission base, and says to "always specify" which north.
+- On-foot ARDF maps are magnetic-oriented (<http://www.homingin.com/apps.html>). Mobile Doppler DF
+  plots against GPS heading, which is true.
+- Callers who give true bearings without saying so: Doppler DF with GPS heading, GPS units set to
+  true, compasses with declination set, phones with "Use True North" on.
+- Consequence: magnetic stays the relay default. The visible reference and the converted number on
+  the switch are what catch a true bearing entered as magnetic.
+
+**CalTopo (corrects the spec's original description).**
+- The map is true-north only. No magnetic map mode exists.
+- Declination is automatic ("MN 13° E" in the map footer).
+- The Measure and Bearing tools show both TN and MN.
+  (<https://training.caltopo.com/all_users/tools/measure>)
+- New > Bearing Line takes the reference per line from a true/magnetic dropdown. After saving, the
+  object is a plain line: no bearing or reference label is shown, and the reference survives only as
+  comment text. (<https://training.caltopo.com/all_users/objects/other-objects>)
+- The dropdown does not remember the last choice. Users have asked it to.
+  (<https://help.caltopo.com/hc/en-us/community/posts/38571413699611>)
+- The one magnetic-mode complaint found concerns the mobile heading line rotating while the map
+  stayed true: a double correction, not a map mode.
+  (<https://help.caltopo.com/hc/en-us/community/posts/23495561086235>)
+
+**Peer-tool pitfall (confirms R1 and FR-003).** Gaia GPS once drew true bearings while set to
+magnetic (<https://groups.google.com/g/gaia-gps/c/IvutFNDXbdg>). With the CalTopo mobile case, this
+is the failure R1 prevents: a reference change must convert the number and never rotate the drawn
+line.
+
+**Alternatives considered**:
+- *Remember the last-used reference* (the CalTopo feature request) — rejected by the 2026-08-07
+  clarification. The switch's converted number already shows a wrong reference before sending.
+- *Store the entered reference in the payload* — nothing reads it (R3). Correction is retract and
+  re-enter, which does not need it.
+
+**Still open**:
+- The default of CalTopo's bearing-line dropdown.
+- Which north the APRS DF `BRG` field uses. The wire mapping sends `heading_true`, and the TAPR APRS
+  1.0 spec does not say.
+- iOS in landscape. WebKit never sets `CLLocationManager.headingOrientation`, so
+  `webkitCompassHeading` likely stays referenced to the portrait top edge. `heading.ts` applies the
+  screen angle on Android only, and the manifest allows any orientation. This is a 004 sensor
+  concern and needs a device check.
