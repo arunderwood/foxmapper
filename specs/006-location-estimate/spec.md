@@ -59,9 +59,9 @@ and says, in plain words, "the fox is probably in here." The region is the group
 wedges pull it toward where they overlap, a strong signal pulls it closer to the station that heard
 it, and "heard nothing" pushes it away from where people listened and got silence.
 
-The region is honest about itself. When there is only one bearing, the region is as long and wide as
-that bearing, and the map says the estimate is weak and why. When two groups of reports disagree, the
-map shows two regions, not one averaged blob between them. As more reports arrive, the region
+The region is honest about itself. When there is only one bearing, the region is as long as that
+bearing and no wider, and the map says the estimate is weak and why. When two groups of reports
+disagree, the map shows two regions, not one averaged blob between them. As more reports arrive, the region
 tightens, and every participant sees it tighten at the same time, from the same reports, with or
 without a network connection.
 
@@ -104,9 +104,9 @@ Scenarios 1–11 assume the participant has turned the estimate on.
 
 1. **Given** a hunt with two bearings that cross, **When** the map renders, **Then** it shows a
    region around the crossing and states in plain language that the fox is probably inside it.
-2. **Given** a hunt with exactly one bearing, **When** the map renders, **Then** the region covers
-   the whole of that bearing's wedge and the map warns, in the primary view, that the estimate rests
-   on too few reports.
+2. **Given** a hunt with exactly one bearing, **When** the map renders, **Then** the region runs the
+   full length of that bearing's wedge, lies within it, and the map warns, in the primary view, that
+   the estimate rests on too few reports.
 3. **Given** a region drawn from bearings, **When** a participant reports "heard nothing" from inside
    that region, **Then** the region moves away from or shrinks around that participant's position on
    every device.
