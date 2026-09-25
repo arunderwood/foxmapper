@@ -13,10 +13,12 @@ import type { Feature, Polygon } from 'geojson';
 import type { BearingReport, WireDigit } from '../log/types.js';
 // From the log layer, never from `aprs/mapping` — nothing that renders may import that module, and
 // the shared table exists so this one does not have to.
-import { rangeMiles, wedgeHalfWidthDegrees, WIDEST_HALF_WIDTH_DEGREES } from '../log/confidence.js';
+import {
+  rangeKm as rangeKmOfDigit,
+  wedgeHalfWidthDegrees,
+  WIDEST_HALF_WIDTH_DEGREES,
+} from '../log/confidence.js';
 import { normalizeHeading } from '../sensors/declination.js';
-
-const MILES_TO_KM = 1.609_344;
 
 /**
  * Range = 2^R miles. Ours is always 1, 3 or 5 → 2, 8 or 32 miles.
@@ -25,7 +27,7 @@ const MILES_TO_KM = 1.609_344;
  * of a table agree right up until the day one is edited.
  */
 export function rangeKm(maxRangeR: number): number {
-  return rangeMiles(maxRangeR as WireDigit) * MILES_TO_KM;
+  return rangeKmOfDigit(maxRangeR as WireDigit);
 }
 
 /**

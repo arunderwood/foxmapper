@@ -39,6 +39,24 @@ export default tseslint.config(
     },
   },
   {
+    // FR-035: every tuning number of the location estimate lives in values.ts, with its reason. A
+    // literal anywhere else in the module is a second copy of a value, or a value with no reason.
+    // detmath.ts is exempt because its literals are polynomial coefficients: mathematics, not
+    // tuning.
+    files: ['src/estimate/**/*.ts'],
+    ignores: ['src/estimate/values.ts', 'src/estimate/detmath.ts'],
+    rules: {
+      'no-magic-numbers': [
+        'error',
+        {
+          ignore: [0, 1, 2, 0.5, -1],
+          ignoreArrayIndexes: true,
+          ignoreDefaultValues: true,
+        },
+      ],
+    },
+  },
+  {
     rules: {
       // tsconfig sets noUncheckedIndexedAccess, which types every array read as `T | undefined`.
       // Inside a bounds-checked loop the assertion is the honest expression of what the code
