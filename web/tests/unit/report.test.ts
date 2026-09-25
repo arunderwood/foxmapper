@@ -164,6 +164,31 @@ describe('bearing entry', () => {
     );
   });
 
+  it('converts a relayed magnetic bearing with the declination at the hunter, anywhere (SC-002)', () => {
+    // ±60° latitude: WMM accuracy degrades near the magnetic poles. Random positions still cover
+    // east, west, and near-zero declination.
+    fc.assert(
+      fc.property(
+        fc.double({ min: -60, max: 60, noNaN: true }),
+        fc.double({ min: -180, max: 180, noNaN: true }),
+        (lat, lon) => {
+          const here = declinationAt(lat, lon, new Date('2026-07-15'));
+          const { payload } = composeBearing({
+            ...context,
+            position: { lat, lon },
+            draft: { heading: 220, reference: 'magnetic' },
+            declination: here,
+            confidence_q: 4,
+            max_range_r: 3,
+          });
+          expect(payload.heading_magnetic).toBe(220);
+          const gap = Math.abs(payload.heading_true - normalizeHeading(220 + here.degrees));
+          expect(Math.min(gap, 360 - gap)).toBeLessThan(1e-9);
+        },
+      ),
+    );
+  });
+
   it('records a bearing, never where the number came from (003 FR-010)', () => {
     // A bearing is a bearing: a compass freeze, a dial twist and a typed figure are the same fact.
     const report = composeBearing({ ...context, draft, declination, confidence_q: 4, max_range_r: 3 });
