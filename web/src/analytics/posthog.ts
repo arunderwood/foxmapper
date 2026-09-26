@@ -167,6 +167,9 @@ export function initAnalytics(): void {
 
 /** Records a usage event. No-op unless analytics is live. Props must be PII-free by construction. */
 export function track(event: string, props?: Record<string, unknown>): void {
+  // The e2e suite's window onto what would be sent: its builds carry no key, so nothing ever is,
+  // and an event's exact property set can only be checked here. Absent outside a test.
+  (window as { __foxmapperTrack?: typeof track }).__foxmapperTrack?.(event, props);
   withClient((ph) => ph.capture(event, props));
 }
 

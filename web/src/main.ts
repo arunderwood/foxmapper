@@ -17,7 +17,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './ui/app.css';
 
 import { audit } from './log/audit.js';
-import { fold } from './log/fold.js';
+import { fold, type FoldResult } from './log/fold.js';
 import { add, toLog } from './log/gset.js';
 import { currentIdentity, rememberHunt } from './log/identity.js';
 import {
@@ -47,7 +47,7 @@ import {
 } from './ui/report-entry.js';
 import { canRetract, composeRetraction } from './report/retract.js';
 import { relayContext, type RelayDetails } from './report/relay.js';
-import { loadRelayMode, openSettings } from './ui/settings.js';
+import { loadEstimateEnabled, loadRelayMode, openSettings } from './ui/settings.js';
 import { openRelaySheet } from './ui/relay-entry.js';
 import { markCompleted, markDeclined, readTourState } from './ui/tour/state.js';
 import { offerTour, runTour } from './ui/tour/tour.js';
@@ -57,6 +57,9 @@ import type { Target } from './ui/target.js';
 import { el, clear } from './ui/dom.js';
 import { landingField, landingScreen } from './ui/landing.js';
 import { captureError, initAnalytics, track } from './analytics/posthog.js';
+import { EstimateClient, warmUp } from './estimate/client.js';
+import type { EstimateResult } from './estimate/types.js';
+import type { EstimateTourState } from './ui/tour/steps.js';
 
 const API_ORIGIN = import.meta.env['VITE_API_ORIGIN'] ?? window.location.origin;
 
@@ -85,6 +88,13 @@ class App {
   #relayMode = false;
   /** Armed relay target: the next observation files as this observer's, then disarms. */
   #relayTarget: RelayDetails | undefined;
+  /** Per-device (settings.ts): the location estimate is computed and drawn only when this is on. */
+  #estimateEnabled = false;
+  /** Exists only while the estimate is on and a hunt is open (006 FR-031). */
+  #estimator: EstimateClient | undefined;
+  #estimate: EstimateResult | undefined;
+  /** The log the last request was made from: a position tick must not re-run the estimate. */
+  #estimatedLog: Log | undefined;
   #clockOffset: ClockOffset = null;
   #queueDepth = 0;
   #live = false;
@@ -101,6 +111,10 @@ class App {
     // An offer, never a gate: if this is denied, everything still works.
     void requestPersistence();
     this.#relayMode = await loadRelayMode(this.#db);
+    this.#estimateEnabled = await loadEstimateEnabled(this.#db);
+    // Whether or not the estimate is on: a hunter who first turns it on out of coverage still has
+    // it (Principle III).
+    warmUp();
 
     const landing = decideLanding();
     if (landing.screen === 'start') {
@@ -177,6 +191,7 @@ class App {
     this.#stopPosition = undefined;
     this.#view?.destroy();
     this.#view = undefined;
+    this.#stopEstimate();
     this.#live = false;
     this.#huntCode = '';
     this.#target = undefined;
@@ -485,6 +500,7 @@ class App {
   #startTour(fromOffer: boolean): void {
     runTour({
       root: this.#root,
+      estimate: () => this.#estimateTourState(),
       onFinish: () => {
         track('tour_completed');
         void markCompleted(this.#db);
@@ -624,9 +640,49 @@ class App {
     void this.#sync?.flush();
   }
 
+  #estimateTourState(): EstimateTourState {
+    if (!this.#estimateEnabled) return 'off';
+    return this.#estimate && this.#estimate.regions.length > 0 ? 'region' : 'none';
+  }
+
+  /**
+   * Keeps the estimate in step with the log (006 FR-019): a new request whenever the log changed,
+   * and nothing on a position tick. The worker is created the first time it is needed and exists
+   * only while the estimate is on.
+   */
+  #syncEstimate(active: FoldResult['active']): void {
+    if (!this.#estimateEnabled || !this.#view) {
+      this.#stopEstimate();
+      return;
+    }
+    this.#estimator ??= new EstimateClient({
+      onResult: (result) => {
+        this.#estimate = result;
+        this.#refresh();
+      },
+      // The last region stays on screen: a failed update is not a reason to draw nothing (FR-020).
+      onError: (error) => captureError(error),
+    });
+    if (this.#log !== this.#estimatedLog) {
+      this.#estimatedLog = this.#log;
+      this.#estimator.request(active);
+    }
+  }
+
+  /** Off, or the hunt view is gone: no worker, no region, no warnings (006 FR-031). */
+  #stopEstimate(): void {
+    this.#estimator?.dispose();
+    this.#estimator = undefined;
+    this.#estimate = undefined;
+    this.#estimatedLog = undefined;
+  }
+
   #refresh(): void {
+    const folded = fold(this.#log);
+    this.#syncEstimate(folded.active);
     this.#view?.update({
-      fold: fold(this.#log),
+      fold: folded,
+      estimate: this.#estimateEnabled ? this.#estimate : undefined,
       target: this.#target,
       huntCode: this.#huntCode,
       live: this.#live && navigator.onLine,
@@ -659,6 +715,12 @@ class App {
             if (!enabled) this.#relayTarget = undefined;
             this.#refresh();
           },
+          estimateEnabled: this.#estimateEnabled,
+          onEstimateEnabled: (enabled) => {
+            this.#estimateEnabled = enabled;
+            track('estimate_toggled', { enabled });
+            this.#refresh();
+          },
           // Relaunch from Settings (FR-003): not the first-run offer, so exiting leaves state as is.
           onReplayTour: () => this.#startTour(false),
           onStartNewHunt: () => this.#leaveForNewHunt(),
@@ -688,6 +750,7 @@ class App {
     this.#sync?.stop();
     this.#stopPosition?.();
     this.#view?.destroy();
+    this.#stopEstimate();
   }
 }
 

@@ -11,6 +11,7 @@
  * points at is exactly the rot US3 exists to catch.
  */
 import type { ReportKind } from '../report-entry.js';
+import { TOUR_SETTINGS_LINE } from '../../estimate/copy.js';
 
 export interface TourStep {
   /** Stable identifier; also the key the e2e suite steps by. */
@@ -72,3 +73,26 @@ export const STEPS: TourStep[] = [
     body: 'That is the whole loop. File a report whenever you hear the fox, and watch the map close in. You can take this tour again any time from Settings.',
   },
 ];
+
+/**
+ * Where the estimate stands on this device when the tour reaches it (006, the tour edge case):
+ * switched off, on with nothing to draw yet, or on with a live region.
+ */
+export type EstimateTourState = 'off' | 'none' | 'region';
+
+/**
+ * The step as shown right now. Only the estimate step changes: it keeps its sample until a live
+ * region exists to spotlight instead, and while the estimate is off it says where to turn it on
+ * (contracts/display-surfaces.md §4). The anchor never changes, so the drift check is unaffected.
+ */
+export function stepFor(step: TourStep, estimate: EstimateTourState): TourStep {
+  if (step.id !== 'estimate') return step;
+  switch (estimate) {
+    case 'off':
+      return { ...step, sample: true, body: `${step.body} ${TOUR_SETTINGS_LINE}` };
+    case 'none':
+      return { ...step, sample: true };
+    case 'region':
+      return { ...step, sample: false };
+  }
+}

@@ -38,7 +38,7 @@ constant is a named value in `values.ts` (R8).
 
 | Kind | Kernel | Named values |
 |---|---|---|
-| `bearing` | Angular: von Mises in the offset between the stated heading and the direction from observer to cell. κ = 1/σ², σ = the half-width from the existing Q table × `BEARING_SIGMA_FRACTION` (0.5, so the drawn wedge holds about 95%). Distance: 1 up to the stated range, linear to 0 over the next `BEARING_RANGE_TAPER` (10%) of it. | `BEARING_SIGMA_FRACTION`, `BEARING_RANGE_TAPER`, `BEARING_FLOOR` |
+| `bearing` | Angular: von Mises in the offset between the stated heading and the direction from observer to cell. κ = 1/σ², σ = the half-width from the existing Q table × `BEARING_SIGMA_FRACTION` (0.5, so the drawn wedge holds about 95%). Distance: 1 up to 90% of the stated range, linear to 0 at the range itself over its last `BEARING_RANGE_TAPER` (10%). The fade sits inside the range so nothing lands past it (FR-004a). | `BEARING_SIGMA_FRACTION`, `BEARING_RANGE_TAPER`, `BEARING_FLOOR` |
 | `omni` | Log-normal ring in distance: exp(−(ln(d/m))² / 2s²). The median distance m comes from the strength bucket (weak 1–3, medium 4–6, strong 7–9). Beyond `OMNI_REACH_KM` the kernel is 0. | `OMNI_MEDIAN_KM` {weak 8, medium 2, strong 0.4}, `OMNI_LOG_SD` 1.2, `OMNI_REACH_KM` 40, `OMNI_FLOOR` |
 | `null` | 1 − (1 − floor) × c(d). c is 1 inside `NULL_CLEAR_INNER_KM` (0.5), falls linearly to 0 at `NULL_CLEAR_OUTER_KM` (1.5). | `NULL_CLEAR_INNER_KM`, `NULL_CLEAR_OUTER_KM`, `NULL_FLOOR` |
 | `fix` | Gaussian spot, σ = `FIX_SIGMA_KM` (0.1). | `FIX_SIGMA_KM`, `FIX_FLOOR` |
@@ -172,7 +172,7 @@ threshold.
 | Too few reports (FR-010) | Count of active positive reports: `bearing`, `omni`, `fix` | `TOO_FEW_REPORTS` | 3 (fewer triggers) |
 | All point the same way (FR-011) | Angular span of positive observers as seen from the probability-weighted centre of the largest region: 360° minus the largest gap between their directions | `NARROW_SPREAD_DEG` | 30 (less triggers) |
 | More than one place (FR-012) | Share of total probability held by the second-largest region | `SECOND_PLACE_SHARE` | 0.15 (at least triggers) |
-| One report conflicts (FR-012a) | Lowest normalized agreement over all active reports, where agreement = (E[kernel under the posterior] − floor) / (1 − floor), so 0 means the report rejects the whole estimate and 1 means it fully supports it | `CONFLICT_AGREEMENT` | 0.1 (less triggers) |
+| One report conflicts (FR-012a) | Lowest normalized agreement over all active reports, where agreement = (E[kernel under the posterior] − floor) / (1 − floor), so 0 means the report rejects the whole estimate and 1 means it fully supports it | `CONFLICT_AGREEMENT`, divided by the number of active reports | 0.1 (less triggers) |
 
 Observers within `SPREAD_NEAR_KM` (0.5) of the centre are left out of the span, and when one is
 present the spread warning does not apply. A station standing at the fox, or a find, is the best
@@ -192,6 +192,11 @@ distance.
 - *Conflict*: normalizing by the floor puts all four kinds on one scale, so a "heard nothing" at the
   centre of the region counts as a conflict just as a bearing pointing away does. The measure is an
   aggregate minimum, and no per-report value leaves the module, so FR-026 holds by construction.
+  The level is divided by the number of active reports (a Bonferroni split): compared against the
+  level itself, the lowest of several honest reports falls short by luck. Implementation measured
+  the undivided level raising the warning on about 10% of simulated honest hunts of 2–14 reports,
+  and the divided level on about 1%. A confidently wrong bearing among 16 honest reports still
+  raises it, because its agreement is close to 0.
 
 **Alternatives considered**:
 - *Geometric dilution of precision from bearing crossing angles*: bearings only, so Principle II

@@ -13,7 +13,7 @@
  * reduced-motion kill neutralises it with no special-casing.
  */
 import { el } from '../dom.js';
-import { STEPS, type TourStep } from './steps.js';
+import { STEPS, stepFor, type EstimateTourState, type TourStep } from './steps.js';
 import { credibleRegionSample } from './sample.js';
 
 export interface TourOffer {
@@ -29,6 +29,8 @@ export interface TourRun {
   onFinish: () => void;
   /** Left before the end — Esc, a scrim tap, or the exit button. */
   onExit: () => void;
+  /** Read on every step, so the estimate step matches the map beneath the overlay. */
+  estimate: () => EstimateTourState;
 }
 
 /**
@@ -278,8 +280,9 @@ export function runTour(run: TourRun): void {
   }
 
   function render(): void {
-    const step = STEPS[index];
-    if (!step) return;
+    const base = STEPS[index];
+    if (!base) return;
+    const step = stepFor(base, run.estimate());
 
     // The current step id, exposed for the e2e suite to assert order without leaning on copy.
     overlay.dataset['step'] = step.id;

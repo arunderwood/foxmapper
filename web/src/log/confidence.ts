@@ -65,3 +65,13 @@ export const WIDEST_HALF_WIDTH_DEGREES = Math.max(...Object.values(Q_FULL_WIDTH_
 export function rangeMiles(r: WireDigit | MaxRangeR): number {
   return 2 ** r;
 }
+
+const MILES_TO_KM = 1.609_344;
+
+/**
+ * The same range in kilometres. One conversion, read by both the wedge the map draws and the
+ * estimate that reads it, so a bearing's stated range is the same distance in both.
+ */
+export function rangeKm(r: WireDigit | MaxRangeR): number {
+  return rangeMiles(r) * MILES_TO_KM;
+}

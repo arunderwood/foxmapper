@@ -87,6 +87,10 @@ test('the estimate step shows a region sample and the omni step names the stock 
   // an empty hunt (FR-014) — a region, not a point.
   await expect(page.getByTestId('tour-overlay')).toHaveAttribute('data-step', 'estimate');
   await expect(page.getByTestId('tour-sample')).toBeVisible();
+  // The estimate ships off (006 FR-029), so the step says where to turn it on.
+  await expect(page.getByTestId('tour-step-body')).toContainText(
+    'Turn it on in Settings: Show where the fox probably is.',
+  );
 
   // omni: a stock handheld can contribute (FR-008 / Principle II).
   for (const to of ['bearing', 'omni']) {

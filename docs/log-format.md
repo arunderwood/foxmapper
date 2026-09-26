@@ -5,7 +5,9 @@ log in any language. If you cannot reimplement it from this page alone, in an af
 defect in this document — please say so.
 
 FoxMapper is a shared map for radio direction finding ("fox hunting"). Participants report what
-they heard and from where; the map draws every report. **No location is estimated or computed.**
+they heard and from where; the map draws every report. The map can also draw a location estimate,
+which each device computes from the reports it holds. The estimate is derived state: it is never
+stored in the log, never sent, and never changes a report. See [estimate.md](estimate.md).
 
 ---
 

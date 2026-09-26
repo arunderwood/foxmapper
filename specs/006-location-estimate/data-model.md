@@ -57,7 +57,7 @@ The one documented set of named numbers (FR-033 to FR-035). One frozen object in
 | Warning | `SPREAD_NEAR_KM` | 0.5 | km |
 | Warning | `SAME_PLACE_KM` | 0.05 | km |
 | Warning | `SECOND_PLACE_SHARE` | 0.15 | share of probability |
-| Warning | `CONFLICT_AGREEMENT` | 0.1 | normalized agreement |
+| Warning | `CONFLICT_AGREEMENT` | 0.1 | normalized agreement, shared across the active reports |
 
 **Validation** (a unit test): every floor lies in (0, 1); `NULL_CLEAR_INNER_KM` <
 `NULL_CLEAR_OUTER_KM`; the omni medians fall as strength rises (FR-004b: louder pulls harder);
@@ -94,7 +94,8 @@ What the worker returns. This is the exposed surface of FR-036.
 | `positive_reports` | integer | `too_few` when below `TOO_FEW_REPORTS` |
 | `observer_span_deg` | number \| `null` | `narrow_spread` when below `NARROW_SPREAD_DEG`. `null` when an observer is within `SPREAD_NEAR_KM` of the centre, which means the warning does not apply. |
 | `second_place_share` | number | `disagree` when at least `SECOND_PLACE_SHARE` |
-| `min_agreement` | number | `disagree` when below `CONFLICT_AGREEMENT` |
+| `min_agreement` | number | `disagree` when below `CONFLICT_AGREEMENT` / `active_reports` |
+| `active_reports` | integer | Every active report, "heard nothing" included. Shares the conflict level across the reports, so the lowest of several honest reports is not read as a conflict. |
 
 `min_agreement` is one aggregate number. No per-report agreement leaves the worker, so nothing can
 rank or label a report by how well it agrees (FR-026).

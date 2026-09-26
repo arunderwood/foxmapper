@@ -30,8 +30,9 @@ vocabulary test (SC-007). Copy lives in `web/src/estimate/copy.ts`.
 - **Never drawn**: a centre marker, a most-likely point, a gradient that peaks in the middle, or
   coordinates (FR-002).
 - **While off**: the source is empty and the layers draw nothing (FR-031).
-- `data-testid="estimate-region-count"` on the status bar carries the region count, so e2e can
-  assert without reading canvas pixels.
+- `data-estimate-region-count` on the status bar carries the region count (0 while off), so e2e
+  can assert without reading canvas pixels. It is an attribute, not a test id, because the status
+  bar already carries `data-testid="status-bar"`.
 
 ## 3. Status-bar chips (FR-010 to FR-016, FR-032)
 

@@ -15,6 +15,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PALETTE } from '../../src/log/colour.js';
 
 const css = readFileSync(
   fileURLToPath(new URL('../../src/ui/tokens.css', import.meta.url)),
@@ -84,6 +85,8 @@ const PAIRS: [string, string, number][] = [
   ['--fx-kind-signal', '--md-sys-color-surface-container', 3],
   ['--fx-kind-null', '--md-sys-color-surface-container', 3],
   ['--fx-kind-fix', '--md-sys-color-surface-container', 3],
+  // 006: the estimate's outline is drawn on the map, whose ground is light on both basemaps.
+  ['--fx-color-estimate', '--fx-color-map-ground', 3],
 ];
 
 describe('design token contrast floors (contracts/design-tokens.md §4)', () => {
@@ -101,5 +104,18 @@ describe('design token contrast floors (contracts/design-tokens.md §4)', () => 
     // cross-device guarantee. A token *named* for hunter identity would mean someone tried to
     // restyle that guarantee. (Kind hues sharing Tol-family values is fine — different channel.)
     expect(css).not.toMatch(/--(fx|md)-[\w-]*(callsign|hunter|observer|swatch)/i);
+  });
+
+  it('draws the estimate in no hunter’s colour (006 FR-024)', () => {
+    const estimate = resolve('--fx-color-estimate').toLowerCase();
+    expect(PALETTE.map((swatch) => swatch.toLowerCase())).not.toContain(estimate);
+    for (const kind of [
+      '--fx-kind-bearing',
+      '--fx-kind-signal',
+      '--fx-kind-null',
+      '--fx-kind-fix',
+    ]) {
+      expect(resolve(kind).toLowerCase()).not.toBe(estimate);
+    }
   });
 });

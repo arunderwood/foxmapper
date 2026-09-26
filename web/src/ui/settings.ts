@@ -27,17 +27,28 @@ import { icon } from './icons.js';
 import { huntLink } from './last-hunt.js';
 import { dismissSheet } from './report-entry.js';
 import { copyHuntLink } from './share.js';
+import { ESTIMATE_SWITCH_LABEL, ESTIMATE_SWITCH_NOTE } from '../estimate/copy.js';
 
 const RELAY_MODE_KEY = 'relay_mode';
+/** Device-scoped like relay mode: one choice for every hunt this device opens (006 FR-030). */
+const ESTIMATE_KEY = 'estimate_enabled';
 
 export async function loadRelayMode(db: FoxmapperDb): Promise<boolean> {
   return (await getMeta<boolean>(db, RELAY_MODE_KEY)) === true;
+}
+
+/** Off unless this device was switched on: absent means off (006 FR-029). */
+export async function loadEstimateEnabled(db: FoxmapperDb): Promise<boolean> {
+  return (await getMeta<boolean>(db, ESTIMATE_KEY)) === true;
 }
 
 export interface SettingsOptions {
   relayMode: boolean;
   /** Fired on every toggle; the caller owns app state and re-render. Persistence happens here. */
   onRelayMode: (enabled: boolean) => void;
+  estimateEnabled: boolean;
+  /** Same contract as `onRelayMode`: persisted here, acted on by the caller. */
+  onEstimateEnabled: (enabled: boolean) => void;
   /** Relaunch the first-visit tour on demand (FR-003). Settings closes first, then the tour runs. */
   onReplayTour: () => void;
   /** Leave the current hunt and go to the create screen. Confirmed here; the caller tears down. */
@@ -96,6 +107,25 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
     toggle.setAttribute('aria-pressed', String(enabled));
     void setMeta(options.db, RELAY_MODE_KEY, enabled);
     options.onRelayMode(enabled);
+  });
+
+  // The location estimate (006): off until this device turns it on. Some hunters read the reports
+  // themselves, and some hunts test exactly that skill, so the choice is each participant's own.
+  const estimateToggle = el(
+    'button',
+    {
+      type: 'button',
+      'aria-pressed': String(options.estimateEnabled),
+      'data-testid': 'estimate-toggle',
+    },
+    icon('radio_button_unchecked', { label: ESTIMATE_SWITCH_LABEL }),
+    el('span', {}, ESTIMATE_SWITCH_LABEL),
+  );
+  estimateToggle.addEventListener('click', () => {
+    const enabled = estimateToggle.getAttribute('aria-pressed') !== 'true';
+    estimateToggle.setAttribute('aria-pressed', String(enabled));
+    void setMeta(options.db, ESTIMATE_KEY, enabled);
+    options.onEstimateEnabled(enabled);
   });
 
   // The relaunch affordance (FR-003): the tour is never a one-time thing. Closing settings first
@@ -159,6 +189,8 @@ export function settingsSheet(options: SettingsOptions, onClose: () => void): HT
       'Relay mode is for net control: it adds a way to file reports for hunters calling theirs ' +
         'in over the radio.',
     ),
+    estimateToggle,
+    el('p', { class: 'small dim' }, ESTIMATE_SWITCH_NOTE),
     northSection(options.position),
     replayTour,
   );

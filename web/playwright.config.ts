@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const TIMING = /-timing\.spec\.ts$/;
+
 /**
  * The E2E suite runs against a **production build**, not the dev server.
  *
@@ -21,6 +23,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: TIMING,
       use: {
         ...devices['Desktop Chrome'],
         // Headless Chromium leaves motion sensors at "ask"; Android Chrome, which this project
@@ -28,7 +31,15 @@ export default defineConfig({
         permissions: ['accelerometer', 'gyroscope', 'magnetometer'],
       },
     },
-    { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
+    { name: 'mobile-safari', testIgnore: TIMING, use: { ...devices['iPhone 14'] } },
+    {
+      // Wall-clock budgets (006 SC-002) run alone, after everything else: a timing taken while
+      // other browsers share the cores measures the machine, not the app.
+      name: 'timing',
+      testMatch: TIMING,
+      dependencies: ['chromium', 'mobile-safari'],
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: process.env['FOXMAPPER_URL']
     ? undefined

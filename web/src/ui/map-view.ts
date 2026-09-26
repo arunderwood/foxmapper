@@ -28,6 +28,8 @@ import { icon, iconPath } from './icons.js';
 import { PALETTE } from '../log/colour.js';
 import { KIND_ICONS, type ReportKind } from './report-entry.js';
 import type { PositionState } from '../sensors/position.js';
+import type { EstimateResult } from '../estimate/types.js';
+import { NOTHING_YET_TEXT, REGION_LABEL, WARNING_TEXT } from '../estimate/copy.js';
 
 const WEDGE_SOURCE = 'reports-wedges';
 const MARKER_SOURCE = 'reports-markers';
@@ -35,6 +37,9 @@ const MARKER_SOURCE = 'reports-markers';
 const PLACED_SOURCE = 'placed-position';
 /** The device's own GPS fix, as map data. Shown only when nothing was placed by hand. */
 const DEVICE_SOURCE = 'device-position';
+/** Where the fox probably is (006). Empty while the estimate is off. */
+const ESTIMATE_SOURCE = 'estimate';
+const ESTIMATE_HATCH = 'estimate-hatch';
 
 /**
  * Resolved when layers are added, not at import: the values come from the token set, and the
@@ -97,6 +102,11 @@ export interface MapViewState {
   onOpenSettings: () => void;
   onBeginRelay: () => void;
   onCancelRelay: () => void;
+  /**
+   * The latest location estimate, or undefined while the estimate is off on this device. Undefined
+   * draws nothing and says nothing: the map is exactly the map without the estimate (006 FR-031).
+   */
+  estimate: EstimateResult | undefined;
 }
 
 /** What the map may do to a report it is drawing. Retraction is the only one. */
@@ -138,6 +148,8 @@ export class MapView {
   #placedPosition: { lat: number; lon: number } | undefined;
   /** The device fix, held for the same re-application. Cleared while a hand-placed position wins. */
   #devicePosition: { lat: number; lon: number } | undefined;
+  /** The estimate, held for re-application when a style swap recreates sources. */
+  #estimate: EstimateResult | undefined;
   /** Marks the armed relay target's position while a relayed report is being filed. */
   #relayPin: Marker | undefined;
   /** Shows "All shared" briefly after a drain completes (FR-011): confirmation, then quiet. */
@@ -189,12 +201,58 @@ export class MapView {
     if (!map || map.getSource(WEDGE_SOURCE)) return;
 
     const empty = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
+    map.addSource(ESTIMATE_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(WEDGE_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(MARKER_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(PLACED_SOURCE, { type: 'geojson', data: empty() });
     map.addSource(DEVICE_SOURCE, { type: 'geojson', data: empty() });
 
-    // The hand-placed position pin, FIRST: it lives in the canvas (not a DOM marker, which
+    // The location estimate (006), under everything else the map draws: every report and both
+    // position pins stay visible and readable on top of it (FR-023). Shape carries it — a hatch
+    // and an outline — and colour only helps (FR-024). There is no gradient and no centre mark:
+    // nothing here reads as a spot the fox is at (FR-002).
+    this.#hatchImage(map);
+    map.addLayer({
+      id: 'estimate-fill',
+      type: 'fill',
+      source: ESTIMATE_SOURCE,
+      paint: { 'fill-pattern': ESTIMATE_HATCH, 'fill-opacity': 0.6 },
+    });
+    // A halo in the map's own ground colour lifts the outline off busy street detail in bright
+    // light.
+    map.addLayer({
+      id: 'estimate-halo',
+      type: 'line',
+      source: ESTIMATE_SOURCE,
+      paint: {
+        'line-color': cssToken('--fx-color-map-ground', '#F6F0EA'),
+        'line-width': 5,
+      },
+    });
+    map.addLayer({
+      id: 'estimate-line',
+      type: 'line',
+      source: ESTIMATE_SOURCE,
+      paint: { 'line-color': cssToken('--fx-color-estimate', '#201A17'), 'line-width': 3 },
+    });
+    // Along the edge, never at a point: a label in the middle would mark a spot (FR-002).
+    map.addLayer({
+      id: 'estimate-label',
+      type: 'symbol',
+      source: ESTIMATE_SOURCE,
+      layout: {
+        'symbol-placement': 'line',
+        'text-field': REGION_LABEL,
+        'text-size': 12,
+      },
+      paint: {
+        'text-color': cssToken('--fx-color-estimate', '#201A17'),
+        'text-halo-color': cssToken('--fx-color-map-ground', '#F6F0EA'),
+        'text-halo-width': 2,
+      },
+    });
+
+    // The hand-placed position pin, next: it lives in the canvas (not a DOM marker, which
     // would float above everything the map draws) precisely so every report renders over it.
     // The pin is position furniture; a planted "Found it" flag on the same spot must win.
     this.#glyphImage(map, 'placed-pin-img', 'edit_location', {
@@ -360,6 +418,32 @@ export class MapView {
     // The swap that recreated these sources also emptied them; the pin state survives here.
     this.#applyPlacedPin();
     this.#applyDevicePin();
+    this.#applyEstimate();
+  }
+
+  /**
+   * The region's diagonal hatch, built pixel by pixel into an ImageData: a data URL would need a
+   * CSP source the app does not grant. Re-added after every style swap, like the glyph images.
+   */
+  #hatchImage(map: MapLibreMap): void {
+    if (map.hasImage(ESTIMATE_HATCH)) return;
+    const size = 16;
+    const stroke = 3;
+    const alpha = 150;
+    const [r, g, b] = hexRgb(cssToken('--fx-color-estimate', '#201A17'));
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        // Lines run corner to corner; the period divides the tile, so tiles meet seamlessly.
+        if ((x + y) % (size / 2) >= stroke) continue;
+        const i = (y * size + x) * 4;
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+        data[i + 3] = alpha;
+      }
+    }
+    map.addImage(ESTIMATE_HATCH, new ImageData(data, size, size), { pixelRatio: 2 });
   }
 
   /**
@@ -547,6 +631,10 @@ export class MapView {
     }
 
     this.#lastState = state;
+    if (state.estimate !== this.#estimate) {
+      this.#estimate = state.estimate;
+      this.#applyEstimate();
+    }
     this.#syncPlacedPin(state.placed);
     // The device fix, but only when it is the position a report would actually use: no hand-placed
     // position overriding it. `positionChip` makes the same call for its "from your phone's fix"
@@ -654,6 +742,21 @@ export class MapView {
     });
   }
 
+  /** Writes the estimate's regions into their source — re-run after style swaps recreate it. */
+  #applyEstimate(): void {
+    const source = this.#map?.getSource(ESTIMATE_SOURCE) as GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData({
+      type: 'FeatureCollection',
+      features: (this.#estimate?.regions ?? []).map((region) => ({
+        type: 'Feature',
+        geometry: region.geometry,
+        // For tests only; no style expression reads it.
+        properties: { probability: region.probability },
+      })),
+    });
+  }
+
   /** Pushes the latest fold to the map, if the style is ready to receive it. */
   #flush(): void {
     const map = this.#map;
@@ -702,10 +805,17 @@ export class MapView {
           icon('cloud_off', { label: 'No signal — showing this phone only' }),
         );
 
+    // The region count, for the e2e suite to read without reading canvas pixels. 0 while off.
+    this.#statusBar.dataset['estimateRegionCount'] = String(state.estimate?.regions.length ?? 0);
+
     const chips: (HTMLElement | undefined)[] = [
       // The hunt name is also the way into the menu (settings + start a new hunt), so the standalone
       // gear is gone: one affordance in the bar, not two that mean nearly the same thing.
       ...targetChips(state.target, state.fold.found, state.onOpenSettings),
+
+      // Principle I: how far to trust the shading sits in the primary view, beside it, for exactly
+      // as long as its condition holds — never in a tooltip, and never dismissible (006 FR-013).
+      ...estimateChips(state.estimate),
 
       // FR-001: the code is how a hunt is shared, and it is normally read aloud over a repeater.
       // A creator whose only copy of it is the address bar has not been given anything.
@@ -919,4 +1029,36 @@ function describeKind(kind: string): string {
     default:
       return kind;
   }
+}
+
+/**
+ * The estimate's chips: one per warning, or the "nothing yet" state. None while the estimate is
+ * off: with no estimate there is nothing to warn about (006 FR-032).
+ */
+function estimateChips(estimate: EstimateResult | undefined): HTMLElement[] {
+  if (!estimate) return [];
+  if (estimate.status === 'none') {
+    return [
+      el(
+        'span',
+        { class: 'chip dim', 'data-testid': 'estimate-warning', 'data-kind': 'none' },
+        icon('radio_button_unchecked', { label: NOTHING_YET_TEXT }),
+        el('span', { class: 'chip-label' }, NOTHING_YET_TEXT),
+      ),
+    ];
+  }
+  return estimate.warnings.map((kind) =>
+    el(
+      'span',
+      { class: 'chip warn', 'data-testid': 'estimate-warning', 'data-kind': kind },
+      icon('warning', { label: WARNING_TEXT[kind] }),
+      el('span', { class: 'chip-label' }, WARNING_TEXT[kind]),
+    ),
+  );
+}
+
+/** `#RRGGBB` to its three channels. */
+function hexRgb(hex: string): [number, number, number] {
+  const value = parseInt(hex.replace('#', ''), 16);
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
 }

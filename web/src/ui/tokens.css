@@ -61,6 +61,9 @@
   --fx-kind-null: #ddcc77;
   --fx-kind-fix: #44aa99;
   --fx-color-map-ground: #f6f0ea;
+  /* The location estimate's outline and hatch (006 FR-024): near-black on the light map ground,
+     outside every per-callsign swatch, so the region never reads as anyone's report. */
+  --fx-color-estimate: #201a17;
   /* Scrims: the only sanctioned translucency (surface-tinted; avoids color-mix for iOS 16). */
   --fx-color-scrim: rgba(25, 18, 16, 0.94);
   --fx-color-scrim-transparent: rgba(25, 18, 16, 0);

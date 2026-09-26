@@ -37,10 +37,15 @@ Anonymous counts, hand-authored one event at a time, with a fixed and reviewed p
 | `report_retracted` | — | A report was withdrawn. |
 | `position_placed` | — | A hunter set their position by hand (that they did, never where). |
 | `relay_mode_toggled` | `enabled` | Net-control relay mode switched. |
+| `estimate_toggled` | `enabled` | The estimate was switched on or off on this device. |
 | `tiles_unavailable` | — | The basemap could not load (a degradation signal). |
 | `tour_offered` / `tour_accepted` / `tour_declined` / `tour_completed` / `tour_exited` | `from_offer` (on exit) | First-visit tour funnel. |
 | `feedback_opened` | — | The feedback affordance was used (see below). |
 | `$exception` | stack, message (URL-redacted) | Unhandled and handled errors, via PostHog error tracking. |
+
+The end-to-end suite checks each event's exact property set without sending anything: its builds
+carry no key, so `track()` also hands every event to `window.__foxmapperTrack` when a test has
+installed one. Outside a test that hook does not exist, and nothing reads it.
 
 ## Consent, and how to say no
 
