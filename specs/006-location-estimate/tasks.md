@@ -207,3 +207,19 @@ changing what any participant sees until they switch it on.
   the number that counts.
 - Commit after each task or logical group, and merge (never rebase) once the branch is pushed
 - Avoid: vague tasks, same-file conflicts, and changing `values.ts` silently
+
+---
+
+## Phase 5: Convergence
+
+- [ ] T040 CRITICAL: Once the relay stores report numbers bit-exact (the separate relay fix: `serde_json` without `float_roundtrip` turned `-122.57812663477081` into `-122.5781266347708`), add an e2e check in `web/tests/e2e/estimate.spec.ts` that the device that authored a report and a device that received it through the relay draw byte-identical regions, using a report with a 17-significant-digit coordinate per Constitution IV, FR-018 (contradicts)
+- [ ] T041 Make a bearing's kernel reach its floor at the stated range, not at range × (1 + `BEARING_RANGE_TAPER`): move the taper inside the range in `web/src/estimate/kernels.ts` and `values.ts` (a one-bearing R3 region currently reaches 13.88 km against a 12.87 km range), then rerun the reference hunts and report the coverage before and after per FR-004a, FR-037 (contradicts)
+- [ ] T042 Keep the single-bearing region inside its wedge near the apex (it spills to 18.8° against a 16° half-width, where second-pass cells are wide relative to the distance from the observer), and assert in `web/tests/unit/reference-hunts.test.ts` that the one-bearing region lies within the wedge and spans its full length per US1/AC2 (partial)
+- [ ] T043 Extend the cross-engine comparison in `web/tests/e2e/estimate.spec.ts` from 7 to every scenario in `web/tests/reference/scenarios.ts` except `five-hundred` per SC-005 (partial)
+- [ ] T044 On a real iPhone and a real Android phone in airplane mode, run quickstart §5 by hand and check that a reload with the estimate on still draws a region, and that a first switch-on after one online visit draws one; Playwright's WebKit offline emulation cannot start a worker, so neither is proven on iOS per Constitution III, T019 (partial)
+- [ ] T045 Add a reference scenario asserting that a strong signal report from one end of an elongated region shifts the region toward that reporter per US1/AC4 (missing)
+- [ ] T046 Assert in the `two-nearly-parallel` scenario that the region extends along the bearings toward their stated range, not a small region at a distant crossing per US1/AC5, FR-011 (missing)
+- [ ] T047 Add a reference scenario asserting that a "heard nothing" filed inside a region moves probability away from the reporter's position (less of the region's probability within the cleared radius) per US1/AC3 (missing)
+- [ ] T048 Reconcile the region-count hook: the status bar already carries `data-testid="status-bar"`, so the count is published as `data-estimate-region-count`; update `contracts/display-surfaces.md` §2 to match, or publish the count on a child element with its own test id per T032, T019 (contradicts)
+- [ ] T049 Review the `window.__foxmapperTrack` e2e seam in `web/src/analytics/posthog.ts`: keep it and document it in `docs/analytics.md`, or replace it with a test-only mechanism per T034 (unrequested)
+- [ ] T050 Register the `radio_button_unchecked` glyph (estimate switch and "nothing yet" chip) and the estimate warning chips' use of `warning` in `specs/002-material3-ui-redesign/contracts/iconography.md`, or reuse an existing glyph per T028, T032 (unrequested)
