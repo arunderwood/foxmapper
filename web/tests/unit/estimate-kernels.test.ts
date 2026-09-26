@@ -115,25 +115,29 @@ describe('bearing (FR-004a)', () => {
     );
   });
 
-  it('adds only its floor beyond its range × (1 + taper)', () => {
+  it('adds only its floor at and beyond its stated range', () => {
     fc.assert(
       fc.property(
         direction,
         fc.constantFrom<WireDigit>(1, 3, 5),
-        fc.double({ min: 1.0001, max: 3, noNaN: true }),
+        fc.double({ min: 1, max: 3, noNaN: true }),
         (heading, r, beyond) => {
           const p = prepare(bearing(heading, 5, r), ORIGIN, V);
-          const far = at(heading, rangeKm(r) * (1 + V.BEARING_RANGE_TAPER) * beyond);
+          const far = at(heading, rangeKm(r) * beyond);
           return kernel(p, far.x, far.y) === V.BEARING_FLOOR;
         },
       ),
     );
   });
 
-  it('keeps its full strength out to the stated range', () => {
+  it('keeps its full strength until it fades out inside the stated range', () => {
     const p = prepare(bearing(90, 4, 3), ORIGIN, V);
-    const edge = at(90, rangeKm(3) * 0.999);
-    expect(kernel(p, edge.x, edge.y)).toBeCloseTo(1, 10);
+    const fadeFrom = rangeKm(3) * (1 - V.BEARING_RANGE_TAPER);
+    const full = at(90, fadeFrom * 0.999);
+    const fading = at(90, (fadeFrom + rangeKm(3)) / 2);
+    expect(kernel(p, full.x, full.y)).toBeCloseTo(1, 10);
+    expect(kernel(p, fading.x, fading.y)).toBeLessThan(1);
+    expect(kernel(p, fading.x, fading.y)).toBeGreaterThan(V.BEARING_FLOOR);
   });
 
   it('reads a confidence nobody can read at the widest width', () => {

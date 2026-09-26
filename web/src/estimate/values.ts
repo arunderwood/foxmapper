@@ -85,8 +85,10 @@ export const ESTIMATE_VALUES: Readonly<EstimateValues> = Object.freeze({
   BEARING_SIGMA_FRACTION: 0.5,
 
   /**
-   * How far past its stated range a bearing fades out, as a share of that range. **0.1**: beyond
-   * range × 1.1 a bearing adds nothing but its floor, which makes FR-004a literal.
+   * The last share of its stated range over which a bearing fades out. **0.1**: full strength to
+   * 90% of the range, falling to its floor at the range itself. The fade sits inside the range, so a
+   * bearing never pushes probability past the distance its reporter stated (FR-004a); a hard cut
+   * would draw a region edge exactly at the range, as if the range were known to the metre.
    */
   BEARING_RANGE_TAPER: 0.1,
 

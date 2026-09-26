@@ -54,7 +54,9 @@ interface PreparedBearing extends Common {
   hx: number;
   hy: number;
   kappa: number;
-  rangeKm: number;
+  /** Where the bearing starts to fade: full strength inside, nothing but its floor past reach. */
+  fadeFromKm: number;
+  /** The stated range itself (FR-004a). */
   reachKm: number;
 }
 
@@ -134,8 +136,8 @@ export function prepare(
         hx: sin(heading),
         hy: cos(heading),
         kappa: 1 / (sigma * sigma),
-        rangeKm: range,
-        reachKm: range * (1 + values.BEARING_RANGE_TAPER),
+        fadeFromKm: range * (1 - values.BEARING_RANGE_TAPER),
+        reachKm: range,
       };
     }
     case 'omni': {
@@ -201,7 +203,7 @@ function shape(p: PreparedReport, x: number, y: number): number {
     case 'bearing': {
       const d = Math.sqrt(d2);
       if (d >= p.reachKm) return 0;
-      const along = d <= p.rangeKm ? 1 : (p.reachKm - d) / (p.reachKm - p.rangeKm);
+      const along = d <= p.fadeFromKm ? 1 : (p.reachKm - d) / (p.reachKm - p.fadeFromKm);
       if (d === 0) return along;
       // von Mises in the offset from the heading: exp(κ(cos Δ − 1)), 1 on the heading itself.
       const cosOffset = (dx * p.hx + dy * p.hy) / d;
@@ -318,7 +320,7 @@ export function multiplyRow(
         const dx = x0 + (i + 0.5) * cell - p.x;
         const d = Math.sqrt(dx * dx + dy2);
         if (d >= p.reachKm) continue;
-        const along = d <= p.rangeKm ? 1 : (p.reachKm - d) / (p.reachKm - p.rangeKm);
+        const along = d <= p.fadeFromKm ? 1 : (p.reachKm - d) / (p.reachKm - p.fadeFromKm);
         let s = along;
         if (d !== 0) {
           const a = p.kappa * ((dx * p.hx + dy * p.hy) / d - 1);

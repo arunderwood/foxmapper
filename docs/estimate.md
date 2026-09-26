@@ -39,7 +39,7 @@ report's **floor** and 1 at every point. The estimate multiplies every report's 
 
 | Report | Its claim | Named values |
 |---|---|---|
-| Bearing | The fox is probably along this heading, within the stated range. The spread matches the wedge the map draws, so the estimate never trusts a bearing more than its wedge says. Beyond the stated range the bearing fades out and then adds nothing. A confidence digit with no agreed width counts at the widest width, as the wedge does. | `BEARING_SIGMA_FRACTION`, `BEARING_RANGE_TAPER`, `BEARING_FLOOR` |
+| Bearing | The fox is probably along this heading, within the stated range. The spread matches the wedge the map draws, so the estimate never trusts a bearing more than its wedge says. It fades out over the last part of its stated range and adds nothing beyond it. A confidence digit with no agreed width counts at the widest width, as the wedge does. | `BEARING_SIGMA_FRACTION`, `BEARING_RANGE_TAPER`, `BEARING_FLOOR` |
 | Signal strength | Louder means probably closer, loosely. Each strength bucket has a most likely distance, with a spread wide enough to cover mismatched radios and antennas. Past a reach limit it says nothing. | `OMNI_STRENGTH_BUCKETS`, `OMNI_MEDIAN_KM`, `OMNI_LOG_SD`, `OMNI_REACH_KM`, `OMNI_FLOOR` |
 | Heard nothing | The fox is probably not right here. It clears a small circle fully and a larger one partly. It never makes any other place more likely. | `NULL_CLEAR_INNER_KM`, `NULL_CLEAR_OUTER_KM`, `NULL_FLOOR` |
 | Found it | Strong evidence at the finder's position. It feeds the estimate like any other report, so a wrong find can be outweighed, and two conflicting finds make two regions. | `FIX_SIGMA_KM`, `FIX_FLOOR` |
