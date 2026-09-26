@@ -1,7 +1,7 @@
 /**
  * The bundled icon set (contracts/iconography.md).
  *
- * Sixteen hand-picked glyphs from Material Symbols (Rounded, filled), Apache License 2.0,
+ * A hand-picked set of glyphs from Material Symbols (Rounded, filled), Apache License 2.0,
  * Copyright Google LLC — https://github.com/google/material-design-icons. Path data is
  * committed here so nothing is ever fetched at runtime (FR-008, SC-009): an icon the network
  * has to deliver is an icon a hunter out of coverage does not have.

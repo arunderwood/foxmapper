@@ -22,12 +22,13 @@ UI modules. Icons ship in the JS bundle; adding an icon is a code change, never 
 | `schedule` | clock skew warning | Labeled |
 | `share` | share hunt action | **Icon-only allowed** (universal) |
 | `close` | dismiss sheet/popup | **Icon-only allowed** (universal) |
-| `warning` | uncertainty / generic warnings | Labeled (the warning text) |
+| `warning` | uncertainty / generic warnings, including the location estimate's warning chips (006) | Labeled (the warning text) |
 | `send` | submit report | Labeled ("Send") — primary action never icon-only |
 | `edit_location` | set-position-by-hand; the placed-position pin | Labeled (pin decorative — the chip carries the words) |
 | `record_voice_over` | relay: mode toggle, arming flow, armed chip, observer pin | Labeled (pin decorative — the armed chip carries the words) |
 | `settings` | the hunt menu (settings + start a new hunt), reached from the hunt-name chip | Labeled by the hunt name it sits beside; **icon-only allowed** (universal) elsewhere |
 | `add` | start a new hunt (from the hunt menu) | Labeled ("Start a new hunt") |
+| `radio_button_unchecked` | the location estimate (006): its Settings switch and the "nothing points at the fox yet" chip — an outline of ground, never a point | Labeled (the switch or chip text) |
 
 ## Rules
 

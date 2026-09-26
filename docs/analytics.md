@@ -43,6 +43,10 @@ Anonymous counts, hand-authored one event at a time, with a fixed and reviewed p
 | `feedback_opened` | — | The feedback affordance was used (see below). |
 | `$exception` | stack, message (URL-redacted) | Unhandled and handled errors, via PostHog error tracking. |
 
+The end-to-end suite checks each event's exact property set without sending anything: its builds
+carry no key, so `track()` also hands every event to `window.__foxmapperTrack` when a test has
+installed one. Outside a test that hook does not exist, and nothing reads it.
+
 ## Consent, and how to say no
 
 Analytics is **on by default but always refusable**, and three independent gates can each keep it
