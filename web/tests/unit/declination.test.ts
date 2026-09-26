@@ -60,6 +60,20 @@ describe('declination', () => {
     const expired = declinationAt(BELLINGHAM.lat, BELLINGHAM.lon, new Date('2030-06-01'));
     expect([fresh.stale, expired.stale]).toEqual([false, true]);
   });
+
+  // NOAA's published WMM2025 test values, sea level, printed to two decimals:
+  // https://www.ncei.noaa.gov/sites/default/files/2025-02/WMM2025testvalues.pdf
+  // The Bellingham check above only proves the model ran. These prove it is the right model with
+  // the right coefficients and sign, so a dependency bump that breaks either fails here.
+  it.each([
+    { at: '2025-01-01T00:00:00Z', lat: 80, lon: 0, noaa: 1.28 },
+    { at: '2025-01-01T00:00:00Z', lat: 0, lon: 120, noaa: -0.16 },
+    // Decimal year 2027.5; lon 240 in NOAA's table.
+    { at: '2027-07-02T12:00:00Z', lat: -80, lon: -120, noaa: 68.49 },
+  ])('matches NOAA at $lat,$lon on $at', ({ at, lat, lon, noaa }) => {
+    const declination = declinationAt(lat, lon, new Date(at));
+    expect(Math.abs(declination.degrees - noaa)).toBeLessThan(0.01);
+  });
 });
 
 describe('magnetic to true', () => {
