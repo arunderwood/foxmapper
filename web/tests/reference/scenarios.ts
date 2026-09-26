@@ -6,6 +6,7 @@
  * All simulated, all seeded (FR-039).
  */
 import type { EstimateReport } from '../../src/estimate/types.js';
+import { rangeKm } from '../../src/log/confidence.js';
 import {
   bearingAt,
   fixAt,
@@ -56,7 +57,9 @@ export const SCENARIOS: ReferenceHunt[] = [
   scenario(
     'two-nearly-parallel',
     103,
-    { status: 'estimate', warnings: ['narrow_spread'] },
+    // Not a small region at a distant crossing: it reaches along the bearings for at least half
+    // their stated range (US1/AC5, FR-011).
+    { status: 'estimate', warnings: ['narrow_spread'], alongKm: rangeKm(3) / 2 },
     ({ rng, ids, fox }) => [
       bearingAt(rng, ids, fox, { from: 180, km: 8, q: 5 }),
       bearingAt(rng, ids, fox, { from: 180 + (0.5 / 8) * (180 / Math.PI), km: 8, q: 5 }),
@@ -154,6 +157,58 @@ export const SCENARIOS: ReferenceHunt[] = [
       ...crowd,
       reports: [...crowd.reports, wrong],
       expect: { status: 'estimate' as const, warnings: ['disagree' as const] },
+    };
+  })(),
+
+  // A long region from two nearly parallel bearings, then a strong signal from its far end: the
+  // region shifts toward the handheld that heard it loudly (US1/AC4).
+  (() => {
+    const rng = mulberry32(114);
+    const ids = new Ids(114);
+    const fox = foxFor(rng);
+    const bearings = [
+      bearingAt(rng, ids, fox, { from: 180, km: 8, q: 5, r: 3, errorDeg: 0 }),
+      bearingAt(rng, ids, fox, {
+        from: 180 + (0.5 / 8) * (180 / Math.PI),
+        km: 8,
+        q: 5,
+        r: 3,
+        errorDeg: 0,
+      }),
+    ];
+    const at = offset(fox, 0, 4);
+    const loud = omniAt(ids, fox, { from: 0, km: 4, bucket: 'strong' });
+    return {
+      name: 'strong-signal-at-one-end',
+      source: 'simulated' as const,
+      fox: at,
+      reports: [...bearings, loud],
+      expect: {
+        status: 'estimate' as const,
+        shifts: { added: [loud.id], point: at, direction: 'toward' as const },
+      },
+    };
+  })(),
+
+  // Three bearings crossing at the fox, then "heard nothing" from inside the region, north of the
+  // crossing: probability moves away from where the silence was heard (US1/AC3).
+  (() => {
+    const rng = mulberry32(115);
+    const ids = new Ids(115);
+    const fox = foxFor(rng);
+    const bearings = [0, 120, 240].map((from) =>
+      bearingAt(rng, ids, fox, { from, km: 3, q: 4, errorDeg: 0 }),
+    );
+    const quiet = nullAt(ids, fox, { from: 0, km: 0.3 });
+    return {
+      name: 'heard-nothing-inside-the-region',
+      source: 'simulated' as const,
+      fox,
+      reports: [...bearings, quiet],
+      expect: {
+        status: 'estimate' as const,
+        shifts: { added: [quiet.id], point: quiet.position, direction: 'away' as const },
+      },
     };
   })(),
 

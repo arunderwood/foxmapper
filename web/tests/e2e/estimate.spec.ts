@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
 import { estimate } from '../../src/estimate/estimate.js';
 import { toEstimateInput } from '../../src/estimate/input.js';
 import { SCENARIOS } from '../reference/scenarios.js';
-import { Ids, nullAt } from '../reference/simulate.js';
+import { Ids, nullAt, offset, type LatLon } from '../reference/simulate.js';
 import {
   crossing,
   device,
@@ -128,6 +128,29 @@ test('a retraction recomputes the region on another device (FR-007, scenario 9)'
   await watcher.context.close();
 });
 
+test('the device that filed a report and one that received it draw the same region (FR-018)', async ({
+  browser,
+}) => {
+  // Seventeen significant digits: the relay once returned this longitude one bit off, and the two
+  // devices then held different copies of one report (Principle IV).
+  const author: LatLon = { lat: 48.59532872157967, lon: -122.57812663477081 };
+  const fox = offset(author, 90, 2);
+  const code = await huntWith(crossing(fox, [0, 120]));
+  const filer = await device(browser, code, 'K7AUT', author);
+  const watcher = await device(browser, code, 'K7RCV');
+  await setEstimate(filer.page, true);
+  await setEstimate(watcher.page, true);
+  await expect.poll(() => regionCount(watcher.page)).toBe(1);
+  const before = await drawnRegions(watcher.page);
+
+  await reportBearing(filer.page, 90);
+  await expect.poll(() => drawnRegions(watcher.page), { timeout: 15_000 }).not.toBe(before);
+  await expect.poll(() => drawnRegions(filer.page)).toBe(await drawnRegions(watcher.page));
+
+  await filer.context.close();
+  await watcher.context.close();
+});
+
 test('switching off clears this map at once and no other (FR-031, scenario 13)', async ({
   browser,
 }) => {
@@ -219,16 +242,9 @@ test('the browser draws exactly what the reference engine computes (SC-005, FR-0
   // the engine here then read the very same numbers.
   const code = await localHunt(page, context, 'K7REF');
 
-  for (const name of [
-    'one-bearing',
-    'two-crossing',
-    'two-groups',
-    'signal-strength-and-heard-nothing',
-    'two-conflicting-finds',
-    'one-wrong-bearing',
-    'heard-nothing-at-the-fox',
-  ]) {
-    const scenario = SCENARIOS.find((s) => s.name === name)!;
+  // Every reference hunt but the 500-report one, which exists to time the estimate, not to vary it.
+  for (const scenario of SCENARIOS.filter((s) => s.name !== 'five-hundred')) {
+    const name = scenario.name;
     const records = scenario.reports.map((r) => toReport(r, code));
     const expected = estimate(toEstimateInput(records, 0));
 

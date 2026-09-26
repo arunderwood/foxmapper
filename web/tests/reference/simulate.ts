@@ -30,6 +30,13 @@ export interface ReferenceExpectation {
   absent?: WarningKind[];
   /** Exactly this many regions. */
   regions?: number;
+  /** The regions stretch at least this far, in km, along their longest side (FR-011). */
+  alongKm?: number;
+  /**
+   * Adding the reports named in `added` moves the regions' probability-weighted centre toward or
+   * away from `point` (US1/AC3, US1/AC4).
+   */
+  shifts?: { added: string[]; point: LatLon; direction: 'toward' | 'away' };
 }
 
 export interface ReferenceHunt {
