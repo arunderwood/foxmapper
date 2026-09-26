@@ -18,7 +18,10 @@ axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.9", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json", "migrate"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: the default parser can read a float as a neighbouring f64, and a report body is
+# parsed twice (request, then jsonb decode). A coordinate one ulp off is a different report on every
+# device but the author's. Features unify, so this also governs sqlx's jsonb decode.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 futures = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
