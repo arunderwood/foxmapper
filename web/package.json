@@ -19,8 +19,8 @@
     "d3-contour": "^4.0.2",
     "geomagnetism": "^0.2.0",
     "idb": "^8.0.0",
-    "maplibre-gl": "^6.10.0",
-    "posthog-js": "^1.434.8"
+    "maplibre-gl": "^6.11.2",
+    "posthog-js": "^1.434.15"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -29,14 +29,14 @@
     "@turf/boolean-point-in-polygon": "^7.4.0",
     "@turf/destination": "^7.3.5",
     "@types/d3-contour": "^3.0.6",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "eslint": "^10.11.0",
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.10.2",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.70.1",
-    "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   }
 }
