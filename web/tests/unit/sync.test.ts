@@ -135,3 +135,35 @@ describe('flush', () => {
     expect(sent.map((batch) => batch.length)).toEqual([200, 200]);
   });
 });
+
+describe('the poll tick', () => {
+  it('retries a queue whose flush on reconnect failed, without waiting on the stream', async () => {
+    // The stream never opens, so its `onopen` flush never comes: the case where SSE is still in
+    // its reconnect backoff when coverage returns.
+    vi.stubGlobal(
+      'EventSource',
+      class {
+        close(): void {}
+      },
+    );
+    // Only the interval is faked; fake-indexeddb schedules its own work on real timers.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    await queue(3);
+    // The first flush meets a network that is not passing requests yet, as an `online` event
+    // fired a beat early would.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const running = sync();
+    await running.start();
+    expect(await outboxIds(db, HUNT)).toHaveLength(3);
+
+    relay();
+    vi.advanceTimersByTime(15_000);
+
+    await vi.waitFor(async () => expect(await outboxIds(db, HUNT)).toEqual([]));
+    running.stop();
+    vi.useRealTimers();
+  });
+});
