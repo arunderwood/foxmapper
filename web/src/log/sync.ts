@@ -83,7 +83,13 @@ export class Sync {
     this.#connect();
     // Polling is the fallback, on the same cursor, for the case SSE cannot cover: a proxy that
     // swallows the stream entirely. It is idempotent with the stream — both advance one cursor.
-    this.#pollTimer = setInterval(() => void this.#poll(), POLL_INTERVAL_MS);
+    // The tick also retries the outbox. The `online` event can fire before requests get through,
+    // and the stream's reconnect backoff reaches a minute, so neither alone bounds how long a
+    // queued report waits once coverage is back. An empty outbox costs one IndexedDB read.
+    this.#pollTimer = setInterval(() => {
+      void this.flush();
+      void this.#poll();
+    }, POLL_INTERVAL_MS);
   }
 
   stop(): void {

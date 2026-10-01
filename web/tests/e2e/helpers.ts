@@ -141,24 +141,33 @@ export async function tapReport(page: Page, index = 0): Promise<void> {
     return Boolean(map) && !map!.isMoving() && !map!.isZooming();
   });
 
-  const point = await page.evaluate(async (i) => {
-    const map = (window as unknown as { __map?: MapLibreMap }).__map;
-    if (!map) return null;
-    for (const id of ['reports-markers', 'reports-wedges']) {
-      const source = map.getSource(id) as GeoJSONSource | undefined;
-      const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)?.data;
-      const feature = data?.features?.[i];
-      if (!feature) continue;
-      // A wedge is a polygon; its first vertex is the observer's position, where the marker sits.
-      const coords =
-        feature.geometry.type === 'Point'
-          ? (feature.geometry.coordinates as [number, number])
-          : ((feature.geometry as GeoJSON.Polygon).coordinates[0]![0] as [number, number]);
-      const projected = map.project(coords);
-      return { x: projected.x, y: projected.y };
-    }
-    return null;
-  }, index);
+  // A feature in the source is not yet a feature on screen: the click handler hit-tests drawn
+  // layers, and the frame that draws new source data can land after the click. Wait until the
+  // projected point hit-tests to a report, the same way the click will.
+  const point = await page
+    .waitForFunction((i) => {
+      const map = (window as unknown as { __map?: MapLibreMap }).__map;
+      if (!map) return null;
+      for (const id of ['reports-markers', 'reports-wedges']) {
+        const source = map.getSource(id) as GeoJSONSource | undefined;
+        const data = (source?.serialize() as { data?: GeoJSON.FeatureCollection } | undefined)
+          ?.data;
+        const feature = data?.features?.[i];
+        if (!feature) continue;
+        // A wedge is a polygon; its first vertex is the observer's position, where the marker sits.
+        const coords =
+          feature.geometry.type === 'Point'
+            ? (feature.geometry.coordinates as [number, number])
+            : ((feature.geometry as GeoJSON.Polygon).coordinates[0]![0] as [number, number]);
+        const projected = map.project(coords);
+        const drawn = map.queryRenderedFeatures(projected, {
+          layers: ['wedge-fill', 'marker-circle', 'fix-flag'],
+        });
+        return drawn.length > 0 ? { x: projected.x, y: projected.y } : null;
+      }
+      return null;
+    }, index)
+    .then((handle) => handle.jsonValue());
 
   if (!point) throw new Error('no rendered report to tap');
   await page.getByTestId('map').click({ position: point });
