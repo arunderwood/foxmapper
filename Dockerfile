@@ -19,7 +19,7 @@ ENV VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY
 ENV VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
 RUN npm run build
 
-FROM rust:1.98-slim AS server
+FROM rust:1.99-slim AS server
 WORKDIR /app
 # rust-toolchain.toml rides along with the manifests: it must be here before the stub build below,
 # or the dependency layer compiles with the base image's toolchain instead of the pinned one.
