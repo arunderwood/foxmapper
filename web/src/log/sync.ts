@@ -101,7 +101,8 @@ export class Sync {
   }
 
   /**
-   * Sends everything queued, in batches of `FLUSH_BATCH_SIZE`. **A batch drains only on a 2xx.**
+   * Sends everything queued, in batches of `FLUSH_BATCH_SIZE`. **A batch drains only on a 2xx,
+   * and only the reports that 2xx lists as accepted.**
    *
    * A 429 is retryable and never drops a report — a dropped report is the one unacceptable
    * outcome, and the rate limit exists to stop a script, not to reject a hunter.
@@ -132,9 +133,15 @@ export class Sync {
         if (response.ok) {
           // The server is idempotent by id, so re-sending a report it already has is harmless.
           // That is what lets this queue be dumb and retry blindly forever.
+          //
+          // Only what the server lists as accepted drains. A 2xx can still leave a report out — an
+          // id another hunt already holds is never stored in this one — and clearing on the status
+          // alone would drop it from the queue while it is missing from the hunt.
+          const { accepted } = (await response.json()) as { accepted: string[] };
+          const offered = new Set(reports.map((r) => r.id));
           await clearOutbox(
             db,
-            reports.map((r) => r.id),
+            accepted.filter((id) => offered.has(id)),
           );
           // Reported per batch, not once at the end: a queue of thousands that only updated after
           // the last batch would sit at its full depth for minutes and read as frozen.

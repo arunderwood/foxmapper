@@ -157,3 +157,44 @@ async fn a_body_without_a_uuid_id_is_rejected() {
     assert!(IncomingReport::from_value(serde_json::json!({ "id": "not-a-uuid" })).is_err());
     assert!(IncomingReport::from_value(serde_json::json!(["an", "array"])).is_err());
 }
+
+#[tokio::test]
+async fn an_id_held_by_another_hunt_is_not_accepted() {
+    const OTHER: &str = "light-tern-3384-7v5z";
+    let db = TestDb::new().await;
+    db.seed_hunt(CODE).await;
+    db.seed_hunt(OTHER).await;
+
+    let claimed = Uuid::new_v4();
+    let original = IncomingReport::from_value(report_body(claimed, "bearing")).expect("parse");
+    store::append_reports(&db.pool, CODE, &[original], 1_000)
+        .await
+        .expect("append to the first hunt");
+
+    // The id is a global key, so the insert into the second hunt is skipped. The client drains
+    // its queue on `accepted`, so listing the skipped id would drop a report it believes is stored.
+    let fresh = Uuid::new_v4();
+    let batch = vec![
+        IncomingReport::from_value(report_body(claimed, "fix")).expect("parse"),
+        IncomingReport::from_value(report_body(fresh, "omni")).expect("parse"),
+    ];
+    let accepted = store::append_reports(&db.pool, OTHER, &batch, 2_000)
+        .await
+        .expect("append to the second hunt");
+
+    assert_eq!(accepted, vec![fresh]);
+    assert_eq!(
+        store::report_ids(&db.pool, OTHER).await.expect("ids"),
+        vec![fresh.to_string()]
+    );
+    let (hunt, kind) = sqlx::query_as::<_, (String, String)>(
+        "SELECT hunt_code, body->>'kind' FROM reports WHERE id = $1",
+    )
+    .bind(claimed)
+    .fetch_one(&db.pool)
+    .await
+    .expect("read claimed row");
+    assert_eq!((hunt.as_str(), kind.as_str()), (CODE, "bearing"));
+
+    db.cleanup().await;
+}

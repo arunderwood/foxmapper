@@ -2,6 +2,8 @@
 
 pub mod purge;
 
+use std::collections::HashSet;
+
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
@@ -118,11 +120,15 @@ async fn append_in_transaction(
         .execute(&mut *tx)
         .await?;
 
-    let mut accepted = Vec::with_capacity(reports.len());
     for report in reports {
         // ON CONFLICT DO NOTHING is the whole idempotency story: re-appending a known id is a
         // no-op. This is what lets the client retry blindly forever with no dedup logic, which is
         // exactly what a flaky mobile link needs and the reason the outbound queue can be dumb.
+        //
+        // The conflict is on the global key, so it also fires for an id another hunt already
+        // holds, and then nothing lands here. Ids stay globally unique because each device keys
+        // its local store by `id` alone: a per-hunt key would let a report copied into a second
+        // hunt overwrite the original on any device that has joined both.
         sqlx::query(
             "INSERT INTO reports (id, hunt_code, received_at, body)
              VALUES ($1, $2, $3, $4)
@@ -134,8 +140,20 @@ async fn append_in_transaction(
         .bind(&report.body)
         .execute(&mut *tx)
         .await?;
-        accepted.push(report.id);
     }
+
+    // Accepted means "in this hunt's log", read back rather than assumed: the client drains its
+    // queue on this list, so an id the insert skipped for another hunt must not appear in it.
+    let ids: Vec<Uuid> = reports.iter().map(|r| r.id).collect();
+    let stored: HashSet<Uuid> =
+        sqlx::query_scalar("SELECT id FROM reports WHERE hunt_code = $1 AND id = ANY($2)")
+            .bind(code)
+            .bind(&ids)
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .collect();
+    let accepted: Vec<Uuid> = ids.into_iter().filter(|id| stored.contains(id)).collect();
 
     // Postgres delivers NOTIFY at commit, so a listener never learns of a seq before it is
     // readable — the same guarantee the advisory lock gives the sequence itself.
