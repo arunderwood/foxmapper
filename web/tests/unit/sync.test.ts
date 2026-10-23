@@ -34,7 +34,9 @@ function report(n: number): Report {
   } as Report;
 }
 
-const accepted = (): Response => new Response(JSON.stringify({ accepted: [] }), { status: 202 });
+/** The relay's 202, listing every id it was offered. */
+const accepted = (batch: readonly Report[]): Response =>
+  new Response(JSON.stringify({ accepted: batch.map((r) => r.id) }), { status: 202 });
 const status = (code: number): Response => new Response('', { status: code });
 
 let db: FoxmapperDb;
@@ -46,13 +48,14 @@ async function queue(count: number): Promise<void> {
 }
 
 /** Replies to the nth POST with `replies[n]`, falling back to acceptance. */
-function relay(...replies: readonly (() => Response)[]): void {
+function relay(...replies: readonly ((batch: readonly Report[]) => Response)[]): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((_url: string, init: RequestInit) => {
-      sent.push(JSON.parse(init.body as string) as Report[]);
+      const batch = JSON.parse(init.body as string) as Report[];
+      sent.push(batch);
       const reply = replies[sent.length - 1] ?? accepted;
-      return Promise.resolve(reply());
+      return Promise.resolve(reply(batch));
     }),
   );
 }
@@ -124,15 +127,25 @@ describe('flush', () => {
     const reentrant: Promise<void>[] = [];
     // A stream reconnect calls flush too, and it can land between batches. Re-entering there would
     // re-send reports the first flush has in flight and has not cleared yet.
-    relay(() => {
+    relay((batch) => {
       reentrant.push(running.flush());
-      return accepted();
+      return accepted(batch);
     });
 
     await running.flush();
     await Promise.all(reentrant);
 
     expect(sent.map((batch) => batch.length)).toEqual([200, 200]);
+  });
+
+  it('keeps a report the relay answered 2xx for but did not accept', async () => {
+    await queue(3);
+    // The relay leaves out an id another hunt already holds: it was never stored in this one.
+    relay((batch) => accepted(batch.filter((r) => r.id !== 'r-0001')));
+
+    await sync().flush();
+
+    expect(await outboxIds(db, HUNT)).toEqual(['r-0001']);
   });
 });
 

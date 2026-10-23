@@ -157,6 +157,13 @@ Append. **Idempotent by report `id`.**
 - **Idempotent by `id`**: re-appending a known `id` is a no-op returning `202`. This is what lets the
   client retry blindly forever with no dedup logic — exactly what a flaky mobile link needs, and the
   reason the outbound queue can be dumb.
+- **`accepted` lists the ids that are in this hunt's log after the call** — newly stored or already
+  there. The client drains its queue on this list, not on the status, so a `202` can leave a report
+  queued.
+- **Ids are unique across all hunts.** An `id` another hunt already holds is not stored and is left
+  out of `accepted`; the rest of the batch still lands. The key is global because each device keys
+  its local store by `id` alone: a per-hunt key would let a report copied into a second hunt
+  overwrite the original on any device that has joined both.
 - The body is **stored opaquely**. The server validates only that `id` is a UUID and the JSON parses.
   It does not check `kind`, does not validate a heading, does not reject a `confidence_q` of 9.
   Enforcing domain rules here would put direction-finding logic in the server.
