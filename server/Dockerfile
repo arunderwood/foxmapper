@@ -3,7 +3,7 @@
 # The compose dev build, and nothing else. The production image is built from the root ./Dockerfile;
 # there is no second runtime stage here, because an untested copy of one only drifts.
 
-FROM rust:1.98-slim AS base
+FROM rust:1.99-slim AS base
 WORKDIR /app
 # Before any cargo call, so dev's cargo-watch resolves the same compiler. rust-toolchain.toml is the
 # source of truth; the tag above is only the base layer. When they agree this costs nothing, and when
