@@ -4,6 +4,7 @@ pub mod purge;
 
 use std::collections::HashSet;
 
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
@@ -120,31 +121,42 @@ async fn append_in_transaction(
         .execute(&mut *tx)
         .await?;
 
-    for report in reports {
-        // ON CONFLICT DO NOTHING is the whole idempotency story: re-appending a known id is a
-        // no-op. This is what lets the client retry blindly forever with no dedup logic, which is
-        // exactly what a flaky mobile link needs and the reason the outbound queue can be dumb.
-        //
-        // The conflict is on the global key, so it also fires for an id another hunt already
-        // holds, and then nothing lands here. Ids stay globally unique because each device keys
-        // its local store by `id` alone: a per-hunt key would let a report copied into a second
-        // hunt overwrite the original on any device that has joined both.
-        sqlx::query(
-            "INSERT INTO reports (id, hunt_code, received_at, body)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (id) DO NOTHING",
-        )
-        .bind(report.id)
-        .bind(code)
-        .bind(received_at)
-        .bind(&report.body)
-        .execute(&mut *tx)
-        .await?;
-    }
+    let ids: Vec<Uuid> = reports.iter().map(|r| r.id).collect();
+    let bodies: Vec<&Value> = reports.iter().map(|r| &r.body).collect();
+
+    // The whole batch in one statement. Everything here runs holding the advisory lock, so a
+    // round trip per report is a round trip every other append to this hunt spends blocked.
+    //
+    // ON CONFLICT DO NOTHING is the whole idempotency story: re-appending a known id is a no-op.
+    // This is what lets the client retry blindly forever with no dedup logic, which is exactly
+    // what a flaky mobile link needs and the reason the outbound queue can be dumb. A single
+    // statement holds that for ids repeated inside one batch too — the second occurrence
+    // conflicts with the row the same statement just inserted, and is skipped.
+    //
+    // The conflict is on the global key, so it also fires for an id another hunt already holds,
+    // and then nothing lands here. Ids stay globally unique because each device keys its local
+    // store by `id` alone: a per-hunt key would let a report copied into a second hunt overwrite
+    // the original on any device that has joined both.
+    //
+    // `WITH ORDINALITY` and the explicit `ORDER BY t.ord` are what give `seq` the batch's order.
+    // `unnest` emits its elements in order, but nothing in the statement obliges the insert to
+    // consume them that way, and `seq` is the order every device replays the log in.
+    sqlx::query(
+        "INSERT INTO reports (id, hunt_code, received_at, body)
+         SELECT t.id, $3, $4, t.body
+         FROM unnest($1::uuid[], $2::jsonb[]) WITH ORDINALITY AS t(id, body, ord)
+         ORDER BY t.ord
+         ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(&ids)
+    .bind(&bodies)
+    .bind(code)
+    .bind(received_at)
+    .execute(&mut *tx)
+    .await?;
 
     // Accepted means "in this hunt's log", read back rather than assumed: the client drains its
     // queue on this list, so an id the insert skipped for another hunt must not appear in it.
-    let ids: Vec<Uuid> = reports.iter().map(|r| r.id).collect();
     let stored: HashSet<Uuid> =
         sqlx::query_scalar("SELECT id FROM reports WHERE hunt_code = $1 AND id = ANY($2)")
             .bind(code)
