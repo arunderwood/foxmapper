@@ -13,6 +13,12 @@ updates:
     directory: /web
     schedule:
       interval: weekly
+    # Transitive deps too, not just the manifest-declared ones. Dependabot's default covers only
+    # what the manifest names, so everything below a direct dependency moves solely when a security
+    # advisory fires -- by which point it is several versions back and the bump drags a new floor
+    # in with it. Tracking the whole lockfile keeps each advisory a one-line change.
+    allow:
+      - dependency-type: all
     groups:
       # Majors stay separate so a breaking change lands in a PR of its own.
       web-minor-patch:
@@ -23,6 +29,9 @@ updates:
     directory: /server
     schedule:
       interval: weekly
+    # Transitive crates too, for the reason given on the npm entry above.
+    allow:
+      - dependency-type: all
     groups:
       server-minor-patch:
         patterns: ['*']
