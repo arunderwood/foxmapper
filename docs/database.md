@@ -115,7 +115,7 @@ What the gap actually is:
 | transactions per session | 13.5 | A short-lived client that connects, runs a dozen statements, leaves. |
 | scans of the relay's own tables | 561,902 | At most 15% of those transactions touched a relay table — and every relay route touches one. |
 | `tup_returned` | 856,670,130 | Against a 2.3 MB database holding 391 live reports. These are system-catalog reads. |
-| `tup_inserted` | 5,453 | The relay's whole write history: 4,378 reports and 618 hunts. |
+| rows the relay ever inserted | 4,996 | Its whole write history: 4,378 reports and 618 hunts. |
 
 So ~85% of the transactions read no relay table at all, while 856 million tuples came back from
 somewhere — the signature of catalog introspection on a fixed timer, not of an application. The
@@ -125,6 +125,6 @@ monitors the database it hosts. The `postgres` database shows the identical shap
 (1,434,122 sessions, 14,198,882 transactions, 1.5 billion tuples returned, 29 rows ever inserted),
 which is the same mechanism pointed at a database that has no application in it whatsoever.
 
-The relay's own footprint, for comparison, is the bottom two rows of that table: 5,453 inserts and
-a few hundred thousand index scans in 100 days. Read `xact_commit` on this instance as a platform
+The relay's own footprint, for comparison, is the bottom two rows of that table: 4,996 rows
+written and a few hundred thousand index scans in 100 days. Read `xact_commit` on this instance as a platform
 statistic. For the relay's load, read `pg_stat_user_tables`, or install §1 and filter by `dbid`.
