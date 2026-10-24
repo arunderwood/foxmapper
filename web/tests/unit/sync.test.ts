@@ -10,7 +10,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
-import { openLogDb, outboxIds, putAuthored, type FoxmapperDb } from '../../src/log/store.js';
+import {
+  cursorKey,
+  getMeta,
+  loadLog,
+  openLogDb,
+  outboxIds,
+  setMeta,
+  putAuthored,
+  type FoxmapperDb,
+} from '../../src/log/store.js';
 import { Sync, type SyncOptions } from '../../src/log/sync.js';
 import type { Report } from '../../src/log/types.js';
 
@@ -178,5 +187,261 @@ describe('the poll tick', () => {
     await vi.waitFor(async () => expect(await outboxIds(db, HUNT)).toEqual([]));
     running.stop();
     vi.useRealTimers();
+  });
+});
+
+/**
+ * The catch-up drain.
+ *
+ * The relay answers `GET /reports?since=` with at most one page, so a single request is an answer
+ * to "what is the next page", not to "what have I missed". A client that absorbs one response and
+ * stops leaves the rest of the log behind — and on the repair path, which reads from 0 once after
+ * the audit found a divergence and never comes back, it leaves it behind permanently. That is a
+ * report dropped in silence, which is the one outcome this codebase does not accept.
+ */
+describe('the catch-up drain', () => {
+  const PAGE = 500;
+  const POLL_INTERVAL_MS = 15_000;
+
+  /** The relay's view of a hunt: `total` reports at seqs 1..total, served a page at a time. */
+  function pagedRelay(total: number): { requested: number[] } {
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const since = Number(new URL(url).searchParams.get('since'));
+        requested.push(since);
+        const seqs = [];
+        for (let seq = since + 1; seq <= Math.min(since + PAGE, total); seq += 1) seqs.push(seq);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: seqs.map((seq) => ({ seq, received_at: seq, body: report(seq) })),
+              cursor: seqs.length > 0 ? seqs[seqs.length - 1] : since,
+              more: seqs.length === PAGE,
+            }),
+          ),
+        );
+      }),
+    );
+    return { requested };
+  }
+
+  /**
+   * Drives one poll tick to completion, without waiting out the real 15s interval.
+   *
+   * It waits for `requested` to stop growing rather than for a fixed number of turns: a drain is
+   * a chain of fetches and IndexedDB writes, and fake-indexeddb runs on real timers, so the tick
+   * callback returns long before the drain it started has finished. Stopping the sync before then
+   * would leave that drain running into the next test's `fetch` stub.
+   */
+  async function tick(running: Sync, requested: readonly number[]): Promise<void> {
+    vi.stubGlobal(
+      'EventSource',
+      class {
+        close(): void {}
+      },
+    );
+    // Only the interval is faked; the settle loop below needs a real setTimeout.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      await running.start();
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+      let seen = -1;
+      while (seen !== requested.length) {
+        seen = requested.length;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    } finally {
+      running.stop();
+      vi.useRealTimers();
+    }
+  }
+
+  it('reads a log of several pages through to the end, every report exactly once', async () => {
+    const total = PAGE * 2 + 7;
+    const { requested } = pagedRelay(total);
+    const delivered: string[] = [];
+
+    await tick(
+      sync({ onReports: (reports) => delivered.push(...reports.map((r) => r.id)) }),
+      requested,
+    );
+
+    // One request per page and one cursor walk: 0, 500, 1000.
+    expect(requested).toEqual([0, PAGE, PAGE * 2]);
+    expect(delivered).toHaveLength(total);
+    expect(new Set(delivered).size).toBe(total);
+    expect((await loadLog(db, HUNT)).size).toBe(total);
+    expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(total);
+  });
+
+  it('leaves the cursor on the last page that landed, not on the one it asked for', async () => {
+    // The invariant that makes a failed write cost a re-download rather than a report: the cursor
+    // never names a report this device does not hold.
+    const total = PAGE * 2 + 7;
+    const first = pagedRelay(total);
+    const running = sync();
+
+    await tick(running, first.requested);
+
+    expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(total);
+    // A second drain from that cursor asks for what comes after the log, and finds nothing.
+    const second = pagedRelay(total);
+    await tick(running, second.requested);
+    expect(second.requested).toEqual([total]);
+    expect((await loadLog(db, HUNT)).size).toBe(total);
+  });
+
+  it('resumes a drain that was cut off mid-log without re-reading the pages that landed', async () => {
+    const total = PAGE * 2 + 7;
+    let fail = false;
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const since = Number(new URL(url).searchParams.get('since'));
+        requested.push(since);
+        // Coverage drops partway through, as it does on a hillside.
+        if (fail && since > 0) return Promise.reject(new TypeError('Failed to fetch'));
+        const seqs = [];
+        for (let seq = since + 1; seq <= Math.min(since + PAGE, total); seq += 1) seqs.push(seq);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: seqs.map((seq) => ({ seq, received_at: seq, body: report(seq) })),
+              cursor: seqs.length > 0 ? seqs[seqs.length - 1] : since,
+              more: seqs.length === PAGE,
+            }),
+          ),
+        );
+      }),
+    );
+
+    fail = true;
+    const running = sync();
+    await tick(running, requested);
+    expect(requested).toEqual([0, PAGE]);
+    expect((await loadLog(db, HUNT)).size).toBe(PAGE);
+
+    fail = false;
+    requested.length = 0;
+    await tick(running, requested);
+    // From the page that landed, not from 0: the first page is not downloaded twice.
+    expect(requested).toEqual([PAGE, PAGE * 2]);
+    expect((await loadLog(db, HUNT)).size).toBe(total);
+  });
+
+  it('stops when the relay claims more but does not advance the cursor', async () => {
+    // A relay bug, or a build that does not send `cursor` at all. Without the guard the drain
+    // re-asks the same question forever, so the relay below gives up after a few repeats rather
+    // than letting the loop run the test process out of memory.
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        requested.push(Number(new URL(url).searchParams.get('since')));
+        const stuck = requested.length < 5;
+        return Promise.resolve(
+          new Response(JSON.stringify({ reports: [], cursor: 0, more: stuck })),
+        );
+      }),
+    );
+
+    await tick(sync(), requested);
+
+    expect(requested).toEqual([0]);
+  });
+
+  it('treats a response without `more` as the end of the log', async () => {
+    // A relay older than this client answers with the whole log and no `more`. Reading one
+    // response and stopping is exactly right there, and must not loop.
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        requested.push(Number(new URL(url).searchParams.get('since')));
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: [{ seq: 1, received_at: 1, body: report(1) }],
+              cursor: 1,
+            }),
+          ),
+        );
+      }),
+    );
+
+    await tick(sync(), requested);
+
+    expect(requested).toEqual([0]);
+    expect((await loadLog(db, HUNT)).size).toBe(1);
+  });
+});
+
+describe('repair', () => {
+  const PAGE = 500;
+
+  it('re-reads the whole log across every page, not just the first', async () => {
+    // The audit found a divergence and this is the pull half. It runs once and never comes back,
+    // so a drain that stopped at the first page would leave the divergence in place and report
+    // the repair as done.
+    const total = PAGE * 2 + 7;
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') return Promise.resolve(new Response('{"accepted":[]}'));
+        const since = Number(new URL(url).searchParams.get('since'));
+        requested.push(since);
+        const seqs = [];
+        for (let seq = since + 1; seq <= Math.min(since + PAGE, total); seq += 1) seqs.push(seq);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: seqs.map((seq) => ({ seq, received_at: seq, body: report(seq) })),
+              cursor: seqs.length > 0 ? seqs[seqs.length - 1] : since,
+              more: seqs.length === PAGE,
+            }),
+          ),
+        );
+      }),
+    );
+
+    await sync().repair([]);
+
+    expect(requested).toEqual([0, PAGE, PAGE * 2]);
+    expect((await loadLog(db, HUNT)).size).toBe(total);
+  });
+
+  it('reads from the beginning even when the stored cursor is already at the end', async () => {
+    // The whole point of reading from 0: the cursor says this device is up to date, and the audit
+    // has just proved it is not.
+    const requested: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') return Promise.resolve(new Response('{"accepted":[]}'));
+        const since = Number(new URL(url).searchParams.get('since'));
+        requested.push(since);
+        const seqs = [];
+        for (let seq = since + 1; seq <= Math.min(since + PAGE, 3); seq += 1) seqs.push(seq);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: seqs.map((seq) => ({ seq, received_at: seq, body: report(seq) })),
+              cursor: seqs.length > 0 ? seqs[seqs.length - 1] : since,
+              more: false,
+            }),
+          ),
+        );
+      }),
+    );
+
+    await setMeta(db, cursorKey(HUNT), 3);
+    await sync().repair([]);
+
+    expect(requested).toEqual([0]);
+    expect((await loadLog(db, HUNT)).size).toBe(3);
   });
 });

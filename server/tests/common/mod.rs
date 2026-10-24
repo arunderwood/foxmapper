@@ -98,6 +98,27 @@ impl TestDb {
     }
 }
 
+/// The whole log, by walking the cursor the way a client does.
+///
+/// Every read of the log is bounded, so a test that wants all of it pages for it. Tests that
+/// assert about one small hunt read this; the paging itself is what `catch_up_paging.rs` is for.
+pub async fn whole_log(pool: &PgPool, code: &str) -> Vec<foxmapper_server::model::ReportEnvelope> {
+    let mut all = Vec::new();
+    let mut cursor = 0i64;
+    loop {
+        let page = store::reports_page(pool, code, cursor)
+            .await
+            .expect("read a page");
+        if let Some(last) = page.reports.last() {
+            cursor = last.seq;
+        }
+        all.extend(page.reports);
+        if !page.filled {
+            return all;
+        }
+    }
+}
+
 fn swap_database(base: &str, name: &str) -> String {
     let (prefix, _) = base.rsplit_once('/').expect("database url has a path");
     format!("{prefix}/{name}")

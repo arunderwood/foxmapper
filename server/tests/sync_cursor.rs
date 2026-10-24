@@ -9,7 +9,7 @@
 
 mod common;
 
-use common::{report_body, TestDb};
+use common::{report_body, whole_log, TestDb};
 use foxmapper_server::{model::IncomingReport, store};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -17,7 +17,7 @@ use uuid::Uuid;
 const CODE: &str = "quiet-fox-8821-h7k2";
 
 #[tokio::test]
-async fn since_zero_returns_the_whole_log() {
+async fn a_cursor_walk_from_zero_returns_the_whole_log() {
     let db = TestDb::new().await;
     db.seed_hunt(CODE).await;
 
@@ -29,8 +29,8 @@ async fn since_zero_returns_the_whole_log() {
     }
 
     // The recovery path after storage eviction, and why eviction costs a re-download rather than
-    // a lost hunt.
-    let all = store::reports_since(&db.pool, CODE, 0).await.expect("sync");
+    // a lost hunt. Reached by paging from zero: no read of the log is unbounded.
+    let all = whole_log(&db.pool, CODE).await;
     assert_eq!(all.len(), 5);
 
     db.cleanup().await;
@@ -48,7 +48,7 @@ async fn reports_come_back_in_ascending_sequence() {
             .expect("append");
     }
 
-    let all = store::reports_since(&db.pool, CODE, 0).await.expect("sync");
+    let all = whole_log(&db.pool, CODE).await;
     let seqs: Vec<i64> = all.iter().map(|r| r.seq).collect();
     let mut sorted = seqs.clone();
     sorted.sort_unstable();
@@ -76,10 +76,12 @@ async fn walking_the_cursor_sees_every_report_exactly_once() {
     let mut cursor = 0i64;
     let mut seen = Vec::new();
     loop {
-        let batch = store::reports_since(&db.pool, CODE, cursor)
+        let batch = store::reports_page(&db.pool, CODE, cursor)
             .await
             .expect("sync");
-        let Some(first) = batch.first() else { break };
+        let Some(first) = batch.reports.first() else {
+            break;
+        };
         cursor = first.seq;
         seen.push(first.body["id"].as_str().expect("id").to_string());
     }
@@ -111,7 +113,7 @@ async fn concurrent_appends_produce_no_gap_a_reader_can_skip_past() {
         handle.await.expect("append task");
     }
 
-    let all = store::reports_since(&db.pool, CODE, 0).await.expect("sync");
+    let all = whole_log(&db.pool, CODE).await;
     assert_eq!(all.len(), 24, "every concurrent append must be readable");
 
     // The real property: a reader advancing its cursor one report at a time never skips one. Any
@@ -119,10 +121,12 @@ async fn concurrent_appends_produce_no_gap_a_reader_can_skip_past() {
     let mut cursor = 0i64;
     let mut count = 0;
     loop {
-        let batch = store::reports_since(&db.pool, CODE, cursor)
+        let batch = store::reports_page(&db.pool, CODE, cursor)
             .await
             .expect("sync");
-        let Some(next) = batch.first() else { break };
+        let Some(next) = batch.reports.first() else {
+            break;
+        };
         cursor = next.seq;
         count += 1;
     }
@@ -153,7 +157,7 @@ async fn a_reader_that_saw_the_highest_seq_has_seen_every_committed_report() {
         handle.await.expect("append task");
     }
 
-    let all = store::reports_since(&db.pool, CODE, 0).await.expect("sync");
+    let all = whole_log(&db.pool, CODE).await;
     let seqs: Vec<i64> = all.iter().map(|r| r.seq).collect();
     let max = *seqs.iter().max().expect("some reports");
     let min = *seqs.iter().min().expect("some reports");
@@ -224,9 +228,7 @@ async fn one_hunts_reports_never_appear_in_another() {
         .await
         .expect("append");
 
-    let theirs = store::reports_since(&db.pool, "brisk-owl-3310-k2m9", 0)
-        .await
-        .expect("sync");
+    let theirs = whole_log(&db.pool, "brisk-owl-3310-k2m9").await;
     assert!(theirs.is_empty());
 
     db.cleanup().await;

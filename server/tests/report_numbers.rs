@@ -11,7 +11,7 @@
 mod common;
 
 use common::TestDb;
-use foxmapper_server::{router, store};
+use foxmapper_server::router;
 use proptest::prelude::*;
 use std::net::SocketAddr;
 use uuid::Uuid;
@@ -91,7 +91,7 @@ async fn coordinates_survive_the_jsonb_decode_exactly() {
     .await
     .expect("insert");
 
-    let reports = store::reports_since(&db.pool, CODE, 0).await.expect("read");
+    let reports = common::whole_log(&db.pool, CODE).await;
     let text = serde_json::to_string(&reports[0].body).expect("serialize");
 
     assert!(
