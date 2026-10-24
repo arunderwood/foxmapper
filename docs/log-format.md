@@ -44,27 +44,33 @@ what keeps merge trivial.
 }
 ```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `v` | integer | yes | Format version. `1`. |
-| `id` | UUIDv4, lowercase canonical | yes | Identity. Generated client-side, offline, uncoordinated. |
-| `hunt_code` | string | yes | Which hunt this belongs to. |
-| `kind` | enum | yes | `bearing` \| `omni` \| `null` \| `fix` \| `retraction` |
-| `observer` | object | yes | Whose observation it is. `callsign` only — **colour is derived, never stored**. |
-| `position` | object | yes | `lat`, `lon` — WGS84 decimal degrees. **The observer's** position. |
-| `position_source` | enum | yes | `measured` (device fix) \| `placed` (set by hand). |
-| `position_accuracy_m` | number | no | Device-reported. **Advisory only** — see §8. |
-| `observed_at` | integer | yes | UTC epoch ms, from the authoring device's clock. When the observation happened, **not** when it was typed. |
-| `clock_offset_ms` | integer \| `null` | yes | Device clock minus true time; positive = running fast. **`null` means never measured** — not zero. |
-| `entered_by` | object | yes | `participant_id` (UUIDv4), `callsign`. Who typed it. |
-| `payload` | object | yes | Kind-specific. May be empty (`{}`). |
-| `wire` | object | no | Raw on-air fields, on ingested reports only. See §7. |
+| Field                 | Type                        | Required | Meaning                                                                                                    |
+| --------------------- | --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `v`                   | integer                     | yes      | Format version. `1`.                                                                                       |
+| `id`                  | UUIDv4, lowercase canonical | yes      | Identity. Generated client-side, offline, uncoordinated.                                                   |
+| `hunt_code`           | string                      | yes      | Which hunt this belongs to.                                                                                |
+| `kind`                | enum                        | yes      | `bearing` \| `omni` \| `null` \| `fix` \| `retraction`                                                     |
+| `observer`            | object                      | yes      | Whose observation it is. `callsign` only — **colour is derived, never stored**.                            |
+| `position`            | object                      | yes      | `lat`, `lon` — WGS84 decimal degrees. **The observer's** position.                                         |
+| `position_source`     | enum                        | yes      | `measured` (device fix) \| `placed` (set by hand).                                                         |
+| `position_accuracy_m` | number                      | no       | Device-reported. **Advisory only** — see §8.                                                               |
+| `observed_at`         | integer                     | yes      | UTC epoch ms, from the authoring device's clock. When the observation happened, **not** when it was typed. |
+| `clock_offset_ms`     | integer \| `null`           | yes      | Device clock minus true time; positive = running fast. **`null` means never measured** — not zero.         |
+| `entered_by`          | object                      | yes      | `participant_id` (UUIDv4), `callsign`. Who typed it.                                                       |
+| `payload`             | object                      | yes      | Kind-specific. May be empty (`{}`).                                                                        |
+| `wire`                | object                      | no       | Raw on-air fields, on ingested reports only. See §7.                                                       |
 
 **`id` generation.** 128 random bits, canonical lowercase hex UUID. `crypto.randomUUID()` in a
 browser; any CSPRNG-backed v4 elsewhere. **Do not derive it from the content** — see §9.
 
 **`relayed` is not a field.** It is derived: `observer.callsign !== entered_by.callsign`. Do not
 store it; a stored flag can disagree with the two names it summarises.
+
+**Machine-readable shape.** [schema/report.v1.schema.json](schema/report.v1.schema.json) (JSON
+Schema 2020-12) is what a reader must check before it folds: every required field present, every
+field the fold or the map reads of the right type. It encodes this section and §3 and §7 as a
+reader needs them — wide ingested ranges, not authoring caps, and no rules about meaning. Where the
+schema and this page disagree, that is a defect in one of them.
 
 ---
 
@@ -83,14 +89,14 @@ store it; a stored flag can disagree with the two names it summarises.
 }
 ```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `heading_true` | number 0–359.9 | yes | Degrees clockwise from **true** north. |
-| `heading_magnetic` | number 0–359.9 | yes | The same direction, degrees clockwise from **magnetic** north. |
-| `declination` | number | yes | Signed degrees added to get true. |
-| `wmm_epoch` | string | yes | Model that produced `declination`, e.g. `"WMM2025"`. |
-| `confidence_q` | integer, **one of {3,4,5}** authored; 0–9 ingested | yes | Raw APRS Q digit. |
-| `max_range_r` | integer, **one of {1,3,5}** authored; 0–9 ingested | yes | Raw APRS R digit. Range = 2^R miles. |
+| Field              | Type                                               | Required | Meaning                                                        |
+| ------------------ | -------------------------------------------------- | -------- | -------------------------------------------------------------- |
+| `heading_true`     | number 0–359.9                                     | yes      | Degrees clockwise from **true** north.                         |
+| `heading_magnetic` | number 0–359.9                                     | yes      | The same direction, degrees clockwise from **magnetic** north. |
+| `declination`      | number                                             | yes      | Signed degrees added to get true.                              |
+| `wmm_epoch`        | string                                             | yes      | Model that produced `declination`, e.g. `"WMM2025"`.           |
+| `confidence_q`     | integer, **one of {3,4,5}** authored; 0–9 ingested | yes      | Raw APRS Q digit.                                              |
+| `max_range_r`      | integer, **one of {1,3,5}** authored; 0–9 ingested | yes      | Raw APRS R digit. Range = 2^R miles.                           |
 
 **Why magnetic, declination and the epoch are all recorded.** So the bearing stays
 reinterpretable. A log storing only `heading_true` asserts a conversion it cannot show its work
@@ -137,7 +143,7 @@ the observer stands. **No direction is claimed.** `0` is not valid here — noth
 {}
 ```
 
-Empty. Kind + position + time is the whole claim: *"I heard nothing here."*
+Empty. Kind + position + time is the whole claim: _"I heard nothing here."_
 
 This is **negative evidence and it is first-class** — on the air it is the high-volume report,
 because far more stations fail to hear a transmitter than hear it, and it is what eliminates
@@ -149,7 +155,7 @@ territory.
 {}
 ```
 
-Empty. *"I found it, here, then."* Does not close the hunt. Does not stop reports. **Two
+Empty. _"I found it, here, then."_ Does not close the hunt. Does not stop reports. **Two
 conflicting `fix` reports both stand** — the system does not adjudicate, and a reimplementation
 must not either.
 
@@ -192,22 +198,29 @@ overwrite, and introducing one would make the phone with the fastest clock the a
 ## 5. The fold
 
 ```
-retracted = { r.payload.retracts_id  |  r ∈ log, r.kind = "retraction" }
-active    = [ r  |  r ∈ log, r.kind ≠ "retraction", r.id ∉ retracted ]
+readable  = [ r  |  r ∈ log, r matches report.v1.schema.json ]
+retracted = { r.payload.retracts_id  |  r ∈ readable, r.kind = "retraction" }
+active    = [ r  |  r ∈ readable, r.kind ≠ "retraction", r.id ∉ retracted ]
 found     = ∃ r ∈ active : r.kind = "fix"
 observers = distinct(r.observer.callsign for r in active)
 ```
+
+**Skip what you cannot read; do not drop it.** The relay never reads a report body, so anyone
+holding a hunt code can post one that is missing its `observer` or has a `lat` of `null`. A reader
+that dereferences such a body crashes on every fold, for every participant, for as long as the log
+holds it. Skip it in the fold — but keep it in the set: it is still a member, it still counts
+toward `id_digest` (§11), and removing it would make a device disagree with the relay forever.
 
 **Compute `retracted` first, then filter.** Do not walk the log marking reports as you find
 retractions — that is order-dependent, and it will pass every test until the day a retraction
 overtakes its target on a real network.
 
-| Property | Statement |
-|---|---|
-| Order-independence | `fold(shuffle(log)) == fold(log)` |
-| Idempotence | `fold(A ∪ A) == fold(A)` |
-| Commutativity | `fold(A ∪ B) == fold(B ∪ A)` |
-| Age-neutrality | The fold never reads report age. No fading, ranking, or time filtering. |
+| Property           | Statement                                                               |
+| ------------------ | ----------------------------------------------------------------------- |
+| Order-independence | `fold(shuffle(log)) == fold(log)`                                       |
+| Idempotence        | `fold(A ∪ A) == fold(A)`                                                |
+| Commutativity      | `fold(A ∪ B) == fold(B ∪ A)`                                            |
+| Age-neutrality     | The fold never reads report age. No fading, ranking, or time filtering. |
 
 ### Observer colour
 
@@ -224,18 +237,18 @@ colour     = PALETTE[index]
 It is Paul Tol's "muted" qualitative scheme, chosen because it survives colour-vision deficiency —
 see [Colour and CVD](#colour-and-cvd) below.
 
-| # | Colour | | # | Colour |
-|---|---|---|---|---|
-| 0 | `#cc6677` | | 5 | `#882255` |
-| 1 | `#332288` | | 6 | `#44aa99` |
-| 2 | `#ddcc77` | | 7 | `#999933` |
-| 3 | `#117733` | | 8 | `#aa4499` |
-| 4 | `#88ccee` | | | |
+| #   | Colour    |     | #   | Colour    |
+| --- | --------- | --- | --- | --------- |
+| 0   | `#cc6677` |     | 5   | `#882255` |
+| 1   | `#332288` |     | 6   | `#44aa99` |
+| 2   | `#ddcc77` |     | 7   | `#999933` |
+| 3   | `#117733` |     | 8   | `#aa4499` |
+| 4   | `#88ccee` |     |     |           |
 
 **Guaranteed**: one callsign is one colour, on every device, forever, offline, whether the report
 was entered by that operator or relayed by someone else.
 
-**Not guaranteed**: that two *different* callsigns get different colours. With nine swatches and a
+**Not guaranteed**: that two _different_ callsigns get different colours. With nine swatches and a
 hash, a hunt of eight will almost always contain a collision — that is birthday maths, not a bug.
 **Colour is an aid, never an identifier.** The callsign is on every report; identity never rests
 on colour alone.
@@ -245,12 +258,12 @@ on colour alone.
 The palette is chosen, not decorative, and a reimplementation should not "improve" it into a
 rainbow. Measured as CAM02-UCS ΔE between every pair, under simulated vision (Machado 2009):
 
-| Vision | Worst pair |
-|---|---|
-| normal | 17.3 |
-| deuteranomaly (~6% of men) | 12.3 |
-| protanomaly (~2% of men) | 15.0 |
-| tritanomaly (rare) | 11.8 |
+| Vision                     | Worst pair |
+| -------------------------- | ---------- |
+| normal                     | 17.3       |
+| deuteranomaly (~6% of men) | 12.3       |
+| protanomaly (~2% of men)   | 15.0       |
+| tritanomaly (rare)         | 11.8       |
 
 The rainbow this replaced scored **2.2** under protanomaly: its red and brown rendered as the same
 colour, and seven pairs collided under deuteranomaly. Because the palette is a hash bucket, a
@@ -286,12 +299,12 @@ either, and the map should not claim to know more than the radio did.
 
 ## 6. Rendering
 
-| Kind | Drawn as | Constraint |
-|---|---|---|
-| `bearing` | Sector from `position`, width from `confidence_q`, length from `max_range_r` | **Never an unbounded ray** |
-| `omni` | Marker at `position`, strength legible | **Must not imply a direction** |
-| `null` | Marker at `position`, distinct from `omni` | **Must not imply the target is elsewhere** |
-| `fix` | Marker at `position` | |
+| Kind      | Drawn as                                                                     | Constraint                                 |
+| --------- | ---------------------------------------------------------------------------- | ------------------------------------------ |
+| `bearing` | Sector from `position`, width from `confidence_q`, length from `max_range_r` | **Never an unbounded ray**                 |
+| `omni`    | Marker at `position`, strength legible                                       | **Must not imply a direction**             |
+| `null`    | Marker at `position`, distinct from `omni`                                   | **Must not imply the target is elsewhere** |
+| `fix`     | Marker at `position`                                                         |                                            |
 
 Every report shows its observer's callsign and colour and when it was taken. A relayed report is
 visibly marked and names the entering operator. A `placed` position is visibly distinct from a
@@ -299,9 +312,9 @@ visibly marked and names the entering operator. A `placed` position is visibly d
 
 **Q → wedge width** (APRS101's table, normative for display because Xastir implements it exactly):
 
-| Q | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Width | *useless* | <240° | <120° | <64° | <32° | <16° | <8° | <4° | <2° | <1° |
+| Q     | 0         | 1     | 2     | 3    | 4    | 5    | 6   | 7   | 8   | 9   |
+| ----- | --------- | ----- | ----- | ---- | ---- | ---- | --- | --- | --- | --- |
+| Width | _useless_ | <240° | <120° | <64° | <32° | <16° | <8° | <4° | <2° | <1° |
 
 Q=0 is overloaded between specs ("useless" vs "OMNI"). We never emit it; on ingest, retain the
 digit and render nothing directional.
@@ -321,30 +334,30 @@ way in.
 }
 ```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `format` | enum | yes | `DF` (`/BRG/NRQ`) \| `DFS` \| `third-party` |
-| `raw` | string | yes | The field exactly as received. If our parse was wrong, the original survives. |
-| *(digits)* | integers | no | Parsed raw digits — `n`,`r`,`q` for `DF`; `s`,`h`,`g`,`d` for `DFS`. Stored undecoded. |
+| Field      | Type     | Required | Meaning                                                                                |
+| ---------- | -------- | -------- | -------------------------------------------------------------------------------------- |
+| `format`   | enum     | yes      | `DF` (`/BRG/NRQ`) \| `DFS` \| `third-party`                                            |
+| `raw`      | string   | yes      | The field exactly as received. If our parse was wrong, the original survives.          |
+| _(digits)_ | integers | no       | Parsed raw digits — `n`,`r`,`q` for `DF`; `s`,`h`,`g`,`d` for `DFS`. Stored undecoded. |
 
 **Rules**
 
 - **Present only on ingested reports.** A report authored in an interface has no `wire` object.
 - **Retain digits you render nothing with.** `h` and `g` size the circle of negated territory
-  upstream. We draw no circle and keep both anyway — dropping them would be lossy *from* the air.
+  upstream. We draw no circle and keep both anyway — dropping them would be lossy _from_ the air.
 - **`wire` may hold values an interface cannot author** (a `Q` of 8, an `r` of 9). Do not clamp on
   ingest. Do not widen the authoring range to match.
 - On re-emit, `raw` wins over the parsed digits if they disagree.
 
 ### On-air mapping
 
-| Kind | Format | Notes |
-|---|---|---|
-| `bearing` | `/BRG/NRQ` | `BRG` = `heading_true` rounded, 001–360 (0 → `360`). `N` always `9` ("report is manual"). CSE/SPD `000/000`. |
-| `omni` | `DFSshgd` | `s` = `strength_s`. We emit `h`=`g`=`d`=`0`. |
-| `null` | `DFSshgd` with `s = 0` | The format's documented purpose is exactly this. |
-| `fix` | **none exists** | Checked against APRS101, DF.TXT, omnidf.txt and the 1.1/1.2 addenda. This is the one kind with new semantics, declared rather than forced onto an unrelated format. |
-| relayed | Third-party traffic (`}`) | Original station's callsign at the head; the relay named separately — structurally `observer` vs `entered_by`. |
+| Kind      | Format                    | Notes                                                                                                                                                               |
+| --------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bearing` | `/BRG/NRQ`                | `BRG` = `heading_true` rounded, 001–360 (0 → `360`). `N` always `9` ("report is manual"). CSE/SPD `000/000`.                                                        |
+| `omni`    | `DFSshgd`                 | `s` = `strength_s`. We emit `h`=`g`=`d`=`0`.                                                                                                                        |
+| `null`    | `DFSshgd` with `s = 0`    | The format's documented purpose is exactly this.                                                                                                                    |
+| `fix`     | **none exists**           | Checked against APRS101, DF.TXT, omnidf.txt and the 1.1/1.2 addenda. This is the one kind with new semantics, declared rather than forced onto an unrelated format. |
+| relayed   | Third-party traffic (`}`) | Original station's callsign at the head; the relay named separately — structurally `observer` vs `entered_by`.                                                      |
 
 ---
 
@@ -363,8 +376,8 @@ Two fields look like inputs to maths and are not:
 
 - **`null` is not `0`.** Zero means "checked, and correct". Null means "nobody ever checked". An
   implementation that coalesces null to zero is asserting a clock is good when nothing knows that.
-- **Never subtract it from `observed_at` in the log.** A reader may render a corrected time *for
-  display*, but the fact is immutable — rewriting it would make the log a record of what we think
+- **Never subtract it from `observed_at` in the log.** A reader may render a corrected time _for
+  display_, but the fact is immutable — rewriting it would make the log a record of what we think
   happened rather than what was reported.
 - It is per-report, not per-participant: a hunter may fix their clock mid-hunt, and their earlier
   reports keep the offset that was true when they were written.
@@ -381,7 +394,7 @@ serialize identically. **They must both survive** — the system cannot know the
 observation, and collapsing them would destroy a real report.
 
 Random IDs also dodge a second trap: content addressing needs canonical serialization, and float
-canonicalization is exactly where a third-party reimplementation computes *different* IDs from the
+canonicalization is exactly where a third-party reimplementation computes _different_ IDs from the
 same report — breaking this document's whole purpose.
 
 ---
@@ -395,6 +408,9 @@ same report — breaking this document's whole purpose.
 - A change to the meaning of an existing field bumps `v`. Since the log is append-only and
   immutable, a `v` bump means readers must handle both, forever. There is no migration; there is
   only addition.
+- **Skip a `kind` you do not recognise.** You cannot know what it claims, and drawing it as
+  anything — even a bare marker — claims something its author may not have said. Keep it in the
+  set (§5); a reader that learns the kind later draws it then.
 
 ---
 
@@ -406,7 +422,7 @@ a USB stick of JSON would satisfy every rule above. What FoxMapper's own relay d
 - `POST /api/hunts/{code}/reports` — append, **idempotent by report `id`**. One report or an array.
 - `GET /api/hunts/{code}/reports?since={seq}` — everything above a server-assigned sequence.
 - `GET /api/hunts/{code}/stream` — SSE. `id:` is the sequence, so the browser's `Last-Event-ID`
-  *is* the sync cursor: catch-up and live push are one code path.
+  _is_ the sync cursor: catch-up and live push are one code path.
 - `GET /api/hunts/{code}` — metadata plus `id_digest`, for detecting divergence cheaply.
 
 The server stores an opaque envelope and holds no domain fact a device could not recompute. It

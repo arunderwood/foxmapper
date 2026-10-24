@@ -5,10 +5,10 @@
  * and why one would be actively wrong here: a library's binary wire format would violate
  * Principle IV's "the log format MUST be documented and reimplementable by a third party".
  */
-import type { Log, Report } from './types.js';
+import type { Log, LogEntry } from './types.js';
 
-export function toLog(reports: Iterable<Report>): Log {
-  const log = new Map<string, Report>();
+export function toLog(reports: Iterable<LogEntry>): Log {
+  const log = new Map<string, LogEntry>();
   for (const report of reports) if (!log.has(report.id)) log.set(report.id, report);
   return log;
 }
@@ -22,13 +22,13 @@ export function toLog(reports: Iterable<Report>): Log {
  * with the fastest clock the arbiter of truth.
  */
 export function merge(a: Log, b: Log): Log {
-  const merged = new Map<string, Report>(a);
+  const merged = new Map<string, LogEntry>(a);
   for (const [id, report] of b) if (!merged.has(id)) merged.set(id, report);
   return merged;
 }
 
 /** Add one report. Adding a known id is a no-op, which is what makes retry-forever safe. */
-export function add(log: Log, report: Report): Log {
+export function add(log: Log, report: LogEntry): Log {
   if (log.has(report.id)) return log;
   return new Map(log).set(report.id, report);
 }

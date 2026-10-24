@@ -33,6 +33,7 @@ import {
 import { getOffset, measureOffset, type ClockOffset } from './log/clock.js';
 import { Sync } from './log/sync.js';
 import { isRelayed, type Log, type Report } from './log/types.js';
+import { isReport } from './log/validate.js';
 import { watchPosition, type PositionState } from './sensors/position.js';
 import { decideLanding, huntIsGone, leaveHunt } from './ui/last-hunt.js';
 import { joinScreen, targetLine } from './ui/join.js';
@@ -237,7 +238,7 @@ class App {
     // The reports this device holds and the server does not. This is the case that loses a report,
     // and re-queueing them is the whole repair.
     const missingRemotely = await getReports(this.#db, result.missingRemotely ?? []);
-    await this.#sync?.repair(missingRemotely);
+    await this.#sync?.repair(missingRemotely.filter(isReport));
   }
 
   /** The last target this device was told, so an offline reopen knows what it is hunting. */
@@ -383,11 +384,11 @@ class App {
       retract: {
         can: (id) => {
           const report = this.#log.get(id);
-          return report ? canRetract(report, this.#identity.participant_id) : false;
+          return isReport(report) && canRetract(report, this.#identity.participant_id);
         },
         do: (id) => {
           const report = this.#log.get(id);
-          if (!report) return;
+          if (!isReport(report)) return;
           void this.#submit(composeRetraction(this.#retractionContext(report), id));
         },
       },
@@ -677,7 +678,20 @@ class App {
     this.#estimatedLog = undefined;
   }
 
+  /**
+   * Every report arrival, reconnect, queue change, position tick and settings change lands here,
+   * so a throw would stop all of them for the rest of the session. The fold already skips bodies
+   * it cannot read; this keeps the last good picture on screen if anything still slips through.
+   */
   #refresh(): void {
+    try {
+      this.#draw();
+    } catch (error) {
+      captureError(error);
+    }
+  }
+
+  #draw(): void {
     const folded = fold(this.#log);
     this.#syncEstimate(folded.active);
     this.#view?.update({
