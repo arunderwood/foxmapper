@@ -115,12 +115,14 @@ describe('bearing (FR-004a)', () => {
     );
   });
 
-  it('adds only its floor at and beyond its stated range', () => {
+  it('adds only its floor beyond its stated range', () => {
     fc.assert(
       fc.property(
         direction,
         fc.constantFrom<WireDigit>(1, 3, 5),
-        fc.double({ min: 1, max: 3, noNaN: true }),
+        // Clear of the range by more than the rounding in `at`, whose point can measure an ulp
+        // short of the distance it was built from, landing in the last sliver of the taper.
+        fc.double({ min: 1.001, max: 3, noNaN: true }),
         (heading, r, beyond) => {
           const p = prepare(bearing(heading, 5, r), ORIGIN, V);
           const far = at(heading, rangeKm(r) * beyond);
@@ -128,6 +130,13 @@ describe('bearing (FR-004a)', () => {
         },
       ),
     );
+  });
+
+  // Due north, the one direction whose point carries the range unrounded, so the range itself is
+  // the distance the kernel measures back.
+  it.each([1, 3, 5] as const)('is exactly its floor at range %i itself', (r: WireDigit) => {
+    const p = prepare(bearing(0, 5, r), ORIGIN, V);
+    expect(kernel(p, 0, rangeKm(r))).toBe(V.BEARING_FLOOR);
   });
 
   it('keeps its full strength until it fades out inside the stated range', () => {
