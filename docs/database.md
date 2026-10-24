@@ -38,9 +38,9 @@ credentials are sufficient.
 
 **This writes to production.** It takes a lock on the extension catalog for the duration of a
 catalog insert and does not touch the relay's tables, but it is still a schema change against the
-live database — get a human to say yes first. Render's MCP query tool runs everything in a
-read-only transaction, so it cannot do this; use `psql` with the instance's connection string from
-the Render dashboard, or the dashboard's own SQL console.
+live database — get a human to say yes first. Render's MCP query tool wraps everything in a
+read-only transaction and refuses it (`SQLSTATE 25006`), so reach for `psql` with the instance's
+connection string from the Render dashboard, or the dashboard's own SQL console.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
