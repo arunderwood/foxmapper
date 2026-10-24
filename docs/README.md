@@ -1,6 +1,6 @@
 # FoxMapper docs
 
-Reference material for the FoxMapper client and its data.
+Reference material for the FoxMapper client, its data, and the relay that carries it.
 
 - [design-system.md](design-system.md) — tokens, iconography, and motion for the field UI.
 - [log-format.md](log-format.md) — the append-only report log: shape, semantics, and merge rules.
@@ -12,3 +12,6 @@ Reference material for the FoxMapper client and its data.
   anyone can relaunch it later from **Settings → Take the tour**.
 - [analytics.md](analytics.md) — the anonymous, opt-out usage and error analytics (PostHog): exactly
   what is and is not sent, how to opt out, and how in-app feedback is collected.
+- [database.md](database.md) — measuring the production Postgres: how to turn on
+  per-statement timing, what the slow-statement log can and cannot show you, and why the
+  instance's transaction count is a statistic about Render rather than about the relay.
