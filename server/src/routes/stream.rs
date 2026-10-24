@@ -55,23 +55,33 @@ pub async fn stream(
         yield Ok::<Event, Infallible>(Event::default().retry(RETRY).comment("connected"));
 
         loop {
-            match store::reports_since(&pool, &hunt_code, cursor).await {
-                Ok(reports) => {
-                    for report in reports {
-                        cursor = report.seq;
-                        let data = match serde_json::to_string(&report) {
-                            Ok(data) => data,
-                            Err(error) => {
-                                tracing::error!(%error, "serializing envelope failed");
-                                continue;
-                            }
-                        };
-                        yield Ok(Event::default().id(report.seq.to_string()).data(data));
+            // Catch-up reads a page at a time. A full page means the log continues above the
+            // cursor, so read again at once — the next append could be hours away, and a client
+            // recovering from storage eviction asks for the whole log from seq 0. A short page is
+            // the end of the log, which is the only place this waits.
+            loop {
+                match store::reports_page(&pool, &hunt_code, cursor).await {
+                    Ok(page) => {
+                        let filled = page.filled;
+                        for report in page.reports {
+                            cursor = report.seq;
+                            let data = match serde_json::to_string(&report) {
+                                Ok(data) => data,
+                                Err(error) => {
+                                    tracing::error!(%error, "serializing envelope failed");
+                                    continue;
+                                }
+                            };
+                            yield Ok(Event::default().id(report.seq.to_string()).data(data));
+                        }
+                        if !filled {
+                            break;
+                        }
                     }
-                }
-                Err(error) => {
-                    tracing::error!(%error, "stream catch-up failed");
-                    return;
+                    Err(error) => {
+                        tracing::error!(%error, "stream catch-up failed");
+                        return;
+                    }
                 }
             }
 
