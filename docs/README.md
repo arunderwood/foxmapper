@@ -12,6 +12,6 @@ Reference material for the FoxMapper client, its data, and the relay that carrie
   anyone can relaunch it later from **Settings → Take the tour**.
 - [analytics.md](analytics.md) — the anonymous, opt-out usage and error analytics (PostHog): exactly
   what is and is not sent, how to opt out, and how in-app feedback is collected.
-- [database.md](database.md) — measuring the production Postgres: reading per-statement timing,
-  why the slow-statement log is permanently silent here, what the relay actually costs (a second a
-  day), and why the instance's transaction count is a statistic about Render rather than the relay.
+- [database.md](database.md) — measuring the production Postgres: per-statement timing, which
+  columns on this instance are meaningless, and why its transaction count is a statistic about
+  Render rather than about the relay.
