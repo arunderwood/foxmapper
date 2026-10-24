@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{PgPool, Row};
+use sqlx::{postgres::PgRow, PgPool, Row};
 use uuid::Uuid;
 
 use crate::model::{Hunt, HuntDetail, IncomingReport, ReportEnvelope, Target};
@@ -200,14 +200,67 @@ pub async fn reports_since(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
-        .into_iter()
-        .map(|r| ReportEnvelope {
-            seq: r.get("seq"),
-            received_at: r.get("received_at"),
-            body: r.get("body"),
-        })
-        .collect())
+    Ok(rows.iter().map(envelope).collect())
+}
+
+/// How many reports one catch-up read returns.
+///
+/// The bound is what keeps a catch-up a sequence of small queries instead of one query
+/// proportional to the hunt. `seq > 0` filters nothing, so once a hunt is a small slice of the
+/// table the planner stops taking its ordering from `reports_hunt_seq_idx` and instead reads the
+/// hunt through `reports_hunt_received_idx` and sorts — and that sort has no bound. Measured on
+/// Postgres 18 with `work_mem` at 1.6 MB, a hunt of 7,000 reports sorts to a temp file
+/// (`external merge  Disk: 1608kB`); the same read under a `LIMIT` plans as an ordered index
+/// scan with no sort at all.
+///
+/// 500 is far above any hunt this has seen — the largest so far is 206 — so in practice the
+/// first page is the whole log and catch-up is still a single query. The page boundary is
+/// invisible to a client either way: the events, their ids and their order do not depend on how
+/// many queries produced them.
+pub const CATCH_UP_PAGE: i64 = 500;
+
+/// One page of a catch-up read.
+pub struct ReportPage {
+    pub reports: Vec<ReportEnvelope>,
+    /// The page came back full, so there is more above its last `seq` and the reader should come
+    /// straight back rather than wait for the next append. A log that ends exactly on a page
+    /// boundary therefore costs one extra empty read.
+    pub filled: bool,
+}
+
+/// At most [`CATCH_UP_PAGE`] reports with a sequence above `since`, ascending — one page of
+/// [`reports_since`], for a reader that walks the log with a cursor.
+pub async fn reports_page(
+    pool: &PgPool,
+    code: &str,
+    since: i64,
+) -> Result<ReportPage, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT seq, received_at, body FROM reports
+         WHERE hunt_code = $1 AND seq > $2
+         ORDER BY seq ASC
+         LIMIT $3",
+    )
+    .bind(code.to_lowercase())
+    .bind(since)
+    .bind(CATCH_UP_PAGE)
+    .fetch_all(pool)
+    .await?;
+
+    let filled = i64::try_from(rows.len()).is_ok_and(|n| n >= CATCH_UP_PAGE);
+
+    Ok(ReportPage {
+        reports: rows.iter().map(envelope).collect(),
+        filled,
+    })
+}
+
+fn envelope(row: &PgRow) -> ReportEnvelope {
+    ReportEnvelope {
+        seq: row.get("seq"),
+        received_at: row.get("received_at"),
+        body: row.get("body"),
+    }
 }
 
 pub async fn report_ids(pool: &PgPool, code: &str) -> Result<Vec<String>, sqlx::Error> {
