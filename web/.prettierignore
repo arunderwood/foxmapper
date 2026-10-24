@@ -5,3 +5,5 @@ coverage/
 playwright-report/
 test-results/
 package-lock.json
+# Generated; scripts/generate-validator.mjs --check compares it byte for byte.
+src/log/report-validator.gen.js

@@ -9,6 +9,8 @@ export default tseslint.config(
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
+      // Generated from docs/schema/report.v1.schema.json; CI checks it against the schema instead.
+      'src/log/report-validator.gen.js',
     ],
   },
   js.configs.recommended,

@@ -5,7 +5,7 @@
  * in the write path and connectivity loss cannot lose or block a report (Principle III).
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Log, Report } from './types.js';
+import type { Log, LogEntry, Report } from './types.js';
 import { toLog } from './gset.js';
 
 const DB_NAME = 'foxmapper';
@@ -14,7 +14,7 @@ const DB_VERSION = 1;
 interface FoxmapperSchema extends DBSchema {
   reports: {
     key: string;
-    value: Report;
+    value: LogEntry;
     indexes: { by_hunt: string };
   };
   /** Report ids not yet accepted by the server. Drained only on a 2xx. */
@@ -74,7 +74,7 @@ export async function putAuthored(db: FoxmapperDb, report: Report): Promise<void
 }
 
 /** Reports arriving from the server. They are already synced, so they never enter the outbox. */
-export async function putRemote(db: FoxmapperDb, reports: readonly Report[]): Promise<void> {
+export async function putRemote(db: FoxmapperDb, reports: readonly LogEntry[]): Promise<void> {
   if (reports.length === 0) return;
   const tx = db.transaction('reports', 'readwrite');
   const store = tx.objectStore('reports');
@@ -99,9 +99,9 @@ export async function clearOutbox(db: FoxmapperDb, ids: readonly string[]): Prom
   await Promise.all([...ids.map((id) => store.delete(id)), tx.done]);
 }
 
-export async function getReports(db: FoxmapperDb, ids: readonly string[]): Promise<Report[]> {
+export async function getReports(db: FoxmapperDb, ids: readonly string[]): Promise<LogEntry[]> {
   const found = await Promise.all(ids.map((id) => db.get('reports', id)));
-  return found.filter((r): r is Report => r !== undefined);
+  return found.filter((r) => r !== undefined);
 }
 
 export async function getMeta<T>(db: FoxmapperDb, key: string): Promise<T | undefined> {

@@ -4,7 +4,7 @@
  * Nothing here is in the write path. A report is already durable before this file sees it, so
  * every failure below costs latency, never a report.
  */
-import type { Report } from './types.js';
+import type { LogEntry, Report } from './types.js';
 import {
   clearOutbox,
   cursorKey,
@@ -23,7 +23,7 @@ export interface SyncOptions {
   huntCode: string;
   apiOrigin: string;
   /** Called whenever reports arrive, so the map can re-fold. */
-  onReports: (reports: readonly Report[]) => void;
+  onReports: (reports: readonly LogEntry[]) => void;
   /**
    * Called when the stream opens or drops.
    *
@@ -42,7 +42,8 @@ export interface SyncOptions {
 interface Envelope {
   seq: number;
   received_at: number;
-  body: Report;
+  /** Whatever the poster sent. The relay checked only that `id` is a UUID. */
+  body: LogEntry;
 }
 
 const MIN_BACKOFF_MS = 1_000;

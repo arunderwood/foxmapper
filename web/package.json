@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "gen:validator": "node scripts/generate-validator.mjs",
+    "check:validator": "node scripts/generate-validator.mjs --check"
   },
   "dependencies": {
     "@turf/sector": "^7.4.0",
@@ -30,6 +32,7 @@
     "@turf/destination": "^7.3.5",
     "@types/d3-contour": "^3.0.6",
     "@types/node": "^26.6.5",
+    "ajv": "^8.20.0",
     "eslint": "^10.13.0",
     "fake-indexeddb": "^6.2.6",
     "fast-check": "^4.10.2",

@@ -141,8 +141,17 @@ export type Report = BearingReport | OmniReport | NullReport | FixReport | Retra
 /** A report that makes a claim about the world. Retractions are facts about other reports. */
 export type ObservationReport = BearingReport | OmniReport | NullReport | FixReport;
 
+/**
+ * A member of the log exactly as it arrived. The relay accepts any JSON object whose `id` is a
+ * UUID and IndexedDB keys on `id`, so an id is all a member is guaranteed to have. `isReport`
+ * decides whether it is a report this client can read; the fold asks, and nothing else trusts it.
+ */
+export interface LogEntry {
+  readonly id: string;
+}
+
 /** The log is a set keyed by id. Merge is union; there is no conflict to resolve. */
-export type Log = ReadonlyMap<string, Report>;
+export type Log = ReadonlyMap<string, LogEntry>;
 
 /**
  * Derived, never stored: a stored flag can disagree with the two names it summarises.

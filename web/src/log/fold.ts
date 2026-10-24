@@ -6,6 +6,7 @@
  * which reports arrived first.
  */
 import type { Log, ObservationReport } from './types.js';
+import { isReport } from './validate.js';
 
 export interface FoldResult {
   /** Reports that stand: not retractions, not retracted. */
@@ -19,16 +20,22 @@ export interface FoldResult {
 }
 
 export function fold(log: Log): FoldResult {
+  // Unreadable bodies are skipped here and nowhere earlier. They stay in the log because the log
+  // is the set of ids the relay holds: dropping one on arrival would make this device's id_digest
+  // disagree with the server's on every reconnect, and the repair would re-download the whole hunt
+  // only to drop the same body again.
+  const reports = [...log.values()].filter(isReport);
+
   // Compute `retracted` first, then filter. Do NOT walk the log marking reports as retractions
   // are found — that is order-dependent, and it will pass every test until the day a retraction
   // overtakes its target on a real network.
   const retracted = new Set<string>();
-  for (const report of log.values()) {
+  for (const report of reports) {
     if (report.kind === 'retraction') retracted.add(report.payload.retracts_id);
   }
 
   const active: ObservationReport[] = [];
-  for (const report of log.values()) {
+  for (const report of reports) {
     if (report.kind === 'retraction') continue;
     if (retracted.has(report.id)) continue;
     active.push(report);
