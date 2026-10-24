@@ -120,13 +120,27 @@ pub struct SinceQuery {
 #[derive(Debug, Serialize)]
 pub struct SyncResponse {
     pub reports: Vec<ReportEnvelope>,
+    /// The highest `seq` in `reports`, or `since` when the page is empty. What the client sends
+    /// back as `since` to continue.
     pub cursor: i64,
+    /// There is more of the log above `cursor`, so the client should come straight back for it
+    /// instead of waiting for the next tick.
+    ///
+    /// Stated rather than left to be inferred from the response being page-sized. Inferring it
+    /// would make the page size a number the client has to agree with the server about, and the
+    /// cost of disagreeing is a client that stops early and calls a truncated log complete — a
+    /// silently dropped report, which is the one unacceptable outcome. A client that has never
+    /// heard of the page size reads this field and cannot make that mistake.
+    pub more: bool,
 }
 
 /// `GET /api/hunts/{code}/reports?since={seq}`.
 ///
-/// `since=0` (or omitted) returns the whole log — the recovery path after storage eviction, and
-/// why eviction costs a re-download rather than a lost hunt.
+/// Returns at most one page ([`store::CATCH_UP_PAGE`]) of the log above `since`. **A client reads
+/// the whole log by walking `cursor` while `more` is set**, which is what `since=0` is for: the
+/// recovery path after storage eviction, and why eviction costs a re-download rather than a lost
+/// hunt. The bound is what keeps the recovery read a sequence of small queries rather than one
+/// query proportional to the hunt.
 pub async fn sync(
     State(state): State<AppState>,
     Path(code): Path<String>,
@@ -141,10 +155,16 @@ pub async fn sync(
         Ok(Some(_)) => {}
     }
 
-    match store::reports_since(&state.pool, &code, query.since).await {
-        Ok(reports) => {
-            let cursor = reports.last().map_or(query.since, |r| r.seq);
-            Ok(Json(SyncResponse { reports, cursor }))
+    match store::reports_page(&state.pool, &code, query.since).await {
+        Ok(page) => {
+            // The highest seq actually in the response, not the highest in the log: the client
+            // resumes from here, so a cursor ahead of what it was handed would skip the gap.
+            let cursor = page.reports.last().map_or(query.since, |r| r.seq);
+            Ok(Json(SyncResponse {
+                reports: page.reports,
+                cursor,
+                more: page.filled,
+            }))
         }
         Err(error) => {
             tracing::error!(%error, "sync failed");

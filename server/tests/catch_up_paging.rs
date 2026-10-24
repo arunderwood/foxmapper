@@ -5,6 +5,11 @@
 //! sort. The read is paged instead, which puts a second property at risk: `seq` is the SSE event
 //! id and the client's cursor, so a page boundary that skipped, duplicated or reordered a report
 //! would corrupt exactly the thing the cursor protects. These tests are about that boundary.
+//!
+//! Both read paths are here: the SSE stream, and the HTTP fallback `GET /reports?since=`. The
+//! fallback is the one a client drives itself, so it also has to *say* that a page is not the end
+//! — a response the client can mistake for the whole log is a report dropped silently, and the
+//! fallback is the repair path the divergence audit uses.
 
 mod common;
 
@@ -227,6 +232,192 @@ async fn the_stream_catches_up_across_a_page_boundary_and_stays_live() {
         ids_seen, expected_ids,
         "every event exactly once, ascending, across the page boundary"
     );
+
+    db.cleanup().await;
+}
+
+/// The `GET /reports?since=` response, as a client parses it.
+#[derive(serde::Deserialize)]
+struct SyncPage {
+    reports: Vec<serde_json::Value>,
+    cursor: i64,
+    more: bool,
+}
+
+#[tokio::test]
+async fn the_sync_endpoint_answers_with_one_bounded_page_and_says_there_is_more() {
+    let db = TestDb::new().await;
+    db.seed_hunt(CODE).await;
+
+    let total = page_size() * 2 + 7;
+    seed_reports(&db, total).await;
+
+    let base = serve(db.state()).await;
+    let page: SyncPage = reqwest::get(format!("{base}/api/hunts/{CODE}/reports?since=0"))
+        .await
+        .expect("sync")
+        .json()
+        .await
+        .expect("decode");
+
+    assert_eq!(
+        page.reports.len(),
+        page_size(),
+        "the response must be one page, not the whole log"
+    );
+    // The highest seq in the response, not the highest in the log: a client resumes from this, so
+    // a cursor ahead of what it was handed would skip the gap in between.
+    assert_eq!(
+        page.cursor,
+        i64::try_from(page_size()).expect("fits"),
+        "the cursor must name the last report actually delivered"
+    );
+    assert!(
+        page.more,
+        "a truncated response that claims to be complete is a report dropped in silence"
+    );
+
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn the_last_page_of_the_sync_endpoint_says_there_is_no_more() {
+    let db = TestDb::new().await;
+    db.seed_hunt(CODE).await;
+    seed_reports(&db, 7).await;
+
+    let base = serve(db.state()).await;
+    let page: SyncPage = reqwest::get(format!("{base}/api/hunts/{CODE}/reports?since=0"))
+        .await
+        .expect("sync")
+        .json()
+        .await
+        .expect("decode");
+
+    assert_eq!(page.reports.len(), 7);
+    assert_eq!(page.cursor, 7);
+    assert!(
+        !page.more,
+        "a short page is the end of the log; claiming more costs every client an extra request \
+         every tick, forever"
+    );
+
+    // An empty hunt is the same statement with nothing in it, and must leave the cursor where the
+    // client put it rather than reporting 0 and rewinding it.
+    let empty: SyncPage = reqwest::get(format!("{base}/api/hunts/{CODE}/reports?since=7"))
+        .await
+        .expect("sync")
+        .json()
+        .await
+        .expect("decode");
+    assert_eq!(empty.reports.len(), 0);
+    assert_eq!(empty.cursor, 7);
+    assert!(!empty.more);
+
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_client_walking_the_sync_endpoint_reads_the_whole_log_exactly_once() {
+    let db = TestDb::new().await;
+    db.seed_hunt(CODE).await;
+
+    // Two full pages and a short one: the walk crosses a boundary twice and then has to stop.
+    let total = page_size() * 2 + 7;
+    seed_reports(&db, total).await;
+
+    let base = serve(db.state()).await;
+    let http = reqwest::Client::new();
+
+    // Exactly what web/src/log/sync.ts does: read from the cursor it was handed, while the relay
+    // says there is more.
+    let mut cursor = 0i64;
+    let mut seqs: Vec<i64> = Vec::new();
+    let mut requests = 0;
+    loop {
+        let page: SyncPage = http
+            .get(format!("{base}/api/hunts/{CODE}/reports?since={cursor}"))
+            .send()
+            .await
+            .expect("sync")
+            .json()
+            .await
+            .expect("decode");
+        requests += 1;
+        assert!(
+            page.reports.len() <= page_size(),
+            "a response must never exceed {} reports, got {}",
+            page_size(),
+            page.reports.len()
+        );
+        for report in &page.reports {
+            seqs.push(report["seq"].as_i64().expect("seq"));
+        }
+        if !page.more {
+            break;
+        }
+        assert!(
+            page.cursor > cursor,
+            "the cursor must advance or the walk cannot end"
+        );
+        cursor = page.cursor;
+    }
+
+    let expected: Vec<i64> = (1..=i64::try_from(total).expect("total fits")).collect();
+    assert_eq!(
+        seqs, expected,
+        "the walk must see every seq once, ascending, across both boundaries"
+    );
+    assert_eq!(
+        seqs.iter().collect::<HashSet<_>>().len(),
+        total,
+        "no seq may be delivered twice"
+    );
+    assert_eq!(
+        requests, 3,
+        "the walk must be three bounded requests; one means the endpoint is still unbounded"
+    );
+
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn the_sync_endpoint_and_the_stream_agree_on_what_a_cursor_has_seen() {
+    let db = TestDb::new().await;
+    db.seed_hunt(CODE).await;
+
+    // The two protocols are idempotent with each other only if they hand the same cursor the same
+    // reports. A client uses both: the stream while it is up, this endpoint every 15s regardless.
+    //
+    // The probe sits far enough below the end that more than a page remains above it, so the two
+    // paths agreeing means they agree about the *bound*, not merely about a short tail they would
+    // both return whole.
+    seed_reports(&db, page_size() * 2 + 7).await;
+
+    let probe = i64::try_from(page_size() / 2).expect("fits");
+    let base = serve(db.state()).await;
+    let page: SyncPage = reqwest::get(format!("{base}/api/hunts/{CODE}/reports?since={probe}"))
+        .await
+        .expect("sync")
+        .json()
+        .await
+        .expect("decode");
+
+    let streamed = store::reports_page(&db.pool, CODE, probe)
+        .await
+        .expect("page");
+
+    let polled: Vec<i64> = page
+        .reports
+        .iter()
+        .map(|r| r["seq"].as_i64().expect("seq"))
+        .collect();
+    let pushed: Vec<i64> = streamed.reports.iter().map(|r| r.seq).collect();
+    assert_eq!(
+        polled, pushed,
+        "the poll and the stream must deliver the same reports above a cursor"
+    );
+    assert_eq!(page.more, streamed.filled);
 
     db.cleanup().await;
 }

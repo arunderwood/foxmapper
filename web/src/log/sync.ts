@@ -46,6 +46,16 @@ interface Envelope {
   body: LogEntry;
 }
 
+/** One page of `GET /reports?since=`. */
+interface SyncPage {
+  reports: Envelope[];
+  /** The highest `seq` in `reports`, or the `since` that was asked for when the page is empty. */
+  cursor: number;
+  /** The log continues above `cursor`. The relay says so rather than leaving it to be inferred
+   * from the page being full, so the page size is not a number the two sides have to agree on. */
+  more: boolean;
+}
+
 const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 60_000;
 const POLL_INTERVAL_MS = 15_000;
@@ -73,6 +83,7 @@ export class Sync {
   #pollTimer: ReturnType<typeof setInterval> | undefined;
   #stopped = false;
   #flushing = false;
+  #polling = false;
 
   constructor(options: SyncOptions) {
     this.#options = options;
@@ -209,9 +220,10 @@ export class Sync {
   /**
    * Repairs a divergence the audit found.
    *
-   * Both directions are blunt on purpose. **Pull**: read the hunt from the beginning — the merge is
-   * a union, so re-reading a report this device already holds cannot lose or duplicate anything,
-   * and divergence is rare enough that the bandwidth does not matter.
+   * Both directions are blunt on purpose. **Pull**: read the hunt from the beginning, paging all
+   * the way to the end — the merge is a union, so re-reading a report this device already holds
+   * cannot lose or duplicate anything, and divergence is rare enough that the bandwidth does not
+   * matter.
    * **Push**: re-queue the reports the server never received, which is the case that actually loses
    * a report and the reason the audit exists.
    *
@@ -230,25 +242,60 @@ export class Sync {
   }
 
   /**
+   * Reads the log forward from a cursor, a page at a time, until the relay says there is no more.
+   *
+   * The relay answers with at most one page, so a single request is not an answer to "what have I
+   * missed" — it is an answer to "what is the next page". Stopping after one would leave the rest
+   * until the next tick on the poll path, and would leave it *forever* on the repair path, which
+   * reads from 0 once and never comes back. A dropped report is the one unacceptable outcome.
+   *
+   * Each page is absorbed before the next is asked for, so the stored cursor only ever names
+   * reports that are already durable (see `#absorb`): a drain interrupted anywhere resumes from
+   * the last page that landed, and the pages that landed are not re-read.
+   *
    * @param from Read from this sequence instead of the stored cursor. The repair passes 0.
    */
   async #poll(from?: number): Promise<void> {
     if (this.#stopped) return;
+    // A drain of a long log can outlast the 15s tick. A second drain alongside it would still be
+    // correct — the merge is a union and the cursor takes the maximum — but it would re-download
+    // what the first is already fetching, and on the connection where that matters the tick can
+    // wait. Only the tick: a repair that quietly did nothing is the failure the audit exists to
+    // catch, so it neither yields to a drain in flight nor claims the flag from one.
+    const tick = from === undefined;
+    if (tick) {
+      if (this.#polling) return;
+      this.#polling = true;
+    }
     const { db, huntCode, apiOrigin } = this.#options;
     try {
-      const cursor = from ?? (await getMeta<number>(db, cursorKey(huntCode))) ?? 0;
-      const response = await fetch(`${apiOrigin}/api/hunts/${huntCode}/reports?since=${cursor}`, {
-        cache: 'no-store',
-      });
-      if (response.status === 404) {
-        this.#options.onHuntGone?.();
-        return;
+      let cursor = from ?? (await getMeta<number>(db, cursorKey(huntCode))) ?? 0;
+      for (;;) {
+        const response = await fetch(`${apiOrigin}/api/hunts/${huntCode}/reports?since=${cursor}`, {
+          cache: 'no-store',
+        });
+        if (response.status === 404) {
+          this.#options.onHuntGone?.();
+          return;
+        }
+        if (!response.ok) return;
+        const page = (await response.json()) as SyncPage;
+        await this.#absorb(page.reports);
+        // Checked per page, not just on the way in: a long drain can outlive the hunt it is
+        // reading, and nothing above this is bounded by anything the caller still cares about.
+        if (this.#stopped) return;
+
+        // Another page only if the relay says so *and* the cursor moved. A relay that reports
+        // more without advancing — a bug, or a `more` an older build does not send at all, which
+        // reads as `undefined` — would otherwise spin this loop on one request forever.
+        if (!page.more || !(page.cursor > cursor)) return;
+        cursor = page.cursor;
       }
-      if (!response.ok) return;
-      const payload = (await response.json()) as { reports: Envelope[] };
-      await this.#absorb(payload.reports);
     } catch {
-      // Offline. The device keeps rendering what it holds.
+      // Offline, or a page that failed to persist. The stored cursor has not passed anything this
+      // device does not hold, so the next drain picks up where this one stopped.
+    } finally {
+      if (tick) this.#polling = false;
     }
   }
 

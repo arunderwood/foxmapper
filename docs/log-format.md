@@ -420,7 +420,10 @@ The log is the contract; the transport is not. A reimplementation may move logs 
 a USB stick of JSON would satisfy every rule above. What FoxMapper's own relay does:
 
 - `POST /api/hunts/{code}/reports` — append, **idempotent by report `id`**. One report or an array.
-- `GET /api/hunts/{code}/reports?since={seq}` — everything above a server-assigned sequence.
+- `GET /api/hunts/{code}/reports?since={seq}` — one bounded page above a server-assigned sequence,
+  as `{ reports, cursor, more }`. `cursor` is the highest `seq` in `reports`; `more` says the log
+  continues above it. **A reader walks `cursor` while `more` is set** — a single response is the
+  next page, not the whole log. Reading the whole log is `since=0` walked to the end.
 - `GET /api/hunts/{code}/stream` — SSE. `id:` is the sequence, so the browser's `Last-Event-ID`
   _is_ the sync cursor: catch-up and live push are one code path.
 - `GET /api/hunts/{code}` — metadata plus `id_digest`, for detecting divergence cheaply.

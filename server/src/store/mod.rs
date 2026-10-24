@@ -183,26 +183,6 @@ async fn append_in_transaction(
 /// rather than an in-process broadcast, so live push still works with more than one instance.
 pub const NOTIFY_CHANNEL: &str = "foxmapper_reports";
 
-/// Everything with a sequence above `since`, ascending. `since = 0` returns the whole log — the
-/// recovery path after storage eviction, and why eviction costs a re-download rather than a hunt.
-pub async fn reports_since(
-    pool: &PgPool,
-    code: &str,
-    since: i64,
-) -> Result<Vec<ReportEnvelope>, sqlx::Error> {
-    let rows = sqlx::query(
-        "SELECT seq, received_at, body FROM reports
-         WHERE hunt_code = $1 AND seq > $2
-         ORDER BY seq ASC",
-    )
-    .bind(code.to_lowercase())
-    .bind(since)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(rows.iter().map(envelope).collect())
-}
-
 /// How many reports one catch-up read returns.
 ///
 /// The bound is what keeps a catch-up a sequence of small queries instead of one query
@@ -228,8 +208,12 @@ pub struct ReportPage {
     pub filled: bool,
 }
 
-/// At most [`CATCH_UP_PAGE`] reports with a sequence above `since`, ascending — one page of
-/// [`reports_since`], for a reader that walks the log with a cursor.
+/// At most [`CATCH_UP_PAGE`] reports with a sequence above `since`, ascending, for a reader that
+/// walks the log with a cursor.
+///
+/// Every read of the log goes through this. There is deliberately no unbounded form: `seq > 0`
+/// filters nothing, so a whole-log read is exactly the shape that sorts without a bound, and it
+/// is the shape a client asks for after storage eviction.
 pub async fn reports_page(
     pool: &PgPool,
     code: &str,
