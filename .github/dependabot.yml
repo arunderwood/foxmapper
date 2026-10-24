@@ -19,6 +19,14 @@ updates:
     # in with it. Tracking the whole lockfile keeps each advisory a one-line change.
     allow:
       - dependency-type: all
+    # posthog-js pulls web-vitals in twice: once under its own name, and once as the alias
+    # `web-vitals-soft-navs: npm:web-vitals@6.2.1`. Tracking the whole lockfile puts that alias key
+    # in front of Dependabot as if it were a package, the registry answers 404, and a single
+    # unresolvable entry fails the whole update run -- so none of the PRs it had already prepared
+    # open. Skipping the alias costs nothing: what sits behind it is the `web-vitals` that
+    # posthog-js also names directly, which stays tracked.
+    ignore:
+      - dependency-name: web-vitals-soft-navs
     groups:
       # Majors stay separate so a breaking change lands in a PR of its own.
       web-minor-patch:
