@@ -22,7 +22,7 @@
     "geomagnetism": "^0.2.0",
     "idb": "^8.0.4",
     "maplibre-gl": "^6.15.0",
-    "posthog-js": "^1.438.13"
+    "posthog-js": "^1.438.21"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
