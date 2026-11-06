@@ -227,36 +227,62 @@ describe('the catch-up drain', () => {
     return { requested };
   }
 
+  /** One turn of the real event loop. */
+  const turn = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 10));
+
   /**
    * Drives one poll tick to completion, without waiting out the real 15s interval.
    *
-   * It waits for `requested` to stop growing rather than for a fixed number of turns: a drain is
-   * a chain of fetches and IndexedDB writes, and fake-indexeddb runs on real timers, so the tick
-   * callback returns long before the drain it started has finished. Stopping the sync before then
-   * would leave that drain running into the next test's `fetch` stub.
+   * A drain is a chain of fetches and IndexedDB writes, and the tick callback returns long before
+   * the drain it started has finished, so `tick` has to wait for that drain itself: `stop()` cuts
+   * a drain off at its next page boundary, which on a half-read log is a test that fails with the
+   * tail of the log missing.
+   *
+   * `landed` is what this tick is expected to leave behind — the last write of the drain, not the
+   * absence of one. Waiting for `fetch` to go quiet instead is a race the drain loses: a page's
+   * write is unbounded, and any window short enough to keep the suite quick is one a loaded runner
+   * can exceed. Once `landed` holds, the remaining wait is bounded — a drain that wrongly carries
+   * on asks for its next page a few turns of the event loop after the write that `landed` saw, not
+   * a page-write later.
+   *
+   * The wait runs on real timers throughout. Advancing the fake interval here would fire a second
+   * tick, and the request that tick makes is indistinguishable from the drain running long.
    */
-  async function tick(running: Sync, requested: readonly number[]): Promise<void> {
+  async function tick(running: Sync, landed: () => Promise<boolean>): Promise<void> {
     vi.stubGlobal(
       'EventSource',
       class {
         close(): void {}
       },
     );
-    // Only the interval is faked; the settle loop below needs a real setTimeout.
+    // Only the interval is faked; fake-indexeddb schedules its own work on real timers.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       await running.start();
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
-      let seen = -1;
-      while (seen !== requested.length) {
-        seen = requested.length;
-        await new Promise((resolve) => setTimeout(resolve, 20));
+      // Inside vitest's own 5s test timeout, so a drain that stalls says which wait it stalled on
+      // rather than reporting the whole test as slow. A drain of a few pages is well under a second.
+      const deadline = Date.now() + 4_000;
+      while (!(await landed())) {
+        if (Date.now() > deadline)
+          throw new Error('the drain never reached the state it was given');
+        await turn();
       }
+      await turn();
+      await turn();
     } finally {
       running.stop();
       vi.useRealTimers();
     }
   }
+
+  /** The drain has read the log through to `seq`: the cursor only names reports already stored. */
+  const readTo = (seq: number) => async (): Promise<boolean> =>
+    (await getMeta<number>(db, cursorKey(HUNT))) === seq;
+
+  /** A drain with nothing to store leaves no write to wait for, only the request it made. */
+  const asked = (requested: readonly number[]) => async (): Promise<boolean> =>
+    requested.length > 0;
 
   it('reads a log of several pages through to the end, every report exactly once', async () => {
     const total = PAGE * 2 + 7;
@@ -265,7 +291,7 @@ describe('the catch-up drain', () => {
 
     await tick(
       sync({ onReports: (reports) => delivered.push(...reports.map((r) => r.id)) }),
-      requested,
+      async () => delivered.length === total,
     );
 
     // One request per page and one cursor walk: 0, 500, 1000.
@@ -280,15 +306,15 @@ describe('the catch-up drain', () => {
     // The invariant that makes a failed write cost a re-download rather than a report: the cursor
     // never names a report this device does not hold.
     const total = PAGE * 2 + 7;
-    const first = pagedRelay(total);
+    pagedRelay(total);
     const running = sync();
 
-    await tick(running, first.requested);
+    await tick(running, readTo(total));
 
     expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(total);
     // A second drain from that cursor asks for what comes after the log, and finds nothing.
     const second = pagedRelay(total);
-    await tick(running, second.requested);
+    await tick(running, asked(second.requested));
     expect(second.requested).toEqual([total]);
     expect((await loadLog(db, HUNT)).size).toBe(total);
   });
@@ -320,13 +346,13 @@ describe('the catch-up drain', () => {
 
     fail = true;
     const running = sync();
-    await tick(running, requested);
+    await tick(running, readTo(PAGE));
     expect(requested).toEqual([0, PAGE]);
     expect((await loadLog(db, HUNT)).size).toBe(PAGE);
 
     fail = false;
     requested.length = 0;
-    await tick(running, requested);
+    await tick(running, readTo(total));
     // From the page that landed, not from 0: the first page is not downloaded twice.
     expect(requested).toEqual([PAGE, PAGE * 2]);
     expect((await loadLog(db, HUNT)).size).toBe(total);
@@ -348,7 +374,7 @@ describe('the catch-up drain', () => {
       }),
     );
 
-    await tick(sync(), requested);
+    await tick(sync(), asked(requested));
 
     expect(requested).toEqual([0]);
   });
@@ -372,7 +398,7 @@ describe('the catch-up drain', () => {
       }),
     );
 
-    await tick(sync(), requested);
+    await tick(sync(), readTo(1));
 
     expect(requested).toEqual([0]);
     expect((await loadLog(db, HUNT)).size).toBe(1);
