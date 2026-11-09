@@ -7,7 +7,7 @@
  * POST stops being deliverable at all once the queue passes 600 — not slow, *stuck*, with the
  * reports present on this phone and invisible to everyone else.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 import {
@@ -43,6 +43,27 @@ function report(n: number): Report {
   } as Report;
 }
 
+/**
+ * The real database with its report writes failing, as a device with no storage left behaves.
+ *
+ * Only the reports store is broken: the meta store still accepts the cursor, which is what makes
+ * the test able to see a cursor that moved when it should not have.
+ */
+function outOfStorage(): FoxmapperDb {
+  return new Proxy(db, {
+    get(target, property) {
+      if (property === 'transaction')
+        return (store: string, mode: string) => {
+          if (store === 'reports' && mode === 'readwrite')
+            throw new DOMException('the quota has been exceeded', 'QuotaExceededError');
+          return target.transaction(store as 'reports', mode as 'readwrite');
+        };
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+    },
+  }) as FoxmapperDb;
+}
+
 /** The relay's 202, listing every id it was offered. */
 const accepted = (batch: readonly Report[]): Response =>
   new Response(JSON.stringify({ accepted: batch.map((r) => r.id) }), { status: 202 });
@@ -69,8 +90,13 @@ function relay(...replies: readonly ((batch: readonly Report[]) => Response)[]):
   );
 }
 
+/** Every `Sync` a test built, so none is left running into the test after it. */
+let built: Sync[];
+
 function sync(options: Partial<SyncOptions> = {}): Sync {
-  return new Sync({ db, huntCode: HUNT, apiOrigin: API, onReports: () => {}, ...options });
+  const running = new Sync({ db, huntCode: HUNT, apiOrigin: API, onReports: () => {}, ...options });
+  built.push(running);
+  return running;
 }
 
 beforeEach(async () => {
@@ -79,7 +105,15 @@ beforeEach(async () => {
   indexedDB = new IDBFactory();
   db = await openLogDb();
   sent = [];
+  built = [];
   relay();
+});
+
+afterEach(() => {
+  // The database is isolated above, but `fetch` is a global stub with no such per-test identity: a
+  // drain still running here would read the *next* test's relay, and a request it never made is
+  // the kind of failure that gets read as a flake in whichever test inherits it.
+  for (const running of built) running.stop();
 });
 
 describe('flush', () => {
@@ -227,8 +261,20 @@ describe('the catch-up drain', () => {
     return { requested };
   }
 
-  /** One turn of the real event loop. */
-  const turn = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 10));
+  /**
+   * Resolves on a real timer, which fires only after every microtask already queued has run.
+   *
+   * That is what makes the tail of `tick` sound: a drain that wrongly carries on reaches its next
+   * `fetch` through microtasks alone, so it has already asked by the time this resolves. The 10ms
+   * is the granularity the waits below poll at, and nothing depends on the figure.
+   */
+  const realTimer = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 10));
+
+  /** When the running test began, so one budget covers however many ticks it drives. */
+  let startedAt = 0;
+  beforeEach(() => {
+    startedAt = Date.now();
+  });
 
   /**
    * Drives one poll tick to completion, without waiting out the real 15s interval.
@@ -238,38 +284,46 @@ describe('the catch-up drain', () => {
    * a drain off at its next page boundary, which on a half-read log is a test that fails with the
    * tail of the log missing.
    *
-   * `landed` is what this tick is expected to leave behind — the last write of the drain, not the
-   * absence of one. Waiting for `fetch` to go quiet instead is a race the drain loses: a page's
-   * write is unbounded, and any window short enough to keep the suite quick is one a loaded runner
-   * can exceed. Once `landed` holds, the remaining wait is bounded — a drain that wrongly carries
-   * on asks for its next page a few turns of the event loop after the write that `landed` saw, not
-   * a page-write later.
+   * `landed` asserts what this tick is expected to leave behind, and is retried until it holds —
+   * so whatever it was still waiting for when the budget ran out is what gets reported. Waiting on
+   * the drain's own writes is what keeps that wait sound: a page write is unbounded, so a window
+   * sized to "nothing has happened lately" is one a loaded runner exceeds, and the drain is then
+   * cut off mid-log.
+   *
+   * By the time `landed` holds there is no write in flight, which is also what keeps a drain from
+   * running on into the next test's `fetch` stub: `stop()` lands on a drain sitting at its loop
+   * condition rather than part-way through a page.
    *
    * The wait runs on real timers throughout. Advancing the fake interval here would fire a second
    * tick, and the request that tick makes is indistinguishable from the drain running long.
    */
-  async function tick(running: Sync, landed: () => Promise<boolean>): Promise<void> {
+  async function tick(running: Sync, landed: () => Promise<void>): Promise<void> {
     vi.stubGlobal(
       'EventSource',
       class {
         close(): void {}
       },
     );
-    // Only the interval is faked; fake-indexeddb schedules its own work on real timers.
+    // Only the interval is faked: fake-indexeddb and the waits below both need a real setTimeout.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       await running.start();
       await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
-      // Inside vitest's own 5s test timeout, so a drain that stalls says which wait it stalled on
-      // rather than reporting the whole test as slow. A drain of a few pages is well under a second.
-      const deadline = Date.now() + 4_000;
-      while (!(await landed())) {
-        if (Date.now() > deadline)
-          throw new Error('the drain never reached the state it was given');
-        await turn();
+      // Budgeted per test rather than per tick, and inside vitest's own 5s timeout, so a test that
+      // drives two ticks still fails with the assertion the drain was short of rather than with a
+      // bare timeout. The slowest drain here runs well under a second on a saturated runner.
+      const deadline = startedAt + 3_000;
+      for (;;) {
+        try {
+          await landed();
+          break;
+        } catch (stillWaiting) {
+          if (Date.now() > deadline) throw stillWaiting;
+          await realTimer();
+        }
       }
-      await turn();
-      await turn();
+      await realTimer();
+      await realTimer();
     } finally {
       running.stop();
       vi.useRealTimers();
@@ -277,12 +331,27 @@ describe('the catch-up drain', () => {
   }
 
   /** The drain has read the log through to `seq`: the cursor only names reports already stored. */
-  const readTo = (seq: number) => async (): Promise<boolean> =>
-    (await getMeta<number>(db, cursorKey(HUNT))) === seq;
+  const readTo = (seq: number) => async (): Promise<void> => {
+    expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(seq);
+  };
 
-  /** A drain with nothing to store leaves no write to wait for, only the request it made. */
-  const asked = (requested: readonly number[]) => async (): Promise<boolean> =>
-    requested.length > 0;
+  /**
+   * The drain has stopped asking for pages.
+   *
+   * For a relay whose pages are empty, and only there: with nothing to store there is no write to
+   * wait on, and equally nothing unbounded between one request and the next, so two readings that
+   * agree mean the drain is done rather than mid-page. Waiting on the first request instead would
+   * make these tests blind to a drain that keeps asking at any pace slower than the tail below —
+   * which is the whole of what they check.
+   */
+  const stoppedAsking = (requested: readonly number[]) => {
+    let previous = -1;
+    return async (): Promise<void> => {
+      const before = previous;
+      previous = requested.length;
+      expect(requested.length, 'the drain is still asking for pages').toBe(before);
+    };
+  };
 
   it('reads a log of several pages through to the end, every report exactly once', async () => {
     const total = PAGE * 2 + 7;
@@ -291,12 +360,11 @@ describe('the catch-up drain', () => {
 
     await tick(
       sync({ onReports: (reports) => delivered.push(...reports.map((r) => r.id)) }),
-      async () => delivered.length === total,
+      async () => expect(delivered).toHaveLength(total),
     );
 
     // One request per page and one cursor walk: 0, 500, 1000.
     expect(requested).toEqual([0, PAGE, PAGE * 2]);
-    expect(delivered).toHaveLength(total);
     expect(new Set(delivered).size).toBe(total);
     expect((await loadLog(db, HUNT)).size).toBe(total);
     expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(total);
@@ -311,12 +379,44 @@ describe('the catch-up drain', () => {
 
     await tick(running, readTo(total));
 
-    expect(await getMeta<number>(db, cursorKey(HUNT))).toBe(total);
     // A second drain from that cursor asks for what comes after the log, and finds nothing.
     const second = pagedRelay(total);
-    await tick(running, asked(second.requested));
+    await tick(running, stoppedAsking(second.requested));
     expect(second.requested).toEqual([total]);
     expect((await loadLog(db, HUNT)).size).toBe(total);
+  });
+
+  it('leaves the cursor alone when the page it read could not be stored', async () => {
+    // The ordering inside `#absorb` is what makes a failed write cost a re-download rather than a
+    // report: a cursor raised before the write would name reports this device does not hold, and
+    // the next drain would start above them — the one outcome this codebase does not accept.
+    //
+    // Driven through `repair`, which reads pages through the same `#absorb` and is awaited, so the
+    // ordering is asserted without a drain to wait on.
+    const total = 3;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              reports: Array.from({ length: total }, (_, n) => ({
+                seq: n + 1,
+                received_at: n + 1,
+                body: report(n + 1),
+              })),
+              cursor: total,
+              more: false,
+            }),
+          ),
+        ),
+      ),
+    );
+
+    await sync({ db: outOfStorage() }).repair([]);
+
+    expect(await getMeta<number>(db, cursorKey(HUNT))).toBeUndefined();
+    expect((await loadLog(db, HUNT)).size).toBe(0);
   });
 
   it('resumes a drain that was cut off mid-log without re-reading the pages that landed', async () => {
@@ -374,7 +474,7 @@ describe('the catch-up drain', () => {
       }),
     );
 
-    await tick(sync(), asked(requested));
+    await tick(sync(), stoppedAsking(requested));
 
     expect(requested).toEqual([0]);
   });
