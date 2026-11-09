@@ -36,7 +36,7 @@ RUN touch src/main.rs src/lib.rs && cargo build --release
 # Distroless: no shell, no package manager, no apt, and a non-root default user. `cc` rather than
 # `base` because the binary links libgcc_s.so.1, which `base` does not carry. CA certificates ship
 # in the image already. The tag is pinned by index digest — see .github/dependabot.yml for why.
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:3ee00291cf386ec52a552e6a858d555debd74776eb4bfa53fa3df2cd6677515e AS runtime
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:cc66d222f0a7ec996b78a99fe76a969bc80b539a5016ad866c14d1949bc6d0ab AS runtime
 WORKDIR /app
 COPY --from=server /app/target/release/foxmapper-server /usr/local/bin/foxmapper-server
 # Deliberately not `--chown`: the bundle lands root-owned and world-readable while the process runs
